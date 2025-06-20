@@ -42,7 +42,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- focus-trap -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/focus-trap/7.5.4/focus-trap.min.js"></script> {/* Ensure this loads */}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/focus-trap/7.5.4/focus-trap.min.js"></script>
 
     <style type="text/tailwindcss">
         @layer base {
@@ -131,54 +131,32 @@
     <script src="https://unpkg.com/dexie@3/dist/dexie.js"></script>
 
     <script type="module">
-        // --- GLOBAL ERROR HANDLER (Keep this for debugging other issues) ---
+        // --- GLOBAL ERROR HANDLER ---
         window.addEventListener('error', function (event) {
-            // ... (error handler code from previous version) ...
-            console.error('GLOBAL UNCAUGHT ERROR:', event.message, 'at', event.filename, ':', event.lineno);
+            console.error('GLOBAL UNCAUGHT ERROR:', event.message, 'at', event.filename, ':', event.lineno, event.error);
             const appDiv = document.getElementById('app');
-            if (appDiv && !document.querySelector('.critical-error-display')) { // Avoid multiple error messages
+            if (appDiv && !document.querySelector('.critical-error-display')) {
                 const errorDiv = document.createElement('div');
-                errorDiv.className = 'critical-error-display'; // Add a class to check if it exists
-                errorDiv.style.color = 'red';
-                errorDiv.style.backgroundColor = 'black';
-                errorDiv.style.padding = '20px';
-                errorDiv.style.border = '2px solid red';
-                errorDiv.style.position = 'fixed';
-                errorDiv.style.top = '10px';
-                errorDiv.style.left = '10px';
-                errorDiv.style.right = '10px';
-                errorDiv.style.zIndex = '9999';
+                errorDiv.className = 'critical-error-display';
+                errorDiv.style.cssText = 'color: red; background-color: black; padding: 20px; border: 2px solid red; position: fixed; top: 10px; left: 10px; right: 10px; z-index: 9999; font-size: 12px; white-space: pre-wrap; word-break: break-all;';
                 errorDiv.innerHTML = `
                     <h2>Critical Application Error!</h2>
                     <p>LogReel could not start. Please check the browser console for details.</p>
                     <p><strong>Error:</strong> ${event.message}</p>
                     <p><strong>File:</strong> ${event.filename}</p>
                     <p><strong>Line:</strong> ${event.lineno}</p>
+                    ${event.error && event.error.stack ? `<p><strong>Stack:</strong><br>${event.error.stack}</p>` : ''}
                 `;
-                if (document.body) {
-                    document.body.prepend(errorDiv);
-                } else {
-                     console.error("Could not display error on screen, body not ready.");
-                }
+                if (document.body) document.body.prepend(errorDiv);
             }
         });
         window.addEventListener('unhandledrejection', function (event) {
-            // ... (error handler code from previous version) ...
             console.error('GLOBAL UNHANDLED PROMISE REJECTION:', event.reason);
              const appDiv = document.getElementById('app');
             if (appDiv && !document.querySelector('.critical-error-display')) {
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'critical-error-display';
-                // ... (style it similarly)
-                errorDiv.style.color = 'orange'; /* ... */
-                errorDiv.style.backgroundColor = 'black';
-                errorDiv.style.padding = '20px';
-                errorDiv.style.border = '2px solid orange';
-                errorDiv.style.position = 'fixed';
-                errorDiv.style.top = '10px';
-                errorDiv.style.left = '10px';
-                errorDiv.style.right = '10px';
-                errorDiv.style.zIndex = '9999';
+                errorDiv.style.cssText = 'color: orange; background-color: black; padding: 20px; border: 2px solid orange; position: fixed; top: 10px; left: 10px; right: 10px; z-index: 9999; font-size: 12px; white-space: pre-wrap; word-break: break-all;';
                 errorDiv.innerHTML = `<h2>Unhandled Promise Rejection!</h2><p>${event.reason.message || event.reason}</p><pre>${event.reason.stack || ''}</pre>`;
                 if (document.body) document.body.prepend(errorDiv);
             }
@@ -187,8 +165,6 @@
 
         try {
             const { createApp, ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
-            // DO NOT DESTRUCTURE focusTrap HERE YET
-            // const { createFocusTrap } = window.focusTrap; // MOVED
 
             const db = new Dexie('LogReelDB');
             db.version(1).stores({
@@ -199,30 +175,18 @@
 
             const App = {
                 setup() {
-                    // --- DESTRUCTURE focusTrap HERE ---
-                    // This code runs when the 'App' component's setup function is called by Vue,
-                    // which is after the initial script parsing and DOM is more likely ready.
                     let createFocusTrap;
                     if (window.focusTrap && typeof window.focusTrap.createFocusTrap === 'function') {
                         createFocusTrap = window.focusTrap.createFocusTrap;
                     } else {
-                        // This is a fallback / error condition.
-                        console.error("FocusTrap library not found or createFocusTrap is not a function on window.focusTrap!");
-                        // You might want to implement a dummy createFocusTrap or throw an error
-                        // to prevent further issues if focus trapping is critical.
-                        // For now, modals might not trap focus correctly.
-                        createFocusTrap = () => ({ activate: () => {}, deactivate: () => {} }); // Dummy function
-                        // Or you could throw an error to halt execution if it's absolutely critical
-                        // throw new Error("FocusTrap library failed to load.");
+                        console.error("FocusTrap library not found or createFocusTrap is not a function on window.focusTrap! Modals will not trap focus.");
+                        createFocusTrap = () => ({ activate: () => {}, deactivate: () => {} });
                     }
-                    // --- END focusTrap DESTRUCTURING ---
-
 
                     const currentScreen = ref('projectDashboard');
                     const currentProjectId = ref(null);
                     const currentVideoId = ref(null);
 
-                    // ... (rest of your setup function code remains the same)
                     const projects = ref([]);
                     const videosInCurrentProject = ref([]);
                     const logsInCurrentProject = ref([]);
@@ -293,7 +257,6 @@
                         nextTick(() => {
                             if (isShown && newProjectModalElement.value) {
                                 if (!newProjectModalFocusTrap) {
-                                     // Ensure createFocusTrap is available
                                     if (typeof createFocusTrap !== 'function') {
                                         console.error("createFocusTrap is not a function. Modal focus trap will not work.");
                                         return;
@@ -361,28 +324,36 @@
                     const currentProject = computed(() => projects.value.find(p => p.id === currentProjectId.value));
                     const assemblySearchQuery = ref('');
 
+                    // MODIFIED loadAssemblyHubData for more logging
                     async function loadAssemblyHubData() {
                         if (!currentProjectId.value) return;
                         isLoading.value = true;
+                        console.log(`Attempting to load Assembly Hub data for projectId: ${currentProjectId.value}`);
                         try {
+                            console.log("Fetching videos from DB...");
                             const projectVideos = await db.videos
                                 .where('projectId').equals(currentProjectId.value)
                                 .orderBy('createdAt').toArray();
+                            console.log("Videos fetched:", projectVideos);
                             videosInCurrentProject.value = projectVideos;
 
+                            console.log("Fetching logs from DB...");
                             const projectLogs = await db.logs
                                 .where('projectId').equals(currentProjectId.value)
                                 .toArray();
+                            console.log("Logs fetched:", projectLogs);
                             logsInCurrentProject.value = projectLogs;
+                            console.log("Assembly Hub data loaded successfully.");
 
                         } catch (error) {
-                            console.error("Error loading assembly hub data:", error);
+                            console.error("Error loading assembly hub data:", error.name, error.message, error.stack, error); // Log full error object
                             showToast("Failed to load project data.", "error");
                             navigateTo('projectDashboard');
                         } finally {
                             isLoading.value = false;
                         }
                     }
+
 
                     watch(currentProjectId, (newVal) => {
                         if (newVal && currentScreen.value === 'assemblyHub') {
@@ -741,37 +712,20 @@
                     onMounted(() => {
                         (async () => {
                             try {
-                                // console.log("LogReel: App Mounting..."); // Less verbose toasts now
-                                // showToast("LogReel: App Mounting...", "info", 2000);
-
                                 await loadProjects();
-                                // console.log("LogReel: Projects loaded (or attempted).");
-                                // showToast("LogReel: Projects loaded (or attempted).", "info", 2000);
-
-
                                 if (navigator.storage && navigator.storage.persist) {
-                                    // console.log("LogReel: Checking storage persistence...");
                                     if (!await navigator.storage.persisted()) {
                                         const result = await navigator.storage.persist();
-                                        // console.log(`LogReel: Storage persistence request: ${result}`);
-                                        // showToast(`Storage persist request: ${result}`, result ? "success" : "warning", 4000);
                                         if(!result) showToast("Offline storage may not be persistent.", "info", 7000);
-                                    } else {
-                                        // console.log("LogReel: Storage is persistent.");
-                                        // showToast("Storage is persistent.", "info", 3000);
                                     }
                                 } else {
-                                    // console.warn("LogReel: Persistent storage API not available.");
                                     showToast("Persistent storage API not available from this context.", "warning", 7000);
                                 }
-                                // console.log("LogReel: Mount sequence complete.");
-                                // showToast("LogReel: Mount sequence complete.", "success", 2000);
                             } catch (e) {
                                 console.error("LogReel: CRITICAL ERROR IN ONMOUNTED", e);
                                 showToast(`CRITICAL Mount Error: ${e.message}. Check console.`, "error", 15000);
                             }
                         })();
-
                         window.addEventListener('keydown', handleKeydown);
                     });
 
@@ -781,9 +735,9 @@
                         if (playSelectsVideoSrc.value) URL.revokeObjectURL(playSelectsVideoSrc.value);
                     });
 
-                    return { // ... (rest of your return object)
+                    return { /* ... */
                         currentScreen, currentProjectId, currentVideoId, isLoading, toastMessages,
-                        projects, videosInCurrentProject, logsForCurrentVideo,
+                        projects, videosInCurrentProject, logsInCurrentProject, logsForCurrentVideo,
                         newProjectName, showNewProjectModal, newProjectModalElement,
                         currentProject, assemblySearchQuery, filteredVideos, expandedVideoLogs,
                         currentVideoDetails, videoPlayerRef, videoSrc, currentTime, duration, isPlaying,
@@ -798,6 +752,7 @@
                         openPlaySelectsModal, closePlaySelectsModal, handlePlaySelectsTimeUpdate, handlePlaySelectsLoadedData,
                     };
                 },
+                // IMPORTANT: Manually remove the "{/* Ensure this loads */}" comment from the start of your template string below if it's there.
                 template: `
                     <!-- Toast Notifications Container -->
                     <div aria-live="assertive" class="fixed inset-0 flex flex-col items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-end z-[100]">
@@ -1101,16 +1056,7 @@
             if (appDiv && !document.querySelector('.critical-error-display')) {
                  const errorDiv = document.createElement('div');
                  errorDiv.className = 'critical-error-display';
-                 // ... styles for errorDiv
-                errorDiv.style.color = 'red';
-                errorDiv.style.backgroundColor = 'black';
-                errorDiv.style.padding = '20px';
-                errorDiv.style.border = '2px solid red';
-                errorDiv.style.position = 'fixed';
-                errorDiv.style.top = '10px';
-                errorDiv.style.left = '10px';
-                errorDiv.style.right = '10px';
-                errorDiv.style.zIndex = '9999';
+                 errorDiv.style.cssText = 'color: red; background-color: black; padding: 20px; border: 2px solid red; position: fixed; top: 10px; left: 10px; right: 10px; z-index: 9999; font-size: 12px; white-space: pre-wrap; word-break: break-all;';
                 errorDiv.innerHTML = `<h2>FATAL ERROR: Application could not start.</h2>
                     <p>Please check the browser console for details.</p>
                     <p><strong>Error:</strong> ${e.message}</p>
