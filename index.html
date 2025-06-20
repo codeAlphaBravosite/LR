@@ -1,1381 +1,2314 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogReel - Professional Video Logging</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Phosphor Icons -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <!-- Dexie.js -->
-    <script src="https://unpkg.com/dexie@3/dist/dexie.js"></script> <!-- Dexie 3.x -->
-    <!-- focus-trap -->
-    <script src="https://unpkg.com/focus-trap@7.5.4/dist/focus-trap.umd.js"></script>
-    <!-- Vue.js 3 -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- Vue Router -->
-    <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LogReel - Professional Video Logging</title>
 
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0c0a09; /* stone-950 */
-            color: #e7e5e4; /* stone-200 (approx for stone-100/200) */
-            overscroll-behavior: none; /* Prevents pull-to-refresh on mobile */
-        }
-        /* Custom scrollbar for webkit browsers */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #1c1917; /* stone-900 */
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #44403c; /* stone-700 */
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #57534e; /* stone-600 */
-        }
-        /* Base styles using @apply (Tailwind JIT CDN will process this) */
-        .btn {
-            @apply px-4 py-2 rounded-md font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-stone-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
-        }
-        .btn-primary {
-            @apply bg-indigo-600 hover:bg-indigo-700 text-white focus:ring-indigo-500;
-        }
-        .btn-secondary {
-            @apply bg-stone-700 hover:bg-stone-600 text-stone-200 focus:ring-stone-500;
-        }
-        .btn-danger {
-            @apply bg-red-600 hover:bg-red-700 text-white focus:ring-red-500;
-        }
-        .card {
-            @apply bg-stone-900 rounded-lg shadow-md p-4 sm:p-6;
-        }
-        .input-field {
-            @apply bg-stone-800 border border-stone-700 text-stone-200 placeholder-stone-500 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5;
-        }
-        .label {
-            @apply block mb-2 text-sm font-medium text-stone-300;
-        }
-        /* Vue transitions */
-        .fade-enter-active, .fade-leave-active {
-            transition: opacity 0.3s ease;
-        }
-        .fade-enter-from, .fade-leave-to {
-            opacity: 0;
-        }
-        .slide-fade-enter-active {
-            transition: all 0.3s ease-out;
-        }
-        .slide-fade-leave-active {
-            transition: all 0.3s cubic-bezier(1, 0.5, 0.8, 1);
-        }
-        .slide-fade-enter-from,
-        .slide-fade-leave-to {
-            transform: translateY(20px);
-            opacity: 0;
-        }
-        /* Ensure touch targets are large enough */
-        button, [role="button"], input[type="checkbox"], input[type="radio"] {
-            min-height: 44px;
-            min-width: 44px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        /* Adjust for buttons that are meant to be smaller (like icon buttons) */
-        .btn-sm, .p-1 { /* specific classes for small buttons */
-            min-height: auto;
-            min-width: auto;
-        }
-        .btn { /* Padded buttons should be fine, but explicit flex align */
-             display: inline-flex; align-items: center; justify-content: center;
-        }
-        /* Phosphor icons size */
-        i.ph, i.ph-bold, i.ph-fill, i.ph-light {
-             line-height: 1; /* Helps with alignment */
-        }
-    </style>
+  <!-- React 18 -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Zustand for State Management -->
+  <script type="module">
+    import { create } from 'https://unpkg.com/zustand@4.4.7/esm/index.js';
+    window.zustand = { create }; // Make it globally available for the Babel script
+    
+    import { subscribeWithSelector } from 'https://unpkg.com/zustand@4.4.7/esm/middleware.js';
+    window.zustandMiddleware = { subscribeWithSelector };
+  </script>
+
+  <!-- Dexie.js for IndexedDB -->
+  <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Lucide React Icons -->
+  <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
+
+  <!-- Framer Motion for Animations -->
+  <script src="https://unpkg.com/framer-motion@10/dist/framer-motion.js"></script>
+
+  <!-- React Hot Toast for Notifications -->
+  <script src="https://unpkg.com/react-hot-toast@2.4.1/dist/index.umd.js"></script>
+
+  <!-- Focus Trap React for Accessibility -->
+  <script src="https://unpkg.com/focus-trap-react@10.2.3/dist/focus-trap-react.umd.js"></script>
+
+  <style>
+    :root {
+      --background-primary: #0a0a0a;
+      --background-secondary: #1a1a1a;
+      --background-tertiary: #2a2a2a;
+      --accent-primary: #3b82f6;
+      --accent-secondary: #8b5cf6;
+      --accent-success: #10b981;
+      --accent-warning: #f59e0b;
+      --accent-danger: #ef4444;
+      --text-primary: #ffffff;
+      --text-secondary: #a1a1aa;
+      --text-tertiary: #71717a;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--background-primary);
+      color: var(--text-primary);
+      overscroll-behavior: none;
+    }
+    .glassmorphism {
+      background: rgba(26, 26, 26, 0.6); /* --background-secondary with alpha */
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(42, 42, 42, 0.5); /* --background-tertiary with alpha */
+    }
+    /* Custom scrollbar for webkit browsers */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--background-secondary);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--accent-primary);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #2563eb; /* Darker blue */
+    }
+    .custom-video-controls::-webkit-media-controls-panel {
+      display: none !important;
+      opacity: 0 !important;
+    }
+    .custom-video-controls::-webkit-media-controls-play-button,
+    .custom-video-controls::-webkit-media-controls-timeline,
+    .custom-video-controls::-webkit-media-controls-current-time-display,
+    .custom-video-controls::-webkit-media-controls-time-remaining-display,
+    .custom-video-controls::-webkit-media-controls-mute-button,
+    .custom-video-controls::-webkit-media-controls-volume-slider,
+    .custom-video-controls::-webkit-media-controls-fullscreen-button {
+        display: none !important;
+        opacity: 0 !important;
+    }
+  </style>
 </head>
 <body>
-    <div id="app" class="antialiased">
-        <router-view v-slot="{ Component }">
-            <transition name="fade" mode="out-in">
-                <component :is="Component" />
-            </transition>
-        </router-view>
-        <toast-notifications></toast-notifications>
-    </div>
+  <div id="root"></div>
 
-    <script type="module">
-        const { createApp, ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
-        const { createRouter, createWebHashHistory, useRoute, useRouter } = VueRouter;
-        const Dexie = window.Dexie; // Dexie is global from CDN
-        const focusTrap = window.focusTrap; // focus-trap is global
+  <script type="text/babel">
+    // Make sure Zustand is loaded
+    if (!window.zustand || !window.zustand.create) {
+      console.error("Zustand not loaded. App will not run.");
+      document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px;">Error: Zustand not loaded. Please check console and ensure script order is correct.</div>';
+    } else {
+      // Initialize Tailwind CSS configuration
+      tailwind.config = {
+        darkMode: 'class', // Using class for manual toggle if needed, or stick to 'media'
+        theme: {
+          extend: {
+            colors: {
+              'bg-primary': 'var(--background-primary)',
+              'bg-secondary': 'var(--background-secondary)',
+              'bg-tertiary': 'var(--background-tertiary)',
+              'accent-primary': 'var(--accent-primary)',
+              'accent-secondary': 'var(--accent-secondary)',
+              'accent-success': 'var(--accent-success)',
+              'accent-warning': 'var(--accent-warning)',
+              'accent-danger': 'var(--accent-danger)',
+              'text-primary': 'var(--text-primary)',
+              'text-secondary': 'var(--text-secondary)',
+              'text-tertiary': 'var(--text-tertiary)',
+            },
+            fontFamily: {
+              inter: ['Inter', 'sans-serif'],
+            },
+            keyframes: {
+              skeleton: {
+                '0%, 100%': { opacity: 1 },
+                '50%': { opacity: 0.5 },
+              },
+            },
+            animation: {
+              skeleton: 'skeleton 1.5s ease-in-out infinite',
+            },
+          },
+        },
+        plugins: [],
+      };
 
-        // --- Database Setup (Dexie) ---
-        const db = new Dexie('LogReelDB');
-        db.version(1).stores({
-            projects: '++id, name, createdAt',
-            videos: '++id, projectId, filename, createdAt, isImportant, &[projectId+filename]',
-            logs: '++id, videoId, markIn, createdAt, &[videoId+markIn]'
-        });
+      // Ensure libraries are available
+      const { create } = window.zustand;
+      const { subscribeWithSelector } = window.zustandMiddleware;
+      const { default: Dexie } = window.Dexie;
+      const { 
+        createElement, useState, useEffect, useCallback, useMemo, useRef, Fragment, memo, lazy, Suspense 
+      } = React;
+      const { render } = ReactDOM;
+      const { 
+        Play, Pause, Settings, PlusCircle, Trash2, Edit3, Search, List, Grid, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Maximize, Minimize, Star, FileVideo, Clock, Tag, Type, ChevronsUpDown, Eye, EyeOff, UploadCloud, Download, AlertTriangle, Info, CheckCircle, Save, Copy, Film, Scissors, SkipForward, SkipBack, Rewind, FastForward, Volume2, VolumeX, Maximize2, Minimize2, ExternalLink, Columns, Layers, Palette, FolderOpen, MoreVertical, ThumbsUp
+      } = lucideReact; // Lucide icons are globally available via lucideReact object
+      const { motion, AnimatePresence } = window.FramerMotion;
+      const { Toaster, toast } = reactHotToast;
+      const FocusTrap = window.FocusTrapReact;
 
-        // --- Global State / Services ---
-        const toastStore = reactive({
-            toasts: [],
-            addToast(message, type = 'success', duration = 3000) {
-                const id = Date.now() + Math.random();
-                this.toasts.push({ id, message, type });
-                setTimeout(() => {
-                    this.toasts = this.toasts.filter(t => t.id !== id);
-                }, duration);
-            }
-        });
+      // === Constants ===
+      const APP_NAME = "LogReel";
+      const SCREENS = {
+        PROJECT_DASHBOARD: 'projects',
+        ASSEMBLY_HUB: 'project',
+        LOGGING_STATION: 'video',
+      };
 
-        // Helper function for File System Access API permissions
-        async function verifyPermission(fileHandle, readWrite = false) {
-            if (!fileHandle || typeof fileHandle.queryPermission !== 'function') {
-                console.warn('Invalid fileHandle or queryPermission not available.');
-                return false; // Or throw an error, depending on how you want to handle this
-            }
-            const options = {};
-            if (readWrite) {
-                options.mode = 'readwrite';
-            }
-            // Check current permission status
-            if ((await fileHandle.queryPermission(options)) === 'granted') {
-                return true;
-            }
-            // If not granted, request permission
-            if ((await fileHandle.requestPermission(options)) === 'granted') {
-                return true;
-            }
-            // Permission not granted
-            return false;
+      // === Animation Definitions ===
+      const animations = {
+        pageTransition: {
+          initial: { opacity: 0, x: 20 },
+          animate: { opacity: 1, x: 0 },
+          exit: { opacity: 0, x: -20 },
+          transition: { duration: 0.2, ease: 'easeOut' }
+        },
+        modalTransition: {
+          initial: { opacity: 0, scale: 0.95 },
+          animate: { opacity: 1, scale: 1 },
+          exit: { opacity: 0, scale: 0.95 },
+          transition: { duration: 0.15 }
+        },
+        listItem: {
+          initial: { opacity: 0, y: 10 },
+          animate: { opacity: 1, y: 0 },
+          exit: { opacity: 0, y: -10 },
+          transition: { duration: 0.2 }
         }
+      };
+      
+      // === Helper Functions ===
+      const formatDuration = (totalSeconds, showMilliseconds = false) => {
+        if (isNaN(totalSeconds) || totalSeconds < 0) return '00:00:00';
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = Math.floor(totalSeconds % 60);
+        const milliseconds = showMilliseconds ? Math.floor((totalSeconds % 1) * 1000).toString().padStart(3, '0') : '';
+
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}${showMilliseconds && milliseconds ? '.' + milliseconds : ''}`;
+      };
+
+      const formatFileSize = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      };
+
+      const debounce = (func, delay) => {
+        let timeout;
+        return (...args) => {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(this, args), delay);
+        };
+      };
+
+      const generateId = () => Date.now() + Math.random().toString(36).substring(2, 9);
+      
+      // === Icon Component ===
+      const Icon = ({ name, size = 20, className = "" }) => {
+        const LucideIcon = lucideReact[name];
+        if (!LucideIcon) {
+          console.warn(`Icon "${name}" not found.`);
+          return <lucideReact.HelpCircle size={size} className={className} />; // Fallback icon
+        }
+        return <LucideIcon size={size} className={className} />;
+      };
+
+      // === Database Setup (Dexie) ===
+      const db = new Dexie('LogReelDB');
+      db.version(2).stores({ // Increased version for fileHandle
+        projects: '++id, name, createdAt, updatedAt', // removed videoCount, totalDuration (will be computed on load or dynamically)
+        videos: '++id, projectId, filename, &fileHandle, fileSize, duration, isImportant, createdAt, updatedAt', // thumbnailBlob removed for simplicity, logCount computed
+        logs: '++id, videoId, notes, rating, keywords, markIn, markOut, createdAt, updatedAt, color',
+        settings: '++id, &key, value' // Key is unique
+      }).upgrade(tx => {
+        // Example upgrade path if needed in the future
+        // For version 2, if there was a version 1 without fileHandle unique index:
+        // No specific data migration needed here for making fileHandle unique if it wasn't before,
+        // but new constraints apply. If old data violates this, it would need manual cleanup or a migration script.
+      });
+
+      // === State Management (Zustand) ===
+      const useUIStore = create(subscribeWithSelector((set, get) => ({
+        currentScreen: SCREENS.PROJECT_DASHBOARD,
+        currentProjectId: null,
+        currentVideoId: null,
+        searchQuery: '',
+        isLoading: true,
+        isModalOpen: null, // e.g., 'newProject', 'editProject', 'playSelects'
+        modalProps: {},
+        notifications: [],
+        globalError: null,
+        theme: 'dark', // Example setting
         
-        // Helper to format timecodes
-        const formatTimecode = (seconds, showHours = false, showMilliseconds = true) => {
-            if (isNaN(seconds) || seconds === null || seconds < 0) return showMilliseconds ? '00:00.000' : '00:00';
-            const hh = Math.floor(seconds / 3600);
-            const mm = Math.floor((seconds % 3600) / 60);
-            const ss = Math.floor(seconds % 60);
-            const ms = Math.floor((seconds - Math.floor(seconds)) * 1000);
+        setLoading: (isLoading) => set({ isLoading }),
+        navigateTo: (screen, projectId = null, videoId = null) => {
+          set({ currentScreen: screen, currentProjectId: projectId, currentVideoId: videoId, isLoading: true });
+          // Update URL hash for basic routing/deep linking
+          let hash = `#${screen}`;
+          if (projectId) hash += `/${projectId}`;
+          if (videoId) hash += `/${videoId}`;
+          window.location.hash = hash;
+        },
+        openModal: (modalName, props = {}) => set({ isModalOpen: modalName, modalProps: props }),
+        closeModal: () => set({ isModalOpen: null, modalProps: {} }),
+        setGlobalError: (error) => set({ globalError: error ? (error.message || String(error)) : null }),
+      })));
 
-            let parts = [
-                mm.toString().padStart(2, '0'),
-                ss.toString().padStart(2, '0')
-            ];
-            if (showHours || hh > 0) {
-                parts.unshift(hh.toString().padStart(2, '0'));
+      const useProjectStore = create((set, get) => ({
+        projects: [],
+        currentProject: null, // Detailed view of current project
+        fetchProjects: async () => {
+          useUIStore.getState().setLoading(true);
+          try {
+            const projects = await db.projects.orderBy('updatedAt').reverse().toArray();
+            // Compute videoCount and totalDuration for each project
+            const projectsWithStats = await Promise.all(projects.map(async project => {
+                const videos = await db.videos.where('projectId').equals(project.id).toArray();
+                const videoCount = videos.length;
+                const totalDuration = videos.reduce((sum, v) => sum + (v.duration || 0), 0);
+                return { ...project, videoCount, totalDuration };
+            }));
+            set({ projects: projectsWithStats });
+          } catch (error) {
+            console.error("Failed to fetch projects:", error);
+            toast.error("Failed to load projects.");
+            useUIStore.getState().setGlobalError(error);
+          } finally {
+            useUIStore.getState().setLoading(false);
+          }
+        },
+        addProject: async (name, description) => {
+          try {
+            const newProject = { 
+              name, 
+              description, 
+              createdAt: new Date(), 
+              updatedAt: new Date(),
+              // videoCount and totalDuration will be 0 initially or computed
+            };
+            const id = await db.projects.add(newProject);
+            // Re-fetch or add to local state
+            await get().fetchProjects(); 
+            toast.success(`Project "${name}" created!`);
+            return { ...newProject, id };
+          } catch (error) {
+            console.error("Failed to add project:", error);
+            toast.error("Failed to create project.");
+            useUIStore.getState().setGlobalError(error);
+            return null;
+          }
+        },
+        updateProject: async (id, updates) => {
+          try {
+            await db.projects.update(id, { ...updates, updatedAt: new Date() });
+            await get().fetchProjects(); // Re-fetch to update list
+            if (get().currentProject && get().currentProject.id === id) {
+                set(state => ({ currentProject: { ...state.currentProject, ...updates, updatedAt: new Date() }}));
             }
-            let timeString = parts.join(':');
-            if (showMilliseconds) {
-                timeString += `.${ms.toString().padStart(3, '0')}`;
+            toast.success("Project updated.");
+          } catch (error) {
+            console.error("Failed to update project:", error);
+            toast.error("Failed to update project.");
+            useUIStore.getState().setGlobalError(error);
+          }
+        },
+        deleteProject: async (id) => {
+          try {
+            // Also delete associated videos and logs
+            const videosToDelete = await db.videos.where('projectId').equals(id).toArray();
+            for (const video of videosToDelete) {
+              await db.logs.where('videoId').equals(video.id).delete();
             }
-            return timeString;
+            await db.videos.where('projectId').equals(id).delete();
+            await db.projects.delete(id);
+            await get().fetchProjects(); // Re-fetch
+            toast.success("Project and its contents deleted.");
+          } catch (error) {
+            console.error("Failed to delete project:", error);
+            toast.error("Failed to delete project.");
+            useUIStore.getState().setGlobalError(error);
+          }
+        },
+        fetchProjectById: async (id) => {
+          useUIStore.getState().setLoading(true);
+          try {
+            const project = await db.projects.get(id);
+            if (project) {
+              const videos = await db.videos.where('projectId').equals(project.id).toArray();
+              const videoCount = videos.length;
+              const totalDuration = videos.reduce((sum, v) => sum + (v.duration || 0), 0);
+              const projectWithStats = { ...project, videoCount, totalDuration, videos };
+              set({ currentProject: projectWithStats });
+              return projectWithStats;
+            } else {
+              throw new Error("Project not found");
+            }
+          } catch (error) {
+            console.error("Failed to fetch project:", error);
+            toast.error(`Failed to load project (ID: ${id}).`);
+            useUIStore.getState().navigateTo(SCREENS.PROJECT_DASHBOARD); // Navigate back
+            useUIStore.getState().setGlobalError(error);
+            return null;
+          } finally {
+            useUIStore.getState().setLoading(false);
+          }
+        },
+      }));
+
+      const useVideoStore = create((set, get) => ({
+        videos: [], // Videos for the current project
+        currentVideo: null, // Detailed view of current video with logs
+        fetchVideosForProject: async (projectId) => {
+          if (!projectId) {
+            set({ videos: [] });
+            return;
+          }
+          useUIStore.getState().setLoading(true);
+          try {
+            const videos = await db.videos.where('projectId').equals(projectId).sortBy('createdAt');
+            const videosWithStats = await Promise.all(videos.map(async video => {
+                const logCount = await db.logs.where('videoId').equals(video.id).count();
+                return { ...video, logCount };
+            }));
+            set({ videos: videosWithStats });
+            // Update project stats in projectStore if currentProject is loaded
+            const projectStore = useProjectStore.getState();
+            if (projectStore.currentProject && projectStore.currentProject.id === projectId) {
+                const videoCount = videos.length;
+                const totalDuration = videos.reduce((sum, v) => sum + (v.duration || 0), 0);
+                projectStore.updateProject(projectId, { videoCount, totalDuration }); // This might re-trigger fetch
+            }
+          } catch (error) {
+            console.error("Failed to fetch videos:", error);
+            toast.error("Failed to load videos for project.");
+            useUIStore.getState().setGlobalError(error);
+          } finally {
+            useUIStore.getState().setLoading(false);
+          }
+        },
+        addVideo: async (projectId, fileHandle) => {
+          try {
+            const file = await fileHandle.getFile();
+            // Check if video already exists by fileHandle (if possible with Dexie query, or by name/size as fallback)
+            // For simplicity, we'll assume fileHandle is unique enough. Dexie can enforce this with `&fileHandle` in schema.
+            // If `fileHandle` cannot be directly queried for uniqueness like this, use filename+size in a compound index.
+            const existingVideoByHandle = await db.videos.get({ fileHandle });
+            if(existingVideoByHandle && existingVideoByHandle.projectId === projectId) {
+                toast.error(`Video "${file.name}" already exists in this project.`);
+                return null;
+            }
+
+            // Get video duration
+            let duration = 0;
+            const videoElementForDuration = document.createElement('video');
+            videoElementForDuration.preload = 'metadata';
+            const url = URL.createObjectURL(file);
+            
+            const durationPromise = new Promise((resolve, reject) => {
+              videoElementForDuration.onloadedmetadata = () => {
+                URL.revokeObjectURL(url);
+                resolve(videoElementForDuration.duration);
+              };
+              videoElementForDuration.onerror = (e) => {
+                URL.revokeObjectURL(url);
+                console.error("Error loading video for duration:", e);
+                reject(new Error("Could not read video metadata."));
+              };
+              videoElementForDuration.src = url;
+            });
+
+            try {
+              duration = await durationPromise;
+            } catch (err) {
+              toast.error(`Could not read metadata for ${file.name}. Adding with 0 duration.`);
+            }
+
+            const newVideo = {
+              projectId,
+              filename: file.name,
+              fileHandle, // Store the handle
+              fileSize: file.size,
+              duration: duration,
+              isImportant: false,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              // logCount will be 0 initially
+            };
+            const id = await db.videos.add(newVideo);
+            await get().fetchVideosForProject(projectId); // Re-fetch
+            useProjectStore.getState().fetchProjects(); // Update project counts on dashboard
+            toast.success(`Video "${file.name}" added.`);
+            return { ...newVideo, id };
+          } catch (error) {
+            console.error("Failed to add video:", error);
+            if (error.name === 'ConstraintError') {
+                 toast.error(`Video "${fileHandle.name}" might already exist across projects or could not be stored uniquely.`);
+            } else {
+                 toast.error("Failed to add video.");
+            }
+            useUIStore.getState().setGlobalError(error);
+            return null;
+          }
+        },
+        updateVideo: async (id, updates) => {
+          try {
+            await db.videos.update(id, { ...updates, updatedAt: new Date() });
+            const video = await db.videos.get(id);
+            if(video) await get().fetchVideosForProject(video.projectId); // Re-fetch for current project
+            if (get().currentVideo && get().currentVideo.id === id) {
+              set(state => ({ currentVideo: { ...state.currentVideo, ...updates, updatedAt: new Date() }}));
+            }
+            toast.success("Video details updated.");
+          } catch (error) {
+            console.error("Failed to update video:", error);
+            toast.error("Failed to update video details.");
+            useUIStore.getState().setGlobalError(error);
+          }
+        },
+        deleteVideo: async (id) => {
+          try {
+            const video = await db.videos.get(id);
+            if (!video) throw new Error("Video not found");
+            
+            await db.logs.where('videoId').equals(id).delete(); // Delete associated logs
+            await db.videos.delete(id);
+            
+            await get().fetchVideosForProject(video.projectId); // Re-fetch
+            useProjectStore.getState().fetchProjects(); // Update project counts on dashboard
+
+            if (get().currentVideo && get().currentVideo.id === id) {
+                set({ currentVideo: null }); // Clear if current video is deleted
+                 // Navigate away if on logging station for this video
+                if(useUIStore.getState().currentScreen === SCREENS.LOGGING_STATION) {
+                    useUIStore.getState().navigateTo(SCREENS.ASSEMBLY_HUB, video.projectId);
+                }
+            }
+            toast.success("Video and its logs deleted.");
+          } catch (error) {
+            console.error("Failed to delete video:", error);
+            toast.error("Failed to delete video.");
+            useUIStore.getState().setGlobalError(error);
+          }
+        },
+        fetchVideoById: async (id) => {
+          useUIStore.getState().setLoading(true);
+          try {
+            const video = await db.videos.get(id);
+            if (video) {
+              const logs = await db.logs.where('videoId').equals(id).sortBy('markIn');
+              const videoWithLogs = { ...video, logs, logCount: logs.length };
+              set({ currentVideo: videoWithLogs });
+              return videoWithLogs;
+            } else {
+              throw new Error("Video not found");
+            }
+          } catch (error) {
+            console.error("Failed to fetch video:", error);
+            toast.error(`Failed to load video (ID: ${id}).`);
+            useUIStore.getState().navigateTo(SCREENS.PROJECT_DASHBOARD); // Navigate back
+            useUIStore.getState().setGlobalError(error);
+            return null;
+          } finally {
+            useUIStore.getState().setLoading(false);
+          }
+        },
+        generateThumbnail: async (videoId, fileHandle) => {
+          // This is a placeholder for actual thumbnail generation logic
+          // Actual implementation would involve creating a video element, seeking, drawing to canvas
+          console.log(`Thumbnail generation requested for video ${videoId}`);
+          try {
+            const file = await fileHandle.getFile();
+            const video = document.createElement('video');
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            return new Promise((resolve, reject) => {
+              video.onloadeddata = () => {
+                video.currentTime = Math.min(1, video.duration / 2); // Seek to 1s or midpoint
+              };
+              video.onseeked = () => {
+                canvas.width = video.videoWidth / 5; // Smaller thumbnail
+                canvas.height = video.videoHeight / 5;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob(blob => {
+                  if (blob) {
+                    // db.videos.update(videoId, { thumbnailBlob: blob }); // Update in DB
+                    // For now, just return the blob URL
+                    resolve(URL.createObjectURL(blob)); 
+                  } else {
+                    reject(new Error("Canvas toBlob failed"));
+                  }
+                }, 'image/jpeg', 0.8);
+                URL.revokeObjectURL(video.src); // Clean up
+              };
+              video.onerror = (e) => {
+                URL.revokeObjectURL(video.src);
+                reject(new Error("Video error during thumbnail generation: " + e));
+              };
+              video.src = URL.createObjectURL(file);
+            });
+          } catch (error) {
+            console.error("Error generating thumbnail:", error);
+            toast.error("Could not generate thumbnail.");
+            return null; // Return a placeholder path or null
+          }
+        }
+      }));
+
+      const useLogStore = create((set, get) => ({
+        // Logs are primarily managed within useVideoStore.currentVideo.logs
+        // This store can hold actions or temporary log states if needed outside video context
+        addLog: async (videoId, logData) => {
+          try {
+            const newLog = { 
+              videoId, 
+              ...logData, 
+              createdAt: new Date(), 
+              updatedAt: new Date() 
+            };
+            const id = await db.logs.add(newLog);
+            // Re-fetch current video to update its logs array and logCount
+            const videoStore = useVideoStore.getState();
+            if (videoStore.currentVideo && videoStore.currentVideo.id === videoId) {
+              await videoStore.fetchVideoById(videoId);
+            }
+            // Also update logCount on the video list
+            await videoStore.fetchVideosForProject(useUIStore.getState().currentProjectId);
+            toast.success("Log saved.");
+            return { ...newLog, id };
+          } catch (error) {
+            console.error("Failed to add log:", error);
+            toast.error("Failed to save log.");
+            useUIStore.getState().setGlobalError(error);
+            return null;
+          }
+        },
+        updateLog: async (id, updates) => {
+          try {
+            await db.logs.update(id, { ...updates, updatedAt: new Date() });
+            const log = await db.logs.get(id);
+            // Re-fetch current video to update its logs array
+            const videoStore = useVideoStore.getState();
+            if (log && videoStore.currentVideo && videoStore.currentVideo.id === log.videoId) {
+              await videoStore.fetchVideoById(log.videoId);
+            }
+            toast.success("Log updated.");
+          } catch (error) {
+            console.error("Failed to update log:", error);
+            toast.error("Failed to update log.");
+            useUIStore.getState().setGlobalError(error);
+          }
+        },
+        deleteLog: async (id) => {
+          try {
+            const log = await db.logs.get(id);
+            if (!log) throw new Error("Log not found");
+            await db.logs.delete(id);
+            // Re-fetch current video to update its logs array and logCount
+            const videoStore = useVideoStore.getState();
+            if (videoStore.currentVideo && videoStore.currentVideo.id === log.videoId) {
+              await videoStore.fetchVideoById(log.videoId);
+            }
+            // Also update logCount on the video list
+            await videoStore.fetchVideosForProject(useUIStore.getState().currentProjectId);
+            toast.success("Log deleted.");
+          } catch (error) {
+            console.error("Failed to delete log:", error);
+            toast.error("Failed to delete log.");
+            useUIStore.getState().setGlobalError(error);
+          }
+        },
+      }));
+
+      // === UI Components ===
+
+      // --- Shared Components ---
+      const Button = ({ children, onClick, variant = 'primary', size = 'md', className = '', icon, disabled = false, ...props }) => {
+        const baseStyles = "font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-secondary transition-colors duration-150 flex items-center justify-center gap-2";
+        const variantStyles = {
+          primary: `bg-accent-primary hover:bg-blue-500 text-white focus:ring-accent-primary ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`,
+          secondary: `bg-bg-tertiary hover:bg-gray-700 text-text-secondary focus:ring-accent-secondary ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`,
+          danger: `bg-accent-danger hover:bg-red-500 text-white focus:ring-accent-danger ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`,
+          ghost: `bg-transparent hover:bg-bg-tertiary text-text-secondary focus:ring-accent-primary ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`,
+        };
+        const sizeStyles = {
+          sm: "px-3 py-1.5 text-sm",
+          md: "px-4 py-2 text-base",
+          lg: "px-6 py-3 text-lg",
         };
 
+        return (
+          <button
+            onClick={onClick}
+            className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+            disabled={disabled}
+            {...props}
+          >
+            {icon && <Icon name={icon} size={size === 'sm' ? 16 : 20} />}
+            {children}
+          </button>
+        );
+      };
+      
+      const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+        if (!isOpen) return null;
 
-        // --- Vue Components ---
+        const sizeClasses = {
+            sm: 'max-w-sm',
+            md: 'max-w-md',
+            lg: 'max-w-lg',
+            xl: 'max-w-xl',
+            '2xl': 'max-w-2xl',
+            full: 'max-w-full h-full'
+        };
 
-        const ToastNotifications = {
-            setup() {
-                return { toasts: computed(() => toastStore.toasts) };
-            },
-            template: `
-                <div class="fixed bottom-0 right-0 p-4 space-y-2 z-[100] max-w-xs w-full">
-                    <transition-group name="slide-fade" tag="div">
-                        <div v-for="toast in toasts" :key="toast.id" 
-                             :class="['p-3 rounded-md shadow-lg text-sm font-medium break-words', toast.type === 'success' ? 'bg-green-600 text-white' : toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white']">
-                            {{ toast.message }}
-                        </div>
-                    </transition-group>
+        return (
+          <FocusTrap focusTrapOptions={{ initialFocus: false }}>
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose} // Close on backdrop click
+            >
+              <motion.div
+                className={`bg-bg-secondary p-6 rounded-lg shadow-xl ${sizeClasses[size]} w-full m-4 overflow-y-auto max-h-[90vh]`}
+                initial={animations.modalTransition.initial}
+                animate={animations.modalTransition.animate}
+                exit={animations.modalTransition.exit}
+                transition={animations.modalTransition.transition}
+                onClick={(e) => e.stopPropagation()} // Prevent close on modal content click
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-text-primary">{title}</h2>
+                  <Button onClick={onClose} variant="ghost" size="sm" icon="X" aria-label="Close modal" />
                 </div>
-            `
+                {children}
+              </motion.div>
+            </motion.div>
+          </FocusTrap>
+        );
+      };
+
+      const Input = ({ label, type = "text", value, onChange, placeholder, className = "", ...props }) => (
+        <div className="w-full">
+          {label && <label className="block text-sm font-medium text-text-secondary mb-1">{label}</label>}
+          <input
+            type={type}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            className={`w-full bg-bg-tertiary text-text-primary border border-gray-600 rounded-md px-3 py-2 focus:ring-accent-primary focus:border-accent-primary outline-none ${className}`}
+            {...props}
+          />
+        </div>
+      );
+
+      const Textarea = ({ label, value, onChange, placeholder, rows = 3, className = "", ...props }) => (
+         <div className="w-full">
+          {label && <label className="block text-sm font-medium text-text-secondary mb-1">{label}</label>}
+          <textarea
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            rows={rows}
+            className={`w-full bg-bg-tertiary text-text-primary border border-gray-600 rounded-md px-3 py-2 focus:ring-accent-primary focus:border-accent-primary outline-none ${className}`}
+            {...props}
+          />
+        </div>
+      );
+
+      const DropdownMenu = ({ trigger, children, align = 'right' }) => {
+        const [isOpen, setIsOpen] = useState(false);
+        const dropdownRef = useRef(null);
+
+        useEffect(() => {
+          const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+              setIsOpen(false);
+            }
+          };
+          document.addEventListener("mousedown", handleClickOutside);
+          return () => document.removeEventListener("mousedown", handleClickOutside);
+        }, []);
+
+        return (
+          <div className="relative" ref={dropdownRef}>
+            <div onClick={() => setIsOpen(!isOpen)}>{trigger}</div>
+            <AnimatePresence>
+              {isOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`absolute z-20 mt-2 w-48 rounded-md shadow-lg bg-bg-tertiary ring-1 ring-black ring-opacity-5 focus:outline-none ${align === 'right' ? 'right-0' : 'left-0'}`}
+                >
+                  <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                    {React.Children.map(children, child => 
+                      React.cloneElement(child, { onClick: () => { child.props.onClick && child.props.onClick(); setIsOpen(false); } })
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      };
+
+      const DropdownItem = ({ children, onClick, icon, className = "" }) => (
+        <button
+          onClick={onClick}
+          className={`flex items-center w-full px-4 py-2 text-sm text-text-secondary hover:bg-gray-700 hover:text-text-primary ${className}`}
+          role="menuitem"
+        >
+          {icon && <Icon name={icon} size={16} className="mr-2" />}
+          {children}
+        </button>
+      );
+      
+      const SkeletonLoader = ({ className = "h-4 w-full" }) => (
+        <div className={`bg-bg-tertiary rounded animate-skeleton ${className}`}></div>
+      );
+
+      const StarRating = ({ rating, setRating, maxRating = 5, editable = true }) => {
+        const [hoverRating, setHoverRating] = useState(0);
+        return (
+          <div className="flex items-center">
+            {[...Array(maxRating)].map((_, index) => {
+              const starValue = index + 1;
+              return (
+                <button
+                  key={starValue}
+                  type="button"
+                  disabled={!editable}
+                  className={`text-2xl ${editable ? 'cursor-pointer' : 'cursor-default'}`}
+                  onClick={() => editable && setRating(starValue === rating ? 0 : starValue)} // Click again to clear rating
+                  onMouseEnter={() => editable && setHoverRating(starValue)}
+                  onMouseLeave={() => editable && setHoverRating(0)}
+                >
+                  <Icon 
+                    name="Star" 
+                    size={24} 
+                    className={
+                      (hoverRating || rating) >= starValue 
+                      ? 'text-yellow-400 fill-yellow-400' 
+                      : 'text-gray-500'
+                    } 
+                  />
+                </button>
+              );
+            })}
+          </div>
+        );
+      };
+
+      const ColorPicker = ({ selectedColor, onColorChange, colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#64748b'] }) => {
+        return (
+          <div className="flex space-x-2">
+            {colors.map(color => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => onColorChange(color)}
+                className={`w-6 h-6 rounded-full border-2 ${selectedColor === color ? 'border-text-primary scale-110' : 'border-transparent'} transition-all`}
+                style={{ backgroundColor: color }}
+                aria-label={`Select color ${color}`}
+              />
+            ))}
+             <input 
+                type="color" 
+                value={selectedColor || '#ffffff'} 
+                onChange={(e) => onColorChange(e.target.value)}
+                className="w-6 h-6 p-0 border-none rounded-full cursor-pointer"
+                title="Custom color"
+            />
+          </div>
+        );
+      };
+
+      // --- Project Dashboard Components ---
+      const ProjectCard = ({ project, onOpen, onQuickAdd, onEdit, onDelete }) => {
+        return (
+          <motion.div 
+            layout
+            initial={animations.listItem.initial}
+            animate={animations.listItem.animate}
+            exit={animations.listItem.exit}
+            className="bg-bg-secondary rounded-lg shadow-lg p-5 flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex justify-between items-start">
+                <h3 className="text-lg font-semibold text-text-primary mb-1">{project.name}</h3>
+                <DropdownMenu 
+                  trigger={<Button variant="ghost" size="sm" icon="MoreVertical" aria-label="Project options" />}
+                >
+                  <DropdownItem icon="Edit3" onClick={onEdit}>Edit Project</DropdownItem>
+                  {/* <DropdownItem icon="Copy" onClick={() => console.log("Duplicate project")}>Duplicate Project</DropdownItem> */}
+                  <DropdownItem icon="Trash2" onClick={onDelete} className="text-accent-danger">Delete Project</DropdownItem>
+                </DropdownMenu>
+              </div>
+              <p className="text-sm text-text-tertiary mb-3 h-10 overflow-hidden">{project.description || "No description."}</p>
+              <div className="text-xs text-text-tertiary space-y-1 mb-4">
+                <p><Icon name="FileVideo" size={14} className="inline mr-1" /> {project.videoCount || 0} videos</p>
+                <p><Icon name="Clock" size={14} className="inline mr-1" /> {formatDuration(project.totalDuration || 0)} total</p>
+                <p><Icon name="Layers" size={14} className="inline mr-1" /> Last modified: {new Date(project.updatedAt).toLocaleDateString()}</p>
+              </div>
+              {/* Mini thumbnails (Placeholder) */}
+              {/* <div className="flex space-x-1 mb-4 h-10 bg-bg-tertiary rounded">
+                {[...Array(Math.min(3, project.videoCount || 0))].map((_, i) => (
+                  <div key={i} className="w-1/3 h-full bg-gray-600 rounded-sm"></div>
+                ))}
+                {(project.videoCount || 0) === 0 && <p className="text-xs text-text-tertiary p-2">No videos yet</p>}
+              </div> */}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 mt-auto">
+              <Button onClick={onOpen} variant="primary" className="flex-1">Open Project</Button>
+              <Button onClick={onQuickAdd} variant="secondary" className="flex-1" icon="PlusCircle">Add Videos</Button>
+            </div>
+          </motion.div>
+        );
+      };
+
+      const ProjectFormModal = ({ isOpen, onClose, project, onSave }) => {
+        const [name, setName] = useState('');
+        const [description, setDescription] = useState('');
+
+        useEffect(() => {
+          if (project) {
+            setName(project.name);
+            setDescription(project.description || '');
+          } else {
+            setName('');
+            setDescription('');
+          }
+        }, [project, isOpen]);
+
+        const handleSubmit = (e) => {
+          e.preventDefault();
+          if (!name.trim()) {
+            toast.error("Project name cannot be empty.");
+            return;
+          }
+          onSave({ id: project?.id, name, description });
+          onClose();
         };
 
-        const Modal = {
-            props: {
-                isOpen: Boolean,
-                title: String,
-            },
-            emits: ['close'],
-            setup(props, { emit }) {
-                const modalRef = ref(null);
-                let trap = null;
+        return (
+          <Modal isOpen={isOpen} onClose={onClose} title={project ? "Edit Project" : "Create New Project"}>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input label="Project Name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Documentary Shoot - Day 1" required />
+              <Textarea label="Description (Optional)" value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief overview of the project" />
+              <div className="flex justify-end space-x-2 pt-2">
+                <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+                <Button type="submit" variant="primary">{project ? "Save Changes" : "Create Project"}</Button>
+              </div>
+            </form>
+          </Modal>
+        );
+      };
 
-                const close = () => emit('close');
+      const ProjectDashboardScreen = () => {
+        const { projects, fetchProjects, addProject, updateProject, deleteProject } = useProjectStore();
+        const { navigateTo, openModal, closeModal, isModalOpen, modalProps } = useUIStore();
+        const isLoading = useUIStore(state => state.isLoading);
+        const [searchTerm, setSearchTerm] = useState('');
+        const [sortOption, setSortOption] = useState('updatedAt_desc'); // e.g. name_asc, updatedAt_desc
 
-                watch(() => props.isOpen, (open) => {
-                    nextTick(() => {
-                        if (open && modalRef.value) {
-                            if (!trap) {
-                                trap = focusTrap.createFocusTrap(modalRef.value, {
-                                    onDeactivate: close, // Automatically call close when trap deactivates
-                                    clickOutsideDeactivates: true,
-                                    escapeDeactivates: true,
-                                    allowOutsideClick: true, // Allow clicks outside to propagate if clickOutsideDeactivates is false or handled
-                                });
-                            }
-                            trap.activate();
-                        } else if (trap && trap.active) {
-                             // trap.deactivate() will be called by focus-trap itself if escapeDeactivates or clickOutsideDeactivates is true
-                             // if close is called programmatically, the watch will trigger this else block.
-                             // Explicitly deactivate if close was called by other means than escape/outside click.
-                            trap.deactivate();
-                        }
-                    });
-                });
-                
-                onUnmounted(() => {
-                    if (trap && trap.active) {
-                        trap.deactivate();
-                    }
-                    trap = null; 
-                });
+        useEffect(() => {
+          fetchProjects();
+        }, []);
 
-                return { modalRef, close };
-            },
-            template: `
-                <transition name="fade">
-                    <div v-if="isOpen" class="fixed inset-0 bg-stone-950 bg-opacity-80 flex items-center justify-center z-40 p-4" @mousedown.self="close">
-                        <div ref="modalRef" class="card w-full max-w-md" role="dialog" aria-modal="true" :aria-labelledby="title ? 'modal-title' : null">
-                            <div class="flex justify-between items-center mb-4">
-                                <h2 v-if="title" id="modal-title" class="text-xl font-semibold text-stone-100">{{ title }}</h2>
-                                <button @click="close" class="text-stone-400 hover:text-stone-200 p-1 -m-1 btn-sm" aria-label="Close modal">
-                                    <i class="ph-bold ph-x text-2xl"></i>
-                                </button>
-                            </div>
-                            <slot></slot>
-                        </div>
-                    </div>
-                </transition>
-            `
+        const handleSaveProject = async (projectData) => {
+          if (projectData.id) {
+            await updateProject(projectData.id, { name: projectData.name, description: projectData.description });
+          } else {
+            await addProject(projectData.name, projectData.description);
+          }
         };
 
-        const ConfirmationModal = {
-            components: { Modal },
-            props: {
-                isOpen: Boolean,
-                title: String,
-                message: String,
-            },
-            emits: ['confirm', 'cancel'],
-            setup(props, { emit }) {
-                const confirm = () => emit('confirm');
-                const cancel = () => emit('cancel');
-                return { confirm, cancel };
-            },
-            template: `
-                <Modal :is-open="isOpen" :title="title" @close="cancel">
-                    <p class="text-stone-300 mb-6">{{ message }}</p>
-                    <div class="flex justify-end space-x-3">
-                        <button @click="cancel" class="btn btn-secondary">Cancel</button>
-                        <button @click="confirm" class="btn btn-danger">Confirm</button>
-                    </div>
-                </Modal>
-            `
+        const filteredAndSortedProjects = useMemo(() => {
+          let SPREAD_PROJECTS = [...projects]; // Ensure it's a new array for sorting
+          if (searchTerm) {
+            SPREAD_PROJECTS = SPREAD_PROJECTS.filter(p => 
+              p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+          }
+
+          const [key, order] = sortOption.split('_');
+          SPREAD_PROJECTS.sort((a, b) => {
+            let valA = a[key];
+            let valB = b[key];
+
+            if (key === 'name') {
+                valA = valA.toLowerCase();
+                valB = valB.toLowerCase();
+            }
+            if (key === 'updatedAt' || key === 'createdAt') {
+                valA = new Date(valA).getTime();
+                valB = new Date(valB).getTime();
+            }
+
+            if (valA < valB) return order === 'asc' ? -1 : 1;
+            if (valA > valB) return order === 'asc' ? 1 : -1;
+            return 0;
+          });
+          return SPREAD_PROJECTS;
+        }, [projects, searchTerm, sortOption]);
+
+        const openProject = (projectId) => {
+          navigateTo(SCREENS.ASSEMBLY_HUB, projectId);
         };
         
-        const ProjectCard = {
-            components: { ConfirmationModal },
-            props: ['project'],
-            emits: ['delete-project', 'project-deleted'], // Added project-deleted
-            setup(props, { emit }) {
-                const router = useRouter();
-                const videoCount = ref(0);
+        const handleQuickAddVideos = async (projectId) => {
+           // For quick add, go to assembly hub and trigger file dialog
+           navigateTo(SCREENS.ASSEMBLY_HUB, projectId, null, { autoOpenFileDialog: true });
+        };
+        
+        // Stats
+        const totalProjects = projects.length;
+        const totalVideosAcrossProjects = projects.reduce((sum, p) => sum + (p.videoCount || 0), 0);
 
-                const fetchVideoCount = async () => {
-                    if(props.project && props.project.id) {
-                       videoCount.value = await db.videos.where('projectId').equals(props.project.id).count();
-                    }
-                };
-
-                onMounted(fetchVideoCount);
-                watch(() => props.project.id, fetchVideoCount);
-
-                const navigateToProject = () => {
-                    router.push(`/project/${props.project.id}`);
-                };
-                
-                const showConfirmDelete = ref(false);
-
-                const deleteProjectConfirmed = async () => {
-                    emit('delete-project', props.project.id);
-                    showConfirmDelete.value = false;
-                };
-
-                return {
-                    navigateToProject,
-                    videoCount,
-                    formattedDate: computed(() => props.project && props.project.createdAt ? new Date(props.project.createdAt).toLocaleDateString() : 'N/A'),
-                    showConfirmDelete,
-                    deleteProjectConfirmed,
-                };
-            },
-            template: `
-                <div class="card cursor-pointer hover:shadow-indigo-500/30 transition-shadow group" @click="navigateToProject">
-                    <div class="flex justify-between items-start">
-                        <h3 class="text-xl font-semibold text-stone-100 mb-2 group-hover:text-indigo-400 transition-colors">{{ project.name }}</h3>
-                        <button @click.stop="showConfirmDelete = true" class="text-stone-500 hover:text-red-500 p-1 -m-1 btn-sm" aria-label="Delete project">
-                            <i class="ph ph-trash text-lg"></i>
-                        </button>
-                    </div>
-                    <p class="text-sm text-stone-400">Videos: {{ videoCount }}</p>
-                    <p class="text-xs text-stone-500 mt-2">Created: {{ formattedDate }}</p>
+        return (
+          <motion.div {...animations.pageTransition} className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+            {/* Header */}
+            <header className="sticky top-0 z-10 py-4 mb-6 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 glassmorphism">
+              <div className="flex flex-col sm:flex-row justify-between items-center max-w-7xl mx-auto">
+                <div className="flex items-center">
+                  <Icon name="Film" size={32} className="text-accent-primary mr-2" />
+                  <h1 className="text-3xl font-bold text-text-primary">{APP_NAME}</h1>
                 </div>
-                <ConfirmationModal
-                    :is-open="showConfirmDelete"
-                    title="Delete Project?"
-                    :message="'Are you sure you want to delete \'' + project.name + '\'? This will also delete all associated videos and logs.'"
-                    @confirm="deleteProjectConfirmed"
-                    @cancel="showConfirmDelete = false"
+                <div className="flex items-center gap-4 mt-4 sm:mt-0">
+                  <div className="text-sm text-text-secondary">
+                    <p>Projects: {totalProjects}</p>
+                    <p>Total Videos: {totalVideosAcrossProjects}</p>
+                  </div>
+                  <Button onClick={() => openModal('projectForm')} icon="PlusCircle" variant="primary">New Project</Button>
+                </div>
+              </div>
+            </header>
+
+            {/* Controls */}
+            <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
+              <div className="relative flex-grow w-full sm:w-auto">
+                <Input 
+                    type="search" 
+                    placeholder="Search projects..." 
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="pl-10"
                 />
-            `
-        };
+                <Icon name="Search" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              </div>
+              <select 
+                value={sortOption} 
+                onChange={e => setSortOption(e.target.value)}
+                className="bg-bg-tertiary text-text-primary border border-gray-600 rounded-md px-3 py-2 focus:ring-accent-primary focus:border-accent-primary outline-none"
+              >
+                <option value="updatedAt_desc">Sort by: Last Modified (Newest)</option>
+                <option value="updatedAt_asc">Sort by: Last Modified (Oldest)</option>
+                <option value="name_asc">Sort by: Name (A-Z)</option>
+                <option value="name_desc">Sort by: Name (Z-A)</option>
+                <option value="createdAt_desc">Sort by: Date Created (Newest)</option>
+                <option value="createdAt_asc">Sort by: Date Created (Oldest)</option>
+                <option value="videoCount_desc">Sort by: Video Count (Most)</option>
+                <option value="videoCount_asc">Sort by: Video Count (Least)</option>
+              </select>
+              {/* Grid/List toggle can be added here */}
+            </div>
 
-        const ProjectDashboard = {
-            components: { ProjectCard, Modal }, // ConfirmationModal is used by ProjectCard
-            setup() {
-                const projects = ref([]);
-                const showNewProjectModal = ref(false);
-                const newProjectName = ref('');
-                const router = useRouter();
-
-                const loadProjects = async () => {
-                    projects.value = await db.projects.orderBy('createdAt').reverse().toArray();
-                };
-
-                onMounted(loadProjects);
-
-                const createNewProject = async () => {
-                    if (!newProjectName.value.trim()) {
-                        toastStore.addToast('Project name cannot be empty.', 'error');
-                        return;
-                    }
-                    try {
-                        const projectId = await db.projects.add({
-                            name: newProjectName.value.trim(),
-                            createdAt: new Date()
-                        });
-                        newProjectName.value = '';
-                        showNewProjectModal.value = false;
-                        await loadProjects(); // Refresh list
-                        toastStore.addToast('Project created!', 'success');
-                        router.push(`/project/${projectId}`);
-                    } catch (error) {
-                        console.error("Failed to create project:", error);
-                        if (error.name === 'ConstraintError') {
-                             toastStore.addToast('A project with this name might already exist.', 'error');
-                        } else {
-                             toastStore.addToast('Failed to create project.', 'error');
+            {/* Project Grid/List */}
+            {isLoading && projects.length === 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(3)].map((_, i) => <SkeletonLoader key={i} className="h-60 rounded-lg" />)}
+              </div>
+            ) : filteredAndSortedProjects.length > 0 ? (
+              <AnimatePresence>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredAndSortedProjects.map(project => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      onOpen={() => openProject(project.id)}
+                      onQuickAdd={() => handleQuickAddVideos(project.id)}
+                      onEdit={() => openModal('projectForm', { project })}
+                      onDelete={() => {
+                        if (confirm(`Are you sure you want to delete project "${project.name}" and all its videos and logs? This cannot be undone.`)) {
+                          deleteProject(project.id);
                         }
-                    }
-                };
-
-                const handleDeleteProject = async (projectId) => {
-                    try {
-                        await db.transaction('rw', db.projects, db.videos, db.logs, async () => {
-                            const videosToDelete = await db.videos.where('projectId').equals(projectId).toArray();
-                            const videoIdsToDelete = videosToDelete.map(v => v.id);
-                            
-                            if (videoIdsToDelete.length > 0) {
-                                await db.logs.where('videoId').anyOf(videoIdsToDelete).delete();
-                            }
-                            await db.videos.where('projectId').equals(projectId).delete();
-                            await db.projects.delete(projectId);
-                        });
-                        toastStore.addToast('Project deleted.', 'success');
-                        loadProjects(); // Refresh list
-                    } catch (error) {
-                        console.error("Failed to delete project:", error);
-                        toastStore.addToast('Error deleting project.', 'error');
-                    }
-                };
-                
-                const exportData = async () => {
-                    try {
-                        const allProjects = await db.projects.toArray();
-                        const allVideos = await db.videos.toArray();
-                        const allLogs = await db.logs.toArray();
-
-                        const serializableVideos = allVideos.map(v => {
-                            const { fileHandle, ...rest } = v; // Exclude fileHandle
-                            return { ...rest, filename: v.filename }; 
-                        });
-                        
-                        const dataToExport = {
-                            appName: 'LogReel',
-                            version: '1.0.0',
-                            exportedAt: new Date().toISOString(),
-                            data: {
-                                projects: allProjects,
-                                videos: serializableVideos,
-                                logs: allLogs,
-                            }
-                        };
-
-                        const jsonString = JSON.stringify(dataToExport, null, 2);
-                        const blob = new Blob([jsonString], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `logreel_export_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                        toastStore.addToast('Data exported successfully.', 'success');
-                    } catch (error) {
-                        console.error('Error exporting data:', error);
-                        toastStore.addToast('Failed to export data.', 'error');
-                    }
-                };
-
-                return {
-                    projects,
-                    showNewProjectModal,
-                    newProjectName,
-                    createNewProject,
-                    handleDeleteProject,
-                    exportData
-                };
-            },
-            template: `
-                <div class="min-h-screen flex flex-col">
-                    <header class="bg-stone-900 shadow-md p-4 sticky top-0 z-20">
-                        <div class="container mx-auto flex flex-wrap justify-between items-center gap-2">
-                            <h1 class="text-2xl font-bold text-indigo-500">LogReel</h1>
-                            <div class="flex items-center space-x-2">
-                                <button @click="exportData" class="btn btn-secondary btn-sm md:btn-md py-1 px-2 md:py-2 md:px-4 text-xs md:text-sm">
-                                    <i class="ph ph-export mr-1"></i> Export Data
-                                </button>
-                                <button @click="showNewProjectModal = true" class="btn btn-primary btn-sm md:btn-md py-1 px-2 md:py-2 md:px-4 text-xs md:text-sm">
-                                    <i class="ph ph-plus-circle mr-1"></i> New Project
-                                </button>
-                            </div>
-                        </div>
-                    </header>
-
-                    <main class="flex-grow container mx-auto p-4 sm:p-6">
-                        <div v-if="projects.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                            <ProjectCard v-for="project in projects" :key="project.id" :project="project" @delete-project="handleDeleteProject" />
-                        </div>
-                        <div v-else class="text-center py-12">
-                            <i class="ph-light ph-folder-notch-open text-6xl text-stone-600 mb-4"></i>
-                            <p class="text-xl text-stone-400">No projects yet.</p>
-                            <p class="text-stone-500">Click "New Project" to get started.</p>
-                        </div>
-                    </main>
-
-                    <Modal :is-open="showNewProjectModal" title="Create New Project" @close="showNewProjectModal = false; newProjectName = '';">
-                        <form @submit.prevent="createNewProject">
-                            <div class="mb-4">
-                                <label for="projectName" class="label">Project Name</label>
-                                <input type="text" id="projectName" v-model="newProjectName" class="input-field" required autofocus>
-                            </div>
-                            <div class="flex justify-end">
-                                <button type="submit" class="btn btn-primary">Create Project</button>
-                            </div>
-                        </form>
-                    </Modal>
-                </div>
-            `
-        };
-
-        const VideoCard = {
-            components: { ConfirmationModal },
-            props: {
-                video: Object,
-                index: Number
-            },
-            emits: ['toggle-importance', 'delete-video', 'play-selects', 'log-video', 'view-logs-toggled'],
-            setup(props, { emit }) {
-                const logCount = ref(0);
-                const logs = ref([]);
-                const showLogs = ref(false);
-
-                const fetchLogData = async () => {
-                    if (!props.video || !props.video.id) return;
-                    logCount.value = await db.logs.where('videoId').equals(props.video.id).count();
-                    if (showLogs.value) {
-                         logs.value = await db.logs.where('videoId').equals(props.video.id).orderBy('markIn').toArray();
-                    }
-                };
-
-                onMounted(fetchLogData);
-                watch(() => [props.video.id, showLogs.value], fetchLogData, { deep: true });
-
-                const toggleImportance = () => {
-                    emit('toggle-importance', props.video.id, !props.video.isImportant);
-                };
-                
-                const showConfirmDelete = ref(false);
-                const deleteVideoConfirmed = () => {
-                     emit('delete-video', props.video.id);
-                     showConfirmDelete.value = false;
-                };
-
-                const logVideo = () => emit('log-video', props.video.id);
-                const playSelects = () => emit('play-selects', props.video.id);
-                
-                const toggleViewLogs = () => {
-                    showLogs.value = !showLogs.value;
-                    emit('view-logs-toggled', props.video.id, showLogs.value);
-                };
-                
-                return {
-                    logCount, logs, showLogs,
-                    toggleImportance, deleteVideoConfirmed, showConfirmDelete,
-                    logVideo, playSelects, toggleViewLogs,
-                    formatTimecode, // make it globally available or pass as prop if needed in template
-                };
-            },
-            template: `
-                <div class="card flex flex-col">
-                    <div class="flex justify-between items-start mb-3">
-                        <div class="flex items-center space-x-2 min-w-0"> <!-- min-w-0 for truncate -->
-                            <span class="text-sm text-stone-500 shrink-0">{{ index + 1 }}.</span>
-                            <h4 class="text-lg font-medium text-stone-200 truncate" :title="video.filename">{{ video.filename }}</h4>
-                        </div>
-                        <div class="flex items-center space-x-1 shrink-0">
-                            <button @click.stop="toggleImportance" class="p-1 btn-sm" :aria-pressed="video.isImportant" aria-label="Toggle importance">
-                                <i :class="['ph-star text-xl', video.isImportant ? 'ph-fill text-yellow-400' : 'ph text-stone-500 hover:text-yellow-400']"></i>
-                            </button>
-                            <button @click.stop="showConfirmDelete = true" class="text-stone-500 hover:text-red-500 p-1 btn-sm" aria-label="Delete video">
-                                <i class="ph ph-trash text-lg"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="bg-stone-800 aspect-video rounded flex items-center justify-center mb-3">
-                        <i class="ph ph-video text-5xl text-stone-600"></i>
-                    </div>
-
-                    <div class="flex justify-between items-center mb-3 text-xs">
-                        <span class="bg-indigo-500 text-indigo-50 font-semibold px-2 py-0.5 rounded-full">{{ logCount }} Log{{ logCount !== 1 ? 's' : '' }}</span>
-                        <div class="space-x-2">
-                             <button @click="toggleViewLogs" class="text-indigo-400 hover:text-indigo-300">
-                                <i :class="['ph text-sm mr-0.5', showLogs ? 'ph-caret-up' : 'ph-caret-down']"></i> View Logs
-                            </button>
-                            <button @click="playSelects" :disabled="logCount === 0" 
-                                    class="btn btn-secondary py-1 px-2 !text-xs"> <!-- !text-xs to override .btn potentially -->
-                                <i class="ph ph-play-circle mr-1"></i> Play Selects
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <button @click="logVideo" class="btn btn-primary w-full mt-auto">
-                        <i class="ph ph-list-plus mr-1"></i> Log Video
-                    </button>
-
-                    <transition name="slide-fade">
-                        <div v-if="showLogs" class="mt-4 pt-4 border-t border-stone-700">
-                            <h5 class="text-sm font-semibold text-stone-300 mb-2">Logs:</h5>
-                            <ul v-if="logs.length > 0" class="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                <li v-for="log_item in logs" :key="log_item.id" class="text-xs p-2 bg-stone-800 rounded">
-                                    <div class="font-medium text-stone-300">{{ formatTimecode(log_item.markIn, false, false) }} - {{ formatTimecode(log_item.markOut, false, false) }}</div>
-                                    <p class="text-stone-400 truncate my-0.5" :title="log_item.notes">{{ log_item.notes || 'No notes' }}</p>
-                                    <div class="flex items-center">
-                                        <i v-for="n in 5" :key="n" :class="['ph-star text-sm', n <= log_item.rating ? 'ph-fill text-yellow-400' : 'ph text-stone-600']"></i>
-                                    </div>
-                                    <div v-if="log_item.keywords && log_item.keywords.length" class="mt-1 flex flex-wrap gap-1">
-                                        <span v-for="kw in log_item.keywords" :key="kw" class="text-indigo-300 bg-indigo-800/60 px-1.5 py-0.5 rounded text-[0.7rem] leading-none">{{ kw }}</span>
-                                    </div>
-                                </li>
-                            </ul>
-                            <p v-else class="text-xs text-stone-500">No logs for this video yet.</p>
-                        </div>
-                    </transition>
-                    <ConfirmationModal
-                        :is-open="showConfirmDelete"
-                        title="Delete Video?"
-                        message="Are you sure you want to delete this video and all its logs? This action cannot be undone."
-                        @confirm="deleteVideoConfirmed"
-                        @cancel="showConfirmDelete = false"
+                      }}
                     />
+                  ))}
                 </div>
-            `
-        };
+              </AnimatePresence>
+            ) : (
+              <div className="text-center py-12">
+                <Icon name="FolderOpen" size={64} className="mx-auto text-text-tertiary mb-4" />
+                <h2 className="text-2xl font-semibold text-text-secondary mb-2">No Projects Found</h2>
+                {searchTerm ? 
+                    <p className="text-text-tertiary">Try adjusting your search or sort criteria.</p> :
+                    <p className="text-text-tertiary">Get started by creating your first project.</p>
+                }
+                {!searchTerm && <Button onClick={() => openModal('projectForm')} icon="PlusCircle" variant="primary" className="mt-6">Create Your First Project</Button>}
+              </div>
+            )}
+            
+            <ProjectFormModal 
+              isOpen={isModalOpen === 'projectForm'}
+              onClose={() => closeModal()}
+              project={modalProps.project}
+              onSave={handleSaveProject}
+            />
 
-        const AssemblyHub = {
-            components: { VideoCard, ConfirmationModal },
-            setup() {
-                const route = useRoute();
-                const router = useRouter();
-                const projectId = computed(() => route.params.id ? parseInt(route.params.id) : null);
-                const project = ref(null);
-                const videos = ref([]);
-                const searchTerm = ref('');
-                
-                const showPlaySelectsModal = ref(false);
-                const playSelectsModalContentRef = ref(null);
-                const videoForPlaySelects = ref(null);
-                const logsForPlaySelects = ref([]);
-                const currentPlayingSelectIndex = ref(0);
-                const playSelectsVideoPlayerRef = ref(null);
-                let playSelectsTrap = null;
-
-
-                const loadProjectData = async () => {
-                    if (!projectId.value) {
-                         router.push('/'); return;
-                    }
-                    project.value = await db.projects.get(projectId.value);
-                    if (!project.value) {
-                        toastStore.addToast('Project not found.', 'error');
-                        router.push('/');
-                        return;
-                    }
-                    await loadVideos();
-                };
-
-                const loadVideos = async () => {
-                    if (!projectId.value) return;
-                    const allProjectVideos = await db.videos.where('projectId').equals(projectId.value).sortBy('createdAt');
-                    
-                    if (!searchTerm.value.trim()) {
-                        videos.value = allProjectVideos;
-                        return;
-                    }
-
-                    const lowerSearchTerm = searchTerm.value.toLowerCase();
-                    const videoIdsWithMatchingLogs = new Set();
-                    
-                    if (allProjectVideos.length > 0) {
-                        const projectVideoIds = allProjectVideos.map(v => v.id);
-                        const allLogsForProject = await db.logs.where('videoId').anyOf(projectVideoIds).toArray();
-                        
-                        allLogsForProject.forEach(log => {
-                            const notesMatch = log.notes && log.notes.toLowerCase().includes(lowerSearchTerm);
-                            const keywordsMatch = log.keywords && log.keywords.some(kw => kw.toLowerCase().includes(lowerSearchTerm));
-                            if (notesMatch || keywordsMatch) {
-                                videoIdsWithMatchingLogs.add(log.videoId);
-                            }
-                        });
-                    }
-
-                    videos.value = allProjectVideos.filter(video => 
-                        video.filename.toLowerCase().includes(lowerSearchTerm) ||
-                        videoIdsWithMatchingLogs.has(video.id)
-                    );
-                };
-                
-                let debounceTimer;
-                watch(searchTerm, () => {
-                    clearTimeout(debounceTimer);
-                    debounceTimer = setTimeout(loadVideos, 300);
-                });
-
-                onMounted(loadProjectData);
-                watch(projectId, (newId, oldId) => {
-                    if (newId !== oldId) loadProjectData();
-                }, { immediate: true });
-
-                const addVideos = async () => {
-                    if (!('showOpenFilePicker' in window)) {
-                        toastStore.addToast('File System Access API is not supported.', 'error', 5000);
-                        return;
-                    }
-                    try {
-                        const fileHandles = await window.showOpenFilePicker({
-                            multiple: true,
-                            types: [{
-                                description: 'Video files',
-                                accept: { 'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm'] }
-                            }]
-                        });
-
-                        let addedCount = 0;
-                        for (const handle of fileHandles) {
-                            const existingVideo = await db.videos.get({ projectId: projectId.value, filename: handle.name });
-                            if (existingVideo) {
-                                toastStore.addToast(`Video "${handle.name}" already exists.`, 'info');
-                                continue;
-                            }
-                            await db.videos.add({
-                                projectId: projectId.value,
-                                filename: handle.name,
-                                fileHandle: handle,
-                                isImportant: false,
-                                createdAt: new Date()
-                            });
-                            addedCount++;
-                        }
-                        if (addedCount > 0) {
-                           await loadVideos();
-                           toastStore.addToast(`${addedCount} video(s) added.`, 'success');
-                        }
-                    } catch (err) {
-                        if (err.name === 'AbortError') {
-                            // User cancelled, do nothing or show info toast
-                        } else {
-                            console.error("Error adding videos:", err);
-                            toastStore.addToast('Error adding videos. Check permissions or console.', 'error');
-                        }
-                    }
-                };
-
-                const handleToggleImportance = async (videoId, newImportance) => {
-                    await db.videos.update(videoId, { isImportant: newImportance });
-                    const videoToUpdate = videos.value.find(v => v.id === videoId);
-                    if (videoToUpdate) videoToUpdate.isImportant = newImportance;
-                };
-
-                const handleDeleteVideo = async (videoId) => {
-                    try {
-                        await db.transaction('rw', db.videos, db.logs, async () => {
-                            await db.logs.where('videoId').equals(videoId).delete();
-                            await db.videos.delete(videoId);
-                        });
-                        toastStore.addToast('Video deleted.', 'success');
-                        await loadVideos(); // Refresh list
-                    } catch (error) {
-                        console.error("Failed to delete video:", error);
-                        toastStore.addToast('Error deleting video.', 'error');
-                    }
-                };
-                
-                const handleLogVideo = (videoId) => {
-                    router.push(`/video/${videoId}`);
-                };
-
-                const openPlaySelectsModal = async (videoId) => {
-                    const selectedVideo = await db.videos.get(videoId);
-                    if (!selectedVideo) {
-                        toastStore.addToast('Video not found for Play Selects.', 'error');
-                        return;
-                    }
-                    videoForPlaySelects.value = selectedVideo;
-                    
-                    logsForPlaySelects.value = await db.logs.where('videoId').equals(videoId).orderBy('markIn').toArray();
-                    if (logsForPlaySelects.value.length === 0) {
-                        toastStore.addToast('No logs to play for this video.', 'info');
-                        return;
-                    }
-                    currentPlayingSelectIndex.value = 0;
-                    showPlaySelectsModal.value = true; // This will trigger the watcher for focus trap
-                    nextTick(playCurrentSelect); // Start playing after modal is rendered
-                };
-
-                const closePlaySelectsModal = () => {
-                    showPlaySelectsModal.value = false; // Triggers watcher to deactivate trap
-                    if (playSelectsVideoPlayerRef.value) {
-                        playSelectsVideoPlayerRef.value.pause();
-                        if (playSelectsVideoPlayerRef.value.src) {
-                            URL.revokeObjectURL(playSelectsVideoPlayerRef.value.src); // Important: Release object URL
-                        }
-                        playSelectsVideoPlayerRef.value.src = ''; 
-                    }
-                    videoForPlaySelects.value = null;
-                    logsForPlaySelects.value = [];
-                };
-                
-                watch(showPlaySelectsModal, (isOpen) => {
-                    nextTick(() => { // Ensure DOM is updated
-                        if (isOpen && playSelectsModalContentRef.value) {
-                            if (!playSelectsTrap) {
-                                playSelectsTrap = focusTrap.createFocusTrap(playSelectsModalContentRef.value, {
-                                    onDeactivate: closePlaySelectsModal,
-                                    clickOutsideDeactivates: false, // Fullscreen modal
-                                    escapeDeactivates: true,
-                                    initialFocus: playSelectsVideoPlayerRef.value || playSelectsModalContentRef.value.querySelector('button[aria-label="Close Play Selects"]')
-                                });
-                            }
-                            playSelectsTrap.activate();
-                        } else if (playSelectsTrap && playSelectsTrap.active) {
-                            playSelectsTrap.deactivate();
-                        }
-                    });
-                });
-                
-                onUnmounted(() => {
-                    if (playSelectsTrap && playSelectsTrap.active) {
-                        playSelectsTrap.deactivate();
-                    }
-                    playSelectsTrap = null;
-                    // Also ensure video object URL is revoked if modal was open
-                    if (playSelectsVideoPlayerRef.value && playSelectsVideoPlayerRef.value.src) {
-                        URL.revokeObjectURL(playSelectsVideoPlayerRef.value.src);
-                    }
-                });
-
-                const playCurrentSelect = async () => {
-                    if (!videoForPlaySelects.value || !playSelectsVideoPlayerRef.value || currentPlayingSelectIndex.value >= logsForPlaySelects.value.length) {
-                        if (logsForPlaySelects.value.length > 0 && currentPlayingSelectIndex.value >= logsForPlaySelects.value.length) {
-                             toastStore.addToast('Finished playing all selects.', 'success');
-                        }
-                        return;
-                    }
-
-                    const logEntry = logsForPlaySelects.value[currentPlayingSelectIndex.value];
-                    const videoPlayer = playSelectsVideoPlayerRef.value;
-
-                    try {
-                        const hasPermission = await verifyPermission(videoForPlaySelects.value.fileHandle);
-                        if (!hasPermission) {
-                            toastStore.addToast('Permission denied for video file.', 'error');
-                            closePlaySelectsModal();
-                            return;
-                        }
-                        const file = await videoForPlaySelects.value.fileHandle.getFile();
-                        
-                        // Revoke previous object URL if any, before setting new one
-                        if (videoPlayer.src) {
-                            URL.revokeObjectURL(videoPlayer.src);
-                        }
-                        videoPlayer.src = URL.createObjectURL(file);
-                        
-                        videoPlayer.onloadedmetadata = () => {
-                            videoPlayer.currentTime = logEntry.markIn;
-                            videoPlayer.play().catch(e => console.error("Play interrupted or failed:", e));
-                        };
-                        
-                        const timeUpdateHandler = () => {
-                            if (videoPlayer.currentTime >= logEntry.markOut) {
-                                videoPlayer.pause();
-                                videoPlayer.removeEventListener('timeupdate', timeUpdateHandler); // Clean up listener
-                                currentPlayingSelectIndex.value++;
-                                if (currentPlayingSelectIndex.value < logsForPlaySelects.value.length) {
-                                    playCurrentSelect();
-                                } else {
-                                    toastStore.addToast('Finished playing all selects.', 'success');
-                                }
-                            }
-                        };
-                        videoPlayer.addEventListener('timeupdate', timeUpdateHandler);
-
-                        videoPlayer.onerror = (e) => {
-                             console.error("Error playing video in selects modal:", e, videoPlayer.error);
-                             toastStore.addToast('Error playing video for selects.', 'error');
-                             closePlaySelectsModal();
-                        }
-                    } catch (error) {
-                        console.error("Error setting up video for play selects:", error);
-                        toastStore.addToast('Failed to load video for Play Selects.', 'error');
-                        closePlaySelectsModal();
-                    }
-                };
-                
-                const currentSelectLog = computed(() => {
-                    if (showPlaySelectsModal.value && logsForPlaySelects.value.length > 0 && currentPlayingSelectIndex.value < logsForPlaySelects.value.length) {
-                        return logsForPlaySelects.value[currentPlayingSelectIndex.value];
-                    }
-                    return null;
-                });
-
-                return {
-                    project, videos, searchTerm,
-                    addVideos, handleToggleImportance, handleDeleteVideo, handleLogVideo,
-                    router,
-                    openPlaySelectsModal, closePlaySelectsModal, showPlaySelectsModal,
-                    playSelectsModalContentRef, playSelectsVideoPlayerRef,
-                    currentPlayingSelectIndex, logsForPlaySelects, currentSelectLog, videoForPlaySelects,
-                };
-            },
-            template: `
-                <div class="min-h-screen flex flex-col">
-                    <header class="bg-stone-900 shadow-md p-4 sticky top-0 z-20">
-                        <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-                            <div class="flex items-center">
-                                <button @click="router.push('/')" class="text-indigo-400 hover:text-indigo-300 mr-2 p-1 btn-sm" aria-label="Back to projects">
-                                    <i class="ph-bold ph-arrow-left text-2xl"></i>
-                                </button>
-                                <h2 class="text-xl font-semibold text-stone-100 truncate" :title="project?.name">
-                                    {{ project?.name || 'Loading...' }}
-                                </h2>
-                            </div>
-                            <div class="flex items-center space-x-2 w-full sm:w-auto">
-                                <input type="search" v-model="searchTerm" placeholder="Search videos & logs..." class="input-field flex-grow sm:w-64 !py-2">
-                                <button @click="addVideos" class="btn btn-primary whitespace-nowrap !py-2">
-                                    <i class="ph ph-plus-circle mr-1"></i> Add Videos
-                                </button>
-                            </div>
-                        </div>
-                    </header>
-
-                    <main class="flex-grow container mx-auto p-4 sm:p-6">
-                        <div v-if="videos.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                            <VideoCard v-for="(video, index) in videos" 
-                                       :key="video.id" 
-                                       :video="video" 
-                                       :index="index"
-                                       @toggle-importance="handleToggleImportance"
-                                       @delete-video="handleDeleteVideo"
-                                       @log-video="handleLogVideo"
-                                       @play-selects="openPlaySelectsModal"
-                            />
-                        </div>
-                        <div v-else-if="project" class="text-center py-12">
-                            <i class="ph-light ph-video text-6xl text-stone-600 mb-4"></i>
-                            <p class="text-xl text-stone-400" v-if="!searchTerm">No videos in this project yet.</p>
-                            <p class="text-xl text-stone-400" v-else>No videos match your search.</p>
-                            <p class="text-stone-500" v-if="!searchTerm">Click "Add Videos" to import some.</p>
-                        </div>
-                         <div v-else class="text-center py-12">
-                            <i class="ph-light ph-spinner-gap text-6xl text-stone-600 mb-4 animate-spin"></i>
-                            <p class="text-xl text-stone-400">Loading project data...</p>
-                        </div>
-                    </main>
-
-                    <!-- Play Selects Modal -->
-                    <transition name="fade">
-                        <div v-if="showPlaySelectsModal" class="fixed inset-0 bg-stone-950 bg-opacity-95 flex flex-col items-center justify-center z-50 p-4">
-                            <div ref="playSelectsModalContentRef" class="w-full h-full flex flex-col items-center justify-center relative outline-none" tabindex="-1">
-                                <button @click="closePlaySelectsModal" class="absolute top-4 right-4 text-stone-300 hover:text-white z-[51] p-2 btn-sm bg-black/30 rounded-full" aria-label="Close Play Selects">
-                                    <i class="ph-bold ph-x text-3xl"></i>
-                                </button>
-                                
-                                <div v-if="videoForPlaySelects" class="text-center mb-4 text-stone-200">
-                                    <p>Playing Select {{ currentPlayingSelectIndex + 1 }} of {{ logsForPlaySelects.length }}</p>
-                                    <p class="text-sm text-stone-400">Video: {{ videoForPlaySelects.filename }}</p>
-                                </div>
-
-                                <video ref="playSelectsVideoPlayerRef" class="max-w-[90vw] max-h-[70vh] bg-black rounded outline-none" controlslist="nodownload nofullscreen noremoteplayback"></video>
-                                
-                                <div v-if="currentSelectLog" class="mt-4 p-4 bg-stone-900 rounded-lg max-w-2xl w-full text-left max-h-32 overflow-y-auto">
-                                    <h4 class="text-md font-semibold text-indigo-400">Notes:</h4>
-                                    <p class="text-stone-300 text-sm whitespace-pre-wrap">{{ currentSelectLog.notes || 'No notes for this select.' }}</p>
-                                </div>
-                                <div v-else-if="!currentSelectLog && videoForPlaySelects" class="mt-4 p-4 bg-stone-900 rounded-lg max-w-2xl w-full text-left">
-                                     <p class="text-stone-400 text-sm">Loading select info...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </transition>
+            {/* Footer - Basic example for Export/Import All */}
+            <footer className="mt-12 pt-6 border-t border-bg-tertiary text-center">
+                <div className="flex gap-4 justify-center">
+                    <Button onClick={() => AppControls.exportAllData()} icon="Download" variant="secondary">Export All Data (JSON)</Button>
+                    <Button onClick={() => AppControls.importData()} icon="UploadCloud" variant="secondary">Import Data (JSON)</Button>
+                    {/* Settings button could open a settings modal */}
+                    {/* <Button icon="Settings" variant="ghost">Settings</Button> */}
                 </div>
-            `
+                <p className="text-xs text-text-tertiary mt-4">LogReel v0.1.0 - Client-Side Video Logging</p>
+            </footer>
+          </motion.div>
+        );
+      };
+
+      // --- Assembly Hub Components ---
+      const VideoCard = React.memo(({ video, onLogVideo, onPlaySelects, onToggleImportant, onDeleteVideo, onOpenVideoSettings }) => {
+        const { updateVideo } = useVideoStore();
+        const [thumbnailUrl, setThumbnailUrl] = useState(null); // Placeholder for actual thumbnail
+
+        useEffect(() => {
+          // Rudimentary thumbnail - ideally use generated one
+          // This is a simplified approach. A real one would use canvas and store blob.
+          // For now, let's assume video.thumbnailBlobUrl might exist if pre-generated
+          if (video.fileHandle && !video.thumbnailBlobUrl) {
+            // Placeholder: could try to generate a quick one here, but might be slow for many cards
+            // useVideoStore.getState().generateThumbnail(video.id, video.fileHandle).then(url => setThumbnailUrl(url));
+          } else if (video.thumbnailBlobUrl) {
+            setThumbnailUrl(video.thumbnailBlobUrl);
+          }
+          return () => {
+            if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(thumbnailUrl);
+            }
+          };
+        }, [video.id, video.fileHandle, video.thumbnailBlobUrl]);
+        
+        const handleToggleImportant = (e) => {
+            e.stopPropagation(); // Prevent card click
+            updateVideo(video.id, { isImportant: !video.isImportant });
         };
         
-        const LoggingStation = {
-            components: { ConfirmationModal },
-            setup() {
-                const route = useRoute();
-                const router = useRouter();
-                const videoId = computed(() => route.params.id ? parseInt(route.params.id) : null);
-                
-                const videoData = ref(null);
-                const videoPlayerRef = ref(null);
-                const timelineRef = ref(null);
-                const videoSrc = ref(null);
-
-                const currentTime = ref(0);
-                const duration = ref(0);
-                const isPlaying = ref(false);
-                const showControls = ref(false); // HTML5 video controls
-
-                const markIn = ref(null);
-                const markOut = ref(null);
-
-                const logForm = reactive({
-                    notes: '',
-                    rating: 0,
-                    keywordsText: '',
-                    keywords: [],
-                });
-
-                const logs = ref([]);
-                const logToDelete = ref(null);
-
-                const loadVideoAndLogs = async () => {
-                    if (!videoId.value) { router.push('/'); return; }
-                    
-                    videoData.value = await db.videos.get(videoId.value);
-                    if (!videoData.value) {
-                        toastStore.addToast('Video not found.', 'error');
-                        router.push(videoData.value?.projectId ? `/project/${videoData.value.projectId}` : '/');
-                        return;
-                    }
-
-                    try {
-                        const hasPermission = await verifyPermission(videoData.value.fileHandle);
-                        if (!hasPermission) {
-                            toastStore.addToast('Permission denied for video file access.', 'error', 5000);
-                            return; // User may need to re-add video or browser may prompt for permission
-                        }
-                        const file = await videoData.value.fileHandle.getFile();
-                        if (videoSrc.value) URL.revokeObjectURL(videoSrc.value); // Revoke old src if any
-                        videoSrc.value = URL.createObjectURL(file);
-                    } catch (err) {
-                        console.error("Error loading video file:", err);
-                        toastStore.addToast('Failed to load video file. It might be corrupted or inaccessible.', 'error', 5000);
-                        videoSrc.value = null; // Ensure no broken player
-                    }
-                    await loadLogs();
-                };
-
-                const handleLoadedMetadata = () => duration.value = videoPlayerRef.value?.duration || 0;
-                const handleTimeUpdate = () => currentTime.value = videoPlayerRef.value?.currentTime || 0;
-                const handlePlay = () => isPlaying.value = true;
-                const handlePause = () => isPlaying.value = false;
-                const handleEnded = () => {
-                    isPlaying.value = false;
-                    currentTime.value = duration.value; // Ensure currentTime is at the end
-                };
-                const videoError = (e) => {
-                    console.error("Video Error:", e, videoPlayerRef.value?.error);
-                    toastStore.addToast('Error playing video. The file might be unsupported or corrupted.', 'error', 5000);
-                    videoSrc.value = null; // Clear src to stop further errors
-                };
-
-
-                onMounted(() => {
-                    loadVideoAndLogs();
-                    const player = videoPlayerRef.value;
-                    if (player) {
-                        player.addEventListener('loadedmetadata', handleLoadedMetadata);
-                        player.addEventListener('timeupdate', handleTimeUpdate);
-                        player.addEventListener('play', handlePlay);
-                        player.addEventListener('pause', handlePause);
-                        player.addEventListener('ended', handleEnded);
-                        player.addEventListener('error', videoError);
-                    }
-                    document.addEventListener('keydown', handleGlobalKeydown);
-                });
-
-                onUnmounted(() => {
-                    const player = videoPlayerRef.value;
-                    if (player) {
-                        player.removeEventListener('loadedmetadata', handleLoadedMetadata);
-                        player.removeEventListener('timeupdate', handleTimeUpdate);
-                        player.removeEventListener('play', handlePlay);
-                        player.removeEventListener('pause', handlePause);
-                        player.removeEventListener('ended', handleEnded);
-                        player.removeEventListener('error', videoError);
-                    }
-                    if (videoSrc.value) {
-                        URL.revokeObjectURL(videoSrc.value);
-                    }
-                    document.removeEventListener('keydown', handleGlobalKeydown);
-                });
-                
-                const togglePlayPause = () => {
-                    if (!videoPlayerRef.value || !videoSrc.value) return;
-                    if (videoPlayerRef.value.paused || videoPlayerRef.value.ended) {
-                        videoPlayerRef.value.play().catch(e => console.warn("Play interrupted:", e));
-                    } else {
-                        videoPlayerRef.value.pause();
-                    }
-                };
-
-                const seekOnTimeline = (event) => {
-                    if (!timelineRef.value || !duration.value || !videoSrc.value) return;
-                    const timelineRect = timelineRef.value.getBoundingClientRect();
-                    const clickX = event.clientX - timelineRect.left;
-                    const percentage = Math.max(0, Math.min(1, clickX / timelineRect.width));
-                    videoPlayerRef.value.currentTime = duration.value * percentage;
-                };
-
-                const currentProgressPercent = computed(() => duration.value ? (currentTime.value / duration.value) * 100 : 0);
-                const markInPercent = computed(() => (markIn.value !== null && duration.value) ? (markIn.value / duration.value) * 100 : null);
-                const markOutPercent = computed(() => (markOut.value !== null && duration.value) ? (markOut.value / duration.value) * 100 : null);
-                
-                const showHoursInTimecode = computed(() => duration.value >= 3600);
-
-                const setMarkIn = () => {
-                    if (!videoSrc.value) return;
-                    markIn.value = currentTime.value;
-                    if (markOut.value !== null && markOut.value < markIn.value) {
-                        markOut.value = null; 
-                    }
-                };
-                const setMarkOut = () => {
-                    if (!videoSrc.value) return;
-                    markOut.value = currentTime.value;
-                     if (markIn.value !== null && markOut.value < markIn.value) {
-                        markIn.value = markOut.value;
-                        toastStore.addToast('Mark In adjusted as it was after Mark Out.', 'info');
-                    }
-                };
-                
-                watch(() => logForm.keywordsText, (newVal) => {
-                    logForm.keywords = newVal.split(/[,;]+/).map(kw => kw.trim()).filter(kw => kw.length > 0);
-                });
-
-                const removeKeyword = (index) => {
-                    logForm.keywords.splice(index, 1);
-                    logForm.keywordsText = logForm.keywords.join(', ');
-                };
-                
-                const saveLog = async () => {
-                    if (markIn.value === null || markOut.value === null) {
-                        toastStore.addToast('Set Mark In and Mark Out.', 'error'); return;
-                    }
-                    if (markIn.value >= markOut.value) {
-                        toastStore.addToast('Mark In must be before Mark Out.', 'error'); return;
-                    }
-                    if (!logForm.notes.trim() && logForm.rating === 0 && logForm.keywords.length === 0) {
-                        toastStore.addToast('Add notes, rating, or keywords.', 'error'); return;
-                    }
-
-                    try {
-                        await db.logs.add({
-                            videoId: videoId.value,
-                            notes: logForm.notes.trim(),
-                            rating: logForm.rating,
-                            keywords: [...logForm.keywords],
-                            markIn: markIn.value,
-                            markOut: markOut.value,
-                            createdAt: new Date()
-                        });
-                        toastStore.addToast('Log saved!', 'success');
-                        logForm.notes = ''; logForm.rating = 0; logForm.keywordsText = ''; logForm.keywords = [];
-                        markIn.value = null; markOut.value = null;
-                        await loadLogs();
-                    } catch (error) {
-                        console.error("Failed to save log:", error);
-                        if (error.name === 'ConstraintError') {
-                            toastStore.addToast('Log at this Mark In time already exists.', 'error');
-                        } else {
-                            toastStore.addToast('Error saving log.', 'error');
-                        }
-                    }
-                };
-
-                const loadLogs = async () => {
-                    if (!videoId.value) return;
-                    logs.value = await db.logs.where('videoId').equals(videoId.value).orderBy('markIn').toArray();
-                };
-
-                const goToLogTime = (seconds) => {
-                    if (videoPlayerRef.value && videoSrc.value) {
-                        videoPlayerRef.value.currentTime = seconds;
-                        if (videoPlayerRef.value.paused) videoPlayerRef.value.play().catch(e => console.warn("Play interrupted:", e));
-                    }
-                };
-
-                const confirmDeleteLog = (logId) => logToDelete.value = logId;
-
-                const deleteLog = async () => {
-                    if (!logToDelete.value) return;
-                    try {
-                        await db.logs.delete(logToDelete.value);
-                        toastStore.addToast('Log deleted.', 'success');
-                        logToDelete.value = null;
-                        await loadLogs();
-                    } catch (error) {
-                        console.error("Failed to delete log:", error);
-                        toastStore.addToast('Error deleting log.', 'error');
-                    }
-                };
-
-                const handleGlobalKeydown = (event) => {
-                    const activeElement = document.activeElement;
-                    const inInputField = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
-
-                    if (event.code === 'Space' && !inInputField && videoSrc.value) {
-                        event.preventDefault(); togglePlayPause();
-                    } else if (event.key.toLowerCase() === 'i' && !inInputField && videoSrc.value) {
-                        event.preventDefault(); setMarkIn();
-                    } else if (event.key.toLowerCase() === 'o' && !inInputField && videoSrc.value) {
-                        event.preventDefault(); setMarkOut();
-                    }
-                };
-
-                return {
-                    videoData, videoPlayerRef, timelineRef, videoSrc,
-                    currentTime, duration, isPlaying, showHoursInTimecode, showControls,
-                    formatTimecode,
-                    togglePlayPause, seekOnTimeline, currentProgressPercent,
-                    markIn, markOut, setMarkIn, setMarkOut,
-                    markInPercent, markOutPercent,
-                    logForm, saveLog, removeKeyword,
-                    logs, goToLogTime, confirmDeleteLog, deleteLog, logToDelete,
-                    router,
-                    projectId // for back button
-                };
-            },
-            template: `
-                <div class="h-screen flex flex-col bg-stone-950">
-                    <header class="bg-stone-900 shadow-md p-3 sm:p-4 flex items-center shrink-0 z-10">
-                        <button @click="router.push(videoData ? \`/project/\${videoData.projectId}\` : '/')" 
-                                class="text-indigo-400 hover:text-indigo-300 mr-3 p-1 btn-sm" aria-label="Back to project">
-                            <i class="ph-bold ph-arrow-left text-2xl"></i>
-                        </button>
-                        <h2 class="text-lg sm:text-xl font-semibold text-stone-100 truncate" :title="videoData?.filename">
-                            {{ videoData?.filename || 'Loading video...' }}
-                        </h2>
-                    </header>
-
-                    <div class="flex-grow overflow-y-auto" v-if="videoData">
-                        <div class="max-w-5xl mx-auto p-3 sm:p-4">
-                            <div class="sticky top-0 bg-stone-950 z-5 py-4">
-                                <div class="relative group/videoplayer">
-                                    <video ref="videoPlayerRef" :src="videoSrc" 
-                                           class="w-full max-h-[60vh] bg-black rounded aspect-video outline-none" 
-                                           :controls="showControls"
-                                           @click="togglePlayPause"
-                                           @dblclick="showControls = !showControls"
-                                           preload="metadata"
-                                           > Your browser does not support the video tag. </video>
-                                    <div v-if="!videoSrc && videoData" class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 rounded">
-                                        <i class="ph-bold ph-warning-circle text-4xl text-yellow-400 mb-2"></i>
-                                        <p class="text-stone-300">Video could not be loaded.</p>
-                                        <p class="text-xs text-stone-400">Check permissions or file integrity.</p>
-                                    </div>
-                                    <div v-if="!showControls && videoSrc" @click="togglePlayPause" class="absolute inset-0 flex items-center justify-center opacity-0 group-hover/videoplayer:opacity-100 transition-opacity bg-black/20 cursor-pointer">
-                                        <i :class="['ph-bold text-6xl text-white/80', isPlaying ? 'ph-pause-circle' : 'ph-play-circle']"></i>
-                                    </div>
-                                </div>
-                                
-                                <div v-if="videoSrc" ref="timelineRef" @click="seekOnTimeline" class="mt-3 h-5 bg-stone-800 rounded cursor-pointer relative group/timeline">
-                                    <div class="h-full bg-stone-600 rounded" :style="{ width: currentProgressPercent + '%' }"></div>
-                                    <div v-if="markInPercent !== null && markOutPercent !== null && markOutPercent > markInPercent" 
-                                         class="absolute top-0 h-full bg-indigo-600/50 rounded pointer-events-none"
-                                         :style="{ left: markInPercent + '%', width: (markOutPercent - markInPercent) + '%' }">
-                                    </div>
-                                    <div v-if="markInPercent !== null" 
-                                         class="absolute top-0 h-full w-1 bg-indigo-400 pointer-events-none" 
-                                         :style="{ left: markInPercent + '%' }">
-                                        <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-indigo-300 bg-stone-700 px-1 rounded opacity-0 group-hover/timeline:opacity-100 transition-opacity whitespace-nowrap">IN</span>
-                                    </div>
-                                    <div v-if="markOutPercent !== null" 
-                                         class="absolute top-0 h-full w-1 bg-indigo-400 pointer-events-none" 
-                                         :style="{ left: markOutPercent + '%' }">
-                                         <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-indigo-300 bg-stone-700 px-1 rounded opacity-0 group-hover/timeline:opacity-100 transition-opacity whitespace-nowrap">OUT</span>
-                                    </div>
-                                     <div class="absolute -bottom-6 left-0 text-xs text-stone-400 pointer-events-none">{{ formatTimecode(currentTime, showHoursInTimecode) }}</div>
-                                     <div class="absolute -bottom-6 right-0 text-xs text-stone-400 pointer-events-none">{{ formatTimecode(duration, showHoursInTimecode) }}</div>
-                                </div>
-                                <div v-else class="mt-3 h-5 bg-stone-800 rounded flex items-center justify-center">
-                                    <p class="text-xs text-stone-500">Video timeline unavailable</p>
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 my-4 sm:my-6 items-center">
-                                <button @click="togglePlayPause" :disabled="!videoSrc" class="btn btn-secondary col-span-1 sm:col-span-1 flex items-center justify-center text-lg py-3">
-                                    <i :class="['ph-bold text-2xl mr-2', isPlaying ? 'ph-pause' : 'ph-play']"></i>
-                                    <span>{{ isPlaying ? 'Pause' : 'Play' }} (Space)</span>
-                                </button>
-                                <button @click="setMarkIn" :disabled="!videoSrc" class="btn btn-secondary flex items-center justify-center py-3">
-                                    <span class="text-indigo-400 mr-2 font-bold">I</span> Mark In: {{ markIn !== null ? formatTimecode(markIn, showHoursInTimecode) : '--:--.---' }}
-                                </button>
-                                <button @click="setMarkOut" :disabled="!videoSrc" class="btn btn-secondary flex items-center justify-center py-3">
-                                    <span class="text-indigo-400 mr-2 font-bold">O</span> Mark Out: {{ markOut !== null ? formatTimecode(markOut, showHoursInTimecode) : '--:--.---' }}
-                                </button>
-                            </div>
-
-                            <form @submit.prevent="saveLog" class="card mb-6">
-                                <h3 class="text-xl font-semibold text-stone-100 mb-4">Create Log Entry</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label for="notes" class="label">Notes</label>
-                                        <textarea id="notes" v-model="logForm.notes" rows="4" class="input-field" placeholder="Enter notes for this segment..."></textarea>
-                                    </div>
-                                    <div>
-                                        <label class="label">Rating</label>
-                                        <div class="flex space-x-1 mb-4">
-                                            <button type="button" v-for="star in 5" :key="star" @click="logForm.rating = star" class="focus:outline-none p-1 btn-sm" :aria-label="'Rate ' + star + ' star' + (star > 1 ? 's' : '')">
-                                                <i :class="['ph-star text-3xl transition-colors', star <= logForm.rating ? 'ph-fill text-yellow-400' : 'ph text-stone-600 hover:text-yellow-300']"></i>
-                                            </button>
-                                        </div>
-                                        
-                                        <label for="keywords" class="label">Keywords (comma/semicolon separated)</label>
-                                        <input type="text" id="keywords" v-model="logForm.keywordsText" class="input-field" placeholder="e.g., b-roll, interview, good take">
-                                        <div class="mt-2 flex flex-wrap gap-1.5" v-if="logForm.keywords.length > 0">
-                                            <span v-for="(kw, index) in logForm.keywords" :key="index" class="bg-indigo-600 text-indigo-50 text-xs px-2 py-1 rounded-full flex items-center">
-                                                {{ kw }}
-                                                <button type="button" @click="removeKeyword(index)" class="ml-1.5 text-indigo-200 hover:text-white p-0.5 btn-sm" aria-label="Remove keyword">
-                                                    <i class="ph-bold ph-x text-[0.6rem]"></i>
-                                                </button>
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="mt-6 flex justify-end">
-                                    <button type="submit" class="btn btn-primary" :disabled="!videoSrc">Save Log</button>
-                                </div>
-                            </form>
-
-                            <div v-if="logs.length > 0">
-                                <h3 class="text-xl font-semibold text-stone-100 mb-4">Saved Logs ({{ logs.length }})</h3>
-                                <div class="space-y-4">
-                                    <div v-for="log_item in logs" :key="log_item.id" class="card bg-stone-800/50">
-                                        <div class="flex flex-col sm:flex-row justify-between items-start gap-2">
-                                            <div class="flex-grow min-w-0"> <!-- For text wrapping -->
-                                                <div class="font-semibold text-indigo-400 mb-1">
-                                                    {{ formatTimecode(log_item.markIn, showHoursInTimecode) }} - {{ formatTimecode(log_item.markOut, showHoursInTimecode) }}
-                                                </div>
-                                                <div class="flex items-center mb-1">
-                                                    <i v-for="n in 5" :key="n" :class="['ph-star text-lg mr-0.5', n <= log_item.rating ? 'ph-fill text-yellow-400' : 'ph text-stone-600']"></i>
-                                                </div>
-                                                <p class="text-stone-300 text-sm whitespace-pre-wrap break-words mb-2">{{ log_item.notes || 'No notes.' }}</p>
-                                                <div v-if="log_item.keywords && log_item.keywords.length" class="flex flex-wrap gap-1.5">
-                                                    <span v-for="kw in log_item.keywords" :key="kw" class="text-indigo-300 bg-indigo-800/60 px-2 py-0.5 rounded-full text-xs">{{ kw }}</span>
-                                                </div>
-                                            </div>
-                                            <div class="flex sm:flex-col items-end sm:items-center gap-2 shrink-0 self-start sm:self-center">
-                                                <button @click="goToLogTime(log_item.markIn)" class="btn btn-secondary !py-1 !px-2 !text-xs whitespace-nowrap" :disabled="!videoSrc">
-                                                    <i class="ph ph-play-circle mr-1"></i> Go
-                                                </button>
-                                                <button @click="confirmDeleteLog(log_item.id)" class="text-stone-500 hover:text-red-500 p-1 btn-sm" aria-label="Delete log">
-                                                    <i class="ph ph-trash text-lg"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                             <div v-else-if="videoData" class="text-center py-8">
-                                <i class="ph-light ph-list-checks text-5xl text-stone-600 mb-3"></i>
-                                <p class="text-stone-400">No logs saved for this video yet.</p>
-                            </div>
-                        </div>
-                    </div>
-                     <div v-else class="flex-grow flex items-center justify-center">
-                        <i class="ph-light ph-spinner-gap text-6xl text-stone-600 mb-4 animate-spin"></i>
-                        <p class="text-xl text-stone-400">Loading video data...</p>
-                    </div>
-
-                     <ConfirmationModal
-                        :is-open="!!logToDelete"
-                        title="Delete Log?"
-                        message="Are you sure you want to delete this log entry? This action cannot be undone."
-                        @confirm="deleteLog"
-                        @cancel="logToDelete = null"
-                    />
-                </div>
-            `
+        const handleLogVideo = (e) => {
+            e.stopPropagation();
+            onLogVideo(video.id);
         };
 
-        // --- Vue Router Setup ---
-        const routes = [
-            { path: '/', component: ProjectDashboard },
-            { path: '/project/:id', component: AssemblyHub, props: true },
-            { path: '/video/:id', component: LoggingStation, props: true },
-            { path: '/:pathMatch(.*)*', redirect: '/' } // Catch all redirect to home
-        ];
+        const handlePlaySelects = (e) => {
+            e.stopPropagation();
+            onPlaySelects(video.id);
+        }
 
-        const router = createRouter({
-            history: createWebHashHistory(),
-            routes,
-        });
+        return (
+          <motion.div 
+            layout
+            initial={animations.listItem.initial}
+            animate={animations.listItem.animate}
+            exit={animations.listItem.exit}
+            className="bg-bg-secondary rounded-lg shadow-lg overflow-hidden flex flex-col cursor-pointer hover:shadow-accent-primary/20 transition-shadow"
+            onClick={() => onLogVideo(video.id)} // Click card to go to logging station
+          >
+            <div className="relative aspect-video bg-bg-tertiary">
+              {thumbnailUrl ? (
+                <img src={thumbnailUrl} alt={video.filename} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Icon name="Film" size={48} className="text-text-tertiary" />
+                </div>
+              )}
+              <div className="absolute top-2 right-2 flex gap-1">
+                <button 
+                    onClick={handleToggleImportant} 
+                    className={`p-1.5 rounded-full transition-colors ${video.isImportant ? 'bg-yellow-500/80 hover:bg-yellow-400' : 'bg-black/30 hover:bg-black/50'}`}
+                    title={video.isImportant ? "Mark as not important" : "Mark as important"}
+                >
+                    <Icon name="Star" size={16} className={` ${video.isImportant ? 'text-white fill-white' : 'text-gray-300'}`} />
+                </button>
+              </div>
+              <div className="absolute bottom-2 left-2 bg-black/50 text-white px-1.5 py-0.5 rounded text-xs">
+                {formatDuration(video.duration)}
+              </div>
+              {/* Quick Play button (could open a small preview modal) */}
+              {/* <button className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                <Icon name="Play" size={48} className="text-white bg-black/30 rounded-full p-2" />
+              </button> */}
+            </div>
+            
+            <div className="p-4 flex flex-col flex-grow">
+              <div className="flex justify-between items-start mb-1">
+                <h4 className="font-semibold text-text-primary truncate" title={video.filename}>{video.filename}</h4>
+                <DropdownMenu 
+                  trigger={<Button variant="ghost" size="sm" icon="MoreVertical" aria-label="Video options" onClick={e => e.stopPropagation()} />}
+                >
+                  <DropdownItem icon="Edit3" onClick={(e) => { e.stopPropagation(); onOpenVideoSettings(video.id); }}>Video Settings</DropdownItem>
+                  <DropdownItem icon="Trash2" onClick={(e) => { e.stopPropagation(); onDeleteVideo(video.id); }} className="text-accent-danger">Delete Video</DropdownItem>
+                </DropdownMenu>
+              </div>
+              
+              <div className="text-xs text-text-tertiary space-y-0.5 mb-2">
+                <p>Size: {formatFileSize(video.fileSize)}</p>
+                <p>Logs: {video.logCount || 0}</p>
+                {/* <p>Last Logged: {video.lastLogged ? new Date(video.lastLogged).toLocaleDateString() : 'N/A'}</p> */}
+              </div>
 
-        // --- Vue App Initialization ---
-        const app = createApp({
-            components: { ToastNotifications },
-            setup() {
-                onMounted(() => {
-                    if (!('showOpenFilePicker' in window)) {
-                        toastStore.addToast('File System Access API not fully supported. Video import may be limited.', 'info', 7000);
-                    }
-                     if (!('indexedDB' in window)) {
-                        toastStore.addToast('IndexedDB not supported. Application data cannot be saved.', 'error', 10000);
-                    }
-                });
+              {/* Logs Preview (simplified) */}
+              {/* <div className="text-xs text-text-tertiary mt-1">
+                {video.logCount > 0 ? `${video.logCount} logs` : "No logs yet"}
+              </div> */}
+
+              <div className="mt-auto pt-3 flex flex-col sm:flex-row gap-2">
+                <Button onClick={handleLogVideo} variant="primary" size="sm" className="flex-1">Log Video</Button>
+                <Button onClick={handlePlaySelects} variant="secondary" size="sm" className="flex-1" disabled={!video.logCount || video.logCount === 0}>
+                  Play Selects ({video.logCount || 0})
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        );
+      });
+
+      const AssemblyHubScreen = () => {
+        const { currentProjectId, navigateTo, openModal, closeModal, isModalOpen, modalProps } = useUIStore();
+        const { currentProject, fetchProjectById } = useProjectStore();
+        const { videos, fetchVideosForProject, addVideo, deleteVideo, updateVideo } = useVideoStore();
+        const isLoading = useUIStore(state => state.isLoading);
+        const [searchTerm, setSearchTerm] = useState('');
+        // Add more filters: isImportant, hasLogs, etc.
+        const fileInputRef = useRef(null);
+
+        useEffect(() => {
+          if (currentProjectId) {
+            fetchProjectById(currentProjectId); // Fetches project details
+            fetchVideosForProject(currentProjectId); // Fetches videos for this project
+          } else {
+            navigateTo(SCREENS.PROJECT_DASHBOARD); // Should not happen if routed correctly
+          }
+           // Check for autoOpenFileDialog flag from navigation (passed via modalProps for simplicity)
+            if (modalProps.autoOpenFileDialog) {
+                handleAddVideosClick();
+                // Clear the flag after use
+                openModal(isModalOpen, { ...modalProps, autoOpenFileDialog: false });
             }
-        });
-        app.use(router);
-        app.mount('#app');
+        }, [currentProjectId, modalProps.autoOpenFileDialog]);
 
-    </script>
+        const handleAddVideosClick = async () => {
+          if (typeof window.showOpenFilePicker === 'function') {
+            try {
+              const fileHandles = await window.showOpenFilePicker({
+                multiple: true,
+                types: [{ description: 'Video Files', accept: { 'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm'] } }],
+              });
+              useUIStore.getState().setLoading(true);
+              for (const handle of fileHandles) {
+                await addVideo(currentProjectId, handle);
+              }
+            } catch (err) {
+              if (err.name !== 'AbortError') {
+                console.error("Error picking files:", err);
+                toast.error("Could not open files. Ensure permissions are granted.");
+              }
+            } finally {
+              useUIStore.getState().setLoading(false);
+            }
+          } else {
+            // Fallback for browsers not supporting File System Access API
+            toast.error("Your browser doesn't support modern file access. For the best experience, use a compatible browser like Chrome or Edge.");
+            // Optionally, could use <input type="file"> but without persistent handles
+             fileInputRef.current.click();
+          }
+        };
+        
+        const handleFallbackAddVideos = async (event) => {
+            const files = event.target.files;
+            if (!files) return;
+            useUIStore.getState().setLoading(true);
+            for (const file of files) {
+                // This path won't have fileHandle persistence, so it's a degraded experience
+                // Need to decide how to handle this. For now, we'll just show an error
+                // or proceed by storing the File object directly (not recommended for large files / persistence)
+                // For this example, we'll assume fileHandle is key, so this path is mostly for notification.
+                toast.warn(`File "${file.name}" selected via fallback. Persistent access may not be available. AddVideo function expects a FileHandle.`);
+                // If you want to proceed without FileHandle (not per spec but for broader support):
+                // await addVideo(currentProjectId, file); // addVideo would need to handle File object too
+            }
+             useUIStore.getState().setLoading(false);
+             event.target.value = null; // Reset file input
+        };
+
+        const filteredVideos = useMemo(() => {
+          return videos.filter(v => 
+            v.filename.toLowerCase().includes(searchTerm.toLowerCase())
+            // Add more filter conditions here based on UI state
+          );
+        }, [videos, searchTerm]);
+
+        const projectStats = useMemo(() => {
+            if (!currentProject) return { totalVideos: 0, importantVideos: 0, totalLogs: 0, totalDuration: 0};
+            const importantVideos = videos.filter(v => v.isImportant).length;
+            const totalLogs = videos.reduce((sum, v) => sum + (v.logCount || 0), 0);
+            return {
+                totalVideos: videos.length,
+                importantVideos,
+                totalLogs,
+                totalDuration: videos.reduce((sum, v) => sum + v.duration, 0)
+            };
+        }, [videos, currentProject]);
+
+        if (isLoading && !currentProject) return <div className="p-8"><SkeletonLoader className="h-12 w-1/2 mb-4" /><SkeletonLoader className="h-8 w-full mb-8" /> <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{[...Array(4)].map((_,i) => <SkeletonLoader key={i} className="h-72" />)}</div></div>;
+        if (!currentProject) return <div className="p-8 text-center text-text-secondary">Project not found or failed to load. <Button onClick={() => navigateTo(SCREENS.PROJECT_DASHBOARD)}>Back to Projects</Button></div>;
+
+        return (
+          <motion.div {...animations.pageTransition} className="flex flex-col h-screen">
+            {/* Header */}
+            <header className="sticky top-0 z-20 p-4 glassmorphism">
+              <div className="max-w-full mx-auto">
+                <div className="flex justify-between items-center mb-3">
+                  {/* Breadcrumbs */}
+                  <div className="text-sm text-text-secondary flex items-center">
+                    <button onClick={() => navigateTo(SCREENS.PROJECT_DASHBOARD)} className="hover:text-accent-primary">Projects</button>
+                    <Icon name="ChevronRight" size={16} className="mx-1" />
+                    <span className="font-semibold text-text-primary">{currentProject.name}</span>
+                  </div>
+                   <Button onClick={() => navigateTo(SCREENS.PROJECT_DASHBOARD)} variant="ghost" size="sm" icon="ChevronLeft">Back to Dashboard</Button>
+                </div>
+                <div className="flex flex-col md:flex-row justify-between items-center gap-2">
+                  <h1 className="text-2xl font-bold text-text-primary truncate" title={currentProject.name}>{currentProject.name}</h1>
+                  <div className="flex items-center gap-2">
+                     <Input 
+                        type="search" 
+                        placeholder="Search videos..." 
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="pl-8 text-sm h-10 w-full md:w-64"
+                    />
+                    <Icon name="Search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary hidden" /> {/* Hidden for now, needs relative parent */}
+                    <Button onClick={handleAddVideosClick} icon="UploadCloud" variant="primary">Add Videos</Button>
+                    <input type="file" ref={fileInputRef} onChange={handleFallbackAddVideos} multiple accept="video/*" className="hidden" />
+                  </div>
+                </div>
+              </div>
+            </header>
+            
+            {/* Quick Stats Bar */}
+            <div className="bg-bg-secondary p-3 sticky top-[calc(theme(spacing.16)+theme(spacing.8))] z-10 shadow-md"> {/* Adjust top based on header height */}
+                <div className="max-w-full mx-auto flex flex-wrap justify-around gap-2 text-sm text-center">
+                    <span><Icon name="Film" className="inline mr-1" size={16}/>Total Videos: <strong className="text-text-primary">{projectStats.totalVideos}</strong></span>
+                    <span><Icon name="Star" className="inline mr-1 text-yellow-400" size={16}/>Important: <strong className="text-text-primary">{projectStats.importantVideos}</strong></span>
+                    <span><Icon name="List" className="inline mr-1" size={16}/>Total Logs: <strong className="text-text-primary">{projectStats.totalLogs}</strong></span>
+                    <span><Icon name="Clock" className="inline mr-1" size={16}/>Total Duration: <strong className="text-text-primary">{formatDuration(projectStats.totalDuration)}</strong></span>
+                </div>
+            </div>
+
+            {/* Video Grid/List */}
+            <main className="flex-grow overflow-y-auto p-4 sm:p-6 lg:p-8">
+              {isLoading && videos.length === 0 && currentProject ? ( // Loading videos for current project
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {[...Array(videos.length || 4)].map((_, i) => <SkeletonLoader key={i} className="h-80 rounded-lg" />)}
+                </div>
+              ) : filteredVideos.length > 0 ? (
+                <AnimatePresence>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredVideos.map(video => (
+                      <VideoCard
+                        key={video.id}
+                        video={video}
+                        onLogVideo={(videoId) => navigateTo(SCREENS.LOGGING_STATION, currentProjectId, videoId)}
+                        onPlaySelects={(videoId) => openModal('playSelects', { videoId })}
+                        onToggleImportant={() => { /* Implemented in VideoCard directly */ }}
+                        onDeleteVideo={(videoId) => {
+                          if (confirm(`Are you sure you want to delete video "${video.filename}" and all its logs?`)) {
+                            deleteVideo(videoId);
+                          }
+                        }}
+                        onOpenVideoSettings={(videoId) => openModal('videoSettings', { videoId })}
+                      />
+                    ))}
+                  </div>
+                </AnimatePresence>
+              ) : (
+                <div className="text-center py-12">
+                  <Icon name="FileVideo" size={64} className="mx-auto text-text-tertiary mb-4" />
+                  <h2 className="text-2xl font-semibold text-text-secondary mb-2">
+                    {videos.length === 0 ? "No Videos in This Project" : "No Videos Match Your Search"}
+                  </h2>
+                  <p className="text-text-tertiary">
+                    {videos.length === 0 ? "Click 'Add Videos' to get started." : "Try adjusting your search or filters."}
+                  </p>
+                  {videos.length === 0 && !searchTerm && <Button onClick={handleAddVideosClick} icon="UploadCloud" variant="primary" className="mt-6">Add Videos</Button>}
+                </div>
+              )}
+            </main>
+            
+            {/* Modals for Assembly Hub - e.g. Video Settings, Play Selects */}
+            <PlaySelectsModal 
+                isOpen={isModalOpen === 'playSelects'} 
+                onClose={closeModal} 
+                videoId={modalProps.videoId} 
+            />
+            {/* <VideoSettingsModal isOpen={isModalOpen === 'videoSettings'} onClose={closeModal} videoId={modalProps.videoId} /> */}
+          </motion.div>
+        );
+      };
+
+      // --- Logging Station Components ---
+      const EnhancedTimeline = ({ duration, logs, currentTime, onSeek, onMark, markIn, markOut, videoRef }) => {
+        const timelineRef = useRef(null);
+
+        const handleTimelineClick = (e) => {
+            if (!timelineRef.current || duration === 0) return;
+            const rect = timelineRef.current.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const percentage = clickX / rect.width;
+            onSeek(percentage * duration);
+        };
+
+        // Draggable playhead, markIn, markOut would be more complex, involving event listeners for mousemove/mouseup
+        // For simplicity, this example only has click-to-seek on timeline.
+
+        return (
+          <div className="w-full select-none py-2">
+            {/* Time Ruler (simplified) */}
+            <div className="h-4 bg-bg-tertiary rounded-t-md flex items-center justify-between px-2 text-xs text-text-tertiary">
+                <span>{formatDuration(0)}</span>
+                <span>{formatDuration(duration)}</span>
+            </div>
+            {/* Main timeline bar */}
+            <div ref={timelineRef} className="relative h-8 bg-gray-700 cursor-pointer rounded-b-md" onClick={handleTimelineClick}>
+              {/* Log Segments */}
+              {logs.map(log => {
+                if (log.markIn == null || log.markOut == null || log.markOut <= log.markIn) return null;
+                const left = (log.markIn / duration) * 100;
+                const width = ((log.markOut - log.markIn) / duration) * 100;
+                return (
+                  <div
+                    key={log.id}
+                    className="absolute h-full opacity-70 hover:opacity-100 transition-opacity"
+                    style={{ 
+                        left: `${left}%`, 
+                        width: `${width}%`, 
+                        backgroundColor: log.color || 'var(--accent-secondary)',
+                        borderLeft: '1px solid rgba(255,255,255,0.2)',
+                        borderRight: '1px solid rgba(255,255,255,0.2)',
+                    }}
+                    title={`${log.notes.substring(0,50)}... (${formatDuration(log.markIn)} - ${formatDuration(log.markOut)})`}
+                    onClick={(e) => { e.stopPropagation(); onSeek(log.markIn); }}
+                  />
+                );
+              })}
+              {/* Mark In/Out Range */}
+              {markIn != null && markOut != null && markOut > markIn && (
+                <div 
+                    className="absolute h-full bg-accent-primary opacity-40 pointer-events-none"
+                    style={{
+                        left: `${(markIn / duration) * 100}%`,
+                        width: `${((markOut - markIn) / duration) * 100}%`
+                    }}
+                />
+              )}
+              {/* Playhead */}
+              <div 
+                className="absolute top-0 h-full w-1 bg-accent-danger pointer-events-none rounded"
+                style={{ left: `${(currentTime / duration) * 100}%` }} 
+              />
+              {/* Mark In Handle (simplified, not draggable) */}
+              {markIn != null && (
+                 <div 
+                    className="absolute top-0 h-full w-1 bg-green-500 pointer-events-none"
+                    style={{ left: `${(markIn / duration) * 100}%` }} 
+                    title={`Mark In: ${formatDuration(markIn, true)}`}
+                  />
+              )}
+              {/* Mark Out Handle (simplified, not draggable) */}
+              {markOut != null && (
+                 <div 
+                    className="absolute top-0 h-full w-1 bg-red-500 pointer-events-none"
+                    style={{ left: `${(markOut / duration) * 100}%` }} 
+                    title={`Mark Out: ${formatDuration(markOut, true)}`}
+                  />
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      const LoggingForm = ({ currentLog, onSave, onClear, videoCurrentTime, onMarkIn, onMarkOut, markInTime, markOutTime }) => {
+        const [notes, setNotes] = useState('');
+        const [rating, setRating] = useState(0);
+        const [keywords, setKeywords] = useState(''); // Comma-separated string
+        const [color, setColor] = useState(useUIStore.getState().theme === 'dark' ? '#3b82f6' : '#3b82f6'); // Default blue
+
+        useEffect(() => {
+          if (currentLog) {
+            setNotes(currentLog.notes || '');
+            setRating(currentLog.rating || 0);
+            setKeywords(currentLog.keywords ? currentLog.keywords.join(', ') : '');
+            setColor(currentLog.color || '#3b82f6');
+          } else { // New log
+            setNotes('');
+            setRating(0);
+            setKeywords('');
+            // Retain color or reset to default for new logs
+          }
+        }, [currentLog]);
+
+        const handleSubmit = (e, andContinue = false) => {
+          e.preventDefault();
+          if (!notes.trim() && !keywords.trim() && rating === 0 && (markInTime == null || markOutTime == null)) {
+            toast.error("Please add some information or set marks for the log.");
+            return;
+          }
+          if (markInTime != null && markOutTime != null && markOutTime <= markInTime) {
+            toast.error("Mark Out time must be after Mark In time.");
+            return;
+          }
+
+          onSave({
+            id: currentLog?.id,
+            notes,
+            rating,
+            keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
+            color,
+            markIn: markInTime,
+            markOut: markOutTime,
+          }, andContinue);
+          
+          if(!currentLog || andContinue) { // If it was a new log, or save & continue
+            setNotes('');
+            setRating(0);
+            setKeywords('');
+            // Don't reset marks here, that's up to onClear or new markIn/Out actions
+          }
+        };
+        
+        const defaultLogColors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#64748b'];
+
+        return (
+          <form className="space-y-4 p-4 bg-bg-secondary rounded-lg">
+            <div className="flex gap-2">
+                <Button onClick={onMarkIn} icon="Scissors" variant="secondary" className="flex-1" title={`Set Mark In (I) - ${markInTime != null ? formatDuration(markInTime, true) : 'Not set'}`}>
+                  Mark In {markInTime != null ? `(${formatDuration(markInTime, true)})` : ''}
+                </Button>
+                <Button onClick={onMarkOut} icon="Scissors" variant="secondary" className="flex-1" title={`Set Mark Out (O) - ${markOutTime != null ? formatDuration(markOutTime, true) : 'Not set'}`}>
+                  Mark Out {markOutTime != null ? `(${formatDuration(markOutTime, true)})` : ''}
+                </Button>
+            </div>
+             <Button onClick={onClear} variant="ghost" size="sm" className="w-full text-xs" title="Clear Marks (Delete/Backspace)">Clear Marks</Button>
+
+
+            <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Log details, comments, transcription..." rows={4} />
+            <Input label="Keywords (comma-separated)" value={keywords} onChange={e => setKeywords(e.target.value)} placeholder="e.g., b-roll, interview, good take" />
+            
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="w-full sm:w-auto">
+                    <label className="block text-sm font-medium text-text-secondary mb-1">Rating</label>
+                    <StarRating rating={rating} setRating={setRating} />
+                </div>
+                <div className="w-full sm:w-auto">
+                    <label className="block text-sm font-medium text-text-secondary mb-1">Color Tag</label>
+                    <ColorPicker selectedColor={color} onColorChange={setColor} colors={defaultLogColors} />
+                </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <Button type="button" onClick={(e) => handleSubmit(e, false)} variant="primary" className="flex-1" icon="Save">
+                {currentLog ? 'Save Changes' : 'Save Log'}
+              </Button>
+              <Button type="button" onClick={(e) => handleSubmit(e, true)} variant="secondary" className="flex-1" icon="PlusCircle">
+                Save & New
+              </Button>
+            </div>
+            {currentLog && <Button type="button" onClick={onClear} variant="ghost" size="sm" className="w-full">Cancel Edit / New Log</Button>}
+          </form>
+        );
+      };
+      
+      const LogItem = ({ log, onEdit, onDelete, onGoTo }) => {
+        return (
+            <motion.div
+                layout
+                initial={animations.listItem.initial}
+                animate={animations.listItem.animate}
+                exit={animations.listItem.exit}
+                className="p-3 bg-bg-tertiary rounded-md mb-2"
+            >
+                <div className="flex justify-between items-start">
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            {log.markIn != null && log.markOut != null && (
+                                <button 
+                                    onClick={() => onGoTo(log.markIn)} 
+                                    className="text-xs font-mono px-2 py-0.5 rounded bg-accent-primary/20 hover:bg-accent-primary/40 text-accent-primary"
+                                    title="Go to Mark In"
+                                >
+                                    {formatDuration(log.markIn, true)} - {formatDuration(log.markOut, true)}
+                                </button>
+                            )}
+                            <StarRating rating={log.rating} editable={false} />
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: log.color || 'transparent' }} title={`Color: ${log.color}`}></div>
+                        </div>
+                        <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{log.notes || "No notes."}</p>
+                        {log.keywords && log.keywords.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                                {log.keywords.map(kw => (
+                                    <span key={kw} className="text-xs bg-gray-600 text-text-secondary px-1.5 py-0.5 rounded-full">{kw}</span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <DropdownMenu
+                        trigger={<Button variant="ghost" size="sm" icon="MoreVertical" aria-label="Log options" />}
+                    >
+                        <DropdownItem icon="Edit3" onClick={onEdit}>Edit Log</DropdownItem>
+                        <DropdownItem icon="Copy" onClick={() => { /* TODO: Duplicate Log */ toast.info("Duplicate not yet implemented")}}>Duplicate Log</DropdownItem>
+                        <DropdownItem icon="Trash2" onClick={onDelete} className="text-accent-danger">Delete Log</DropdownItem>
+                    </DropdownMenu>
+                </div>
+                <p className="text-xs text-text-tertiary mt-2 text-right">Created: {new Date(log.createdAt).toLocaleString()}</p>
+            </motion.div>
+        );
+      };
+
+
+      const LoggingStationScreen = () => {
+        const { currentProjectId, currentVideoId, navigateTo, openModal, closeModal, isModalOpen } = useUIStore();
+        const { currentVideo, fetchVideoById } = useVideoStore();
+        const { addLog, updateLog, deleteLog } = useLogStore();
+        const isLoading = useUIStore(state => state.isLoading);
+        const project = useProjectStore(state => state.projects.find(p => p.id === currentProjectId));
+
+        const videoRef = useRef(null);
+        const [videoSrc, setVideoSrc] = useState(null);
+        const [isPlaying, setIsPlaying] = useState(false);
+        const [currentTime, setCurrentTime] = useState(0);
+        const [duration, setDuration] = useState(0);
+        const [volume, setVolume] = useState(1);
+        const [playbackRate, setPlaybackRate] = useState(1);
+        const [isMuted, setIsMuted] = useState(false);
+        const [isFullScreen, setIsFullScreen] = useState(false);
+        const playerContainerRef = useRef(null);
+
+
+        const [markIn, setMarkIn] = useState(null);
+        const [markOut, setMarkOut] = useState(null);
+        const [currentEditingLog, setCurrentEditingLog] = useState(null); // Log object being edited
+
+        useEffect(() => {
+          if (currentVideoId) {
+            fetchVideoById(currentVideoId).then(videoData => {
+              if (videoData && videoData.fileHandle) {
+                videoData.fileHandle.getFile().then(file => {
+                  const url = URL.createObjectURL(file);
+                  setVideoSrc(url);
+                }).catch(err => {
+                    console.error("Error getting file from handle:", err);
+                    toast.error("Could not load video file. Permissions might have changed.");
+                    navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId);
+                });
+              }
+            });
+          } else {
+             navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId); // Should not happen
+          }
+          // Cleanup video URL on unmount
+          return () => {
+            if (videoSrc) {
+              URL.revokeObjectURL(videoSrc);
+            }
+          };
+        }, [currentVideoId]);
+        
+        // Keyboard shortcuts for logging screen
+        useEffect(() => {
+            const handleKeyDown = (e) => {
+                // Ensure focus is not in an input field before triggering player/logging shortcuts
+                const activeElement = document.activeElement;
+                const isInputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement.tagName) || activeElement.isContentEditable;
+
+                if (useUIStore.getState().currentScreen !== SCREENS.LOGGING_STATION) return;
+                
+                // Player controls (even if input focused for spacebar if video player itself is 'focused' conceptually)
+                if (e.code === 'Space' && !isInputFocused) { // Space for play/pause
+                    e.preventDefault();
+                    togglePlayPause();
+                }
+                if (e.key.toLowerCase() === 'm' && !isInputFocused) { // M for mute/unmute
+                    e.preventDefault();
+                    toggleMute();
+                }
+                if (e.key === 'ArrowLeft' && !isInputFocused) { // Left arrow for seek back
+                    e.preventDefault();
+                    seekRelative(e.shiftKey ? -30 : -5);
+                }
+                if (e.key === 'ArrowRight' && !isInputFocused) { // Right arrow for seek forward
+                    e.preventDefault();
+                    seekRelative(e.shiftKey ? 30 : 5);
+                }
+                // J K L keys are also common for -10s, play/pause, +10s
+                if (e.key.toLowerCase() === 'j' && !isInputFocused) { e.preventDefault(); seekRelative(-10); }
+                if (e.key.toLowerCase() === 'k' && !isInputFocused) { e.preventDefault(); togglePlayPause(); }
+                if (e.key.toLowerCase() === 'l' && !isInputFocused) { e.preventDefault(); seekRelative(10); }
+
+
+                // Logging controls (usually safe even if input focused for specific keys like Enter with modifiers)
+                if (e.key.toLowerCase() === 'i' && !isInputFocused) { // I for Mark In
+                    e.preventDefault();
+                    handleMarkIn();
+                }
+                if (e.key.toLowerCase() === 'o' && !isInputFocused) { // O for Mark Out
+                    e.preventDefault();
+                    handleMarkOut();
+                }
+                 if ((e.key === 'Delete' || e.key === 'Backspace') && !isInputFocused) { // Delete/Backspace to clear marks
+                    e.preventDefault();
+                    handleClearMarks();
+                }
+                // Enter to save log could be handled in form, Cmd/Ctrl+Enter for Save & New
+            };
+
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }, [isPlaying, currentTime, duration, markIn, markOut]); // Add other relevant dependencies if they affect shortcuts
+
+        const handleLoadedMetadata = () => {
+          if (videoRef.current) {
+            setDuration(videoRef.current.duration);
+          }
+        };
+        const handleTimeUpdate = () => {
+          if (videoRef.current) {
+            setCurrentTime(videoRef.current.currentTime);
+          }
+        };
+        const handleVideoEnded = () => setIsPlaying(false);
+
+        const togglePlayPause = () => {
+          if (videoRef.current) {
+            if (videoRef.current.paused || videoRef.current.ended) {
+              videoRef.current.play().then(() => setIsPlaying(true)).catch(e => console.error("Play error:", e));
+            } else {
+              videoRef.current.pause();
+              setIsPlaying(false);
+            }
+          }
+        };
+        const seek = (time) => {
+          if (videoRef.current) {
+            videoRef.current.currentTime = Math.max(0, Math.min(time, duration));
+            setCurrentTime(videoRef.current.currentTime); // Ensure UI updates immediately
+          }
+        };
+        const seekRelative = (offset) => seek(currentTime + offset);
+        
+        const handleVolumeChange = (newVolume) => {
+            if (videoRef.current) {
+                videoRef.current.volume = newVolume;
+                setVolume(newVolume);
+                setIsMuted(newVolume === 0);
+            }
+        };
+        const toggleMute = () => {
+            if (videoRef.current) {
+                const newMuted = !videoRef.current.muted;
+                videoRef.current.muted = newMuted;
+                setIsMuted(newMuted);
+                if (!newMuted && volume === 0) { // If unmuting and volume was 0, set to a default
+                    handleVolumeChange(0.5);
+                } else if (newMuted) {
+                    // Store current volume before muting to restore it later? Optional.
+                }
+            }
+        };
+        const handlePlaybackRateChange = (rate) => {
+            if (videoRef.current) {
+                videoRef.current.playbackRate = rate;
+                setPlaybackRate(rate);
+            }
+        };
+        const toggleFullScreen = () => {
+            if (!playerContainerRef.current) return;
+            if (!document.fullscreenElement) {
+                playerContainerRef.current.requestFullscreen().then(() => setIsFullScreen(true)).catch(err => console.error(err));
+            } else {
+                document.exitFullscreen().then(() => setIsFullScreen(false)).catch(err => console.error(err));
+            }
+        };
+         useEffect(() => {
+            const fsChangeHandler = () => setIsFullScreen(!!document.fullscreenElement);
+            document.addEventListener('fullscreenchange', fsChangeHandler);
+            return () => document.removeEventListener('fullscreenchange', fsChangeHandler);
+        }, []);
+
+
+        const handleMarkIn = () => {
+          if (videoRef.current) {
+            setMarkIn(videoRef.current.currentTime);
+            toast(`Mark In set: ${formatDuration(videoRef.current.currentTime, true)}`, { icon: <Icon name="Scissors" />});
+          }
+        };
+        const handleMarkOut = () => {
+          if (videoRef.current) {
+            const newMarkOut = videoRef.current.currentTime;
+            if (markIn != null && newMarkOut <= markIn) {
+                toast.error("Mark Out must be after Mark In.");
+                return;
+            }
+            setMarkOut(newMarkOut);
+            toast(`Mark Out set: ${formatDuration(newMarkOut, true)}`, { icon: <Icon name="Scissors" />});
+          }
+        };
+        const handleClearMarks = () => {
+          setMarkIn(null);
+          setMarkOut(null);
+          setCurrentEditingLog(null); // Also clear editing state if marks are cleared
+          toast.info("Marks cleared.");
+        };
+
+        const handleSaveLog = async (logData, andContinue = false) => {
+          if (logData.id) { // Updating existing log
+            await updateLog(logData.id, logData);
+          } else { // Adding new log
+            await addLog(currentVideoId, logData);
+          }
+          if (!logData.id || andContinue) { // If new log or "save and new"
+            handleClearMarks(); // Clear marks and form for next log
+            setCurrentEditingLog(null);
+          } else if (logData.id && !andContinue) { // Saved an existing log and NOT continuing
+            setCurrentEditingLog(null); // Clear editing state but keep marks if they were from the edited log
+          }
+        };
+        
+        const handleEditLog = (log) => {
+            setCurrentEditingLog(log);
+            setMarkIn(log.markIn);
+            setMarkOut(log.markOut);
+            seek(log.markIn); // Optionally seek to log start when editing
+            toast.info("Editing log. Form populated.");
+        };
+        
+        const handleDeleteLog = async (logId) => {
+            if (confirm("Are you sure you want to delete this log?")) {
+                await deleteLog(logId);
+                if (currentEditingLog && currentEditingLog.id === logId) {
+                    handleClearMarks(); // Clear form if deleted log was being edited
+                }
+            }
+        };
+
+        if (isLoading && !currentVideo) return <div className="p-8"><SkeletonLoader className="h-12 w-1/2 mb-4" /><SkeletonLoader className="h-[60vh] w-full mb-4" /><SkeletonLoader className="h-24 w-full" /></div>;
+        if (!currentVideo || !videoSrc) return <div className="p-8 text-center text-text-secondary">Video not found or failed to load. <Button onClick={() => navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId)}>Back to Project</Button></div>;
+        
+        const logsForTimeline = currentVideo.logs || [];
+
+        return (
+          <motion.div {...animations.pageTransition} className="flex flex-col lg:flex-row h-screen max-h-screen overflow-hidden">
+            {/* Main Content: Video Player and Timeline (takes up remaining space) */}
+            <div className="flex-grow flex flex-col bg-bg-primary overflow-hidden relative" ref={playerContainerRef}>
+              {/* Sticky Header */}
+              <header className="p-3 border-b border-bg-tertiary">
+                <div className="flex justify-between items-center">
+                    <div className="text-sm text-text-secondary flex items-center overflow-hidden">
+                        <button onClick={() => navigateTo(SCREENS.PROJECT_DASHBOARD)} className="hover:text-accent-primary hidden sm:inline">Projects</button>
+                        <Icon name="ChevronRight" size={16} className="mx-1 hidden sm:inline" />
+                        <button onClick={() => navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId)} className="hover:text-accent-primary truncate max-w-[150px] sm:max-w-[200px]">
+                            {project ? project.name : 'Project'}
+                        </button>
+                        <Icon name="ChevronRight" size={16} className="mx-1" />
+                        <span className="font-semibold text-text-primary truncate max-w-[150px] sm:max-w-[300px]" title={currentVideo.filename}>{currentVideo.filename}</span>
+                    </div>
+                  <div className="flex items-center gap-2">
+                     <span className="text-xs text-text-tertiary hidden md:block">
+                        {formatDuration(currentTime, true)} / {formatDuration(duration, true)}
+                     </span>
+                     {/* Quick Actions (Export logs for this video, etc) */}
+                     {/* <Button variant="ghost" size="sm" icon="Download" title="Export Logs for this Video">Export</Button> */}
+                     <Button onClick={() => navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId)} variant="ghost" size="sm" icon="ChevronLeft">Back to Assembly</Button>
+                  </div>
+                </div>
+              </header>
+
+              {/* Video Player Section */}
+              <div className="relative flex-grow flex items-center justify-center bg-black group">
+                <video
+                  ref={videoRef}
+                  src={videoSrc}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onTimeUpdate={handleTimeUpdate}
+                  onEnded={handleVideoEnded}
+                  onClick={togglePlayPause} // Click on video to play/pause
+                  onDoubleClick={toggleFullScreen} // Double click for fullscreen
+                  className="max-w-full max-h-[calc(100%-160px)] object-contain custom-video-controls" // Adjust max-h based on controls/timeline
+                  playsInline // Important for mobile
+                />
+                {/* Custom Controls Overlay (shown on hover/focus) */}
+                <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300">
+                    <EnhancedTimeline
+                        duration={duration}
+                        logs={logsForTimeline}
+                        currentTime={currentTime}
+                        onSeek={seek}
+                        markIn={markIn}
+                        markOut={markOut}
+                        videoRef={videoRef}
+                    />
+                    <div className="flex items-center justify-between gap-2 sm:gap-4 mt-2">
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <Button onClick={togglePlayPause} variant="ghost" icon={isPlaying ? "Pause" : "Play"} size="sm" aria-label={isPlaying ? "Pause" : "Play"} />
+                            <Button onClick={() => seekRelative(-10)} variant="ghost" icon="Rewind" size="sm" aria-label="Rewind 10s" />
+                            <Button onClick={() => seekRelative(10)} variant="ghost" icon="FastForward" size="sm" aria-label="Fast Forward 10s" />
+                            
+                            <div className="flex items-center group/volume">
+                                <Button onClick={toggleMute} variant="ghost" icon={isMuted || volume === 0 ? "VolumeX" : "Volume2"} size="sm" aria-label={isMuted ? "Unmute" : "Mute"} />
+                                <input 
+                                    type="range" min="0" max="1" step="0.05" 
+                                    value={isMuted ? 0 : volume} 
+                                    onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                                    className="w-0 group-hover/volume:w-20 ml-1 transition-all duration-200 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-accent-primary"
+                                    aria-label="Volume"
+                                />
+                            </div>
+                        </div>
+                        <div className="text-xs sm:text-sm text-text-primary font-mono">
+                            {formatDuration(currentTime, true)} / {formatDuration(duration, true)}
+                        </div>
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <select 
+                                value={playbackRate} 
+                                onChange={e => handlePlaybackRateChange(parseFloat(e.target.value))}
+                                className="bg-transparent text-text-primary text-xs sm:text-sm focus:outline-none hover:bg-bg-tertiary p-1 rounded"
+                                aria-label="Playback speed"
+                            >
+                                {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => <option key={rate} value={rate} className="bg-bg-secondary text-text-primary">{rate}x</option>)}
+                            </select>
+                            <Button onClick={toggleFullScreen} variant="ghost" icon={isFullScreen ? "Minimize2" : "Maximize2"} size="sm" aria-label={isFullScreen ? "Exit Fullscreen" : "Enter Fullscreen"} />
+                        </div>
+                    </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sidebar: Logging Panel & Logs List (collapsible on smaller screens) */}
+            <aside className="w-full lg:w-[400px] xl:w-[450px] flex-shrink-0 bg-bg-secondary flex flex-col h-full max-h-screen border-l border-bg-tertiary">
+              <div className="p-1 border-b border-bg-tertiary"> {/* Tab-like controls can go here if panel becomes collapsible */}
+                <h3 className="text-lg font-semibold p-3 text-center">Logging Panel</h3>
+              </div>
+              <div className="overflow-y-auto flex-grow">
+                <LoggingForm
+                  currentLog={currentEditingLog}
+                  onSave={handleSaveLog}
+                  onClear={() => { handleClearMarks(); setCurrentEditingLog(null);}}
+                  videoCurrentTime={currentTime}
+                  onMarkIn={handleMarkIn}
+                  onMarkOut={handleMarkOut}
+                  markInTime={markIn}
+                  markOutTime={markOut}
+                />
+                
+                <div className="p-4">
+                  <h4 className="text-md font-semibold mb-2 text-text-secondary">Logs ({currentVideo.logs ? currentVideo.logs.length : 0})</h4>
+                   {/* TODO: List Controls: Search Logs, Filter by Rating, Sort Options */}
+                  <div className="max-h-[calc(100vh-500px)] overflow-y-auto pr-1"> {/* Adjust max-h based on form height */}
+                     <AnimatePresence>
+                        {currentVideo.logs && currentVideo.logs.length > 0 ? (
+                           currentVideo.logs.slice().reverse().map(log => ( // Show newest first, or sort by markIn
+                            <LogItem 
+                                key={log.id} 
+                                log={log}
+                                onEdit={() => handleEditLog(log)}
+                                onDelete={() => handleDeleteLog(log.id)}
+                                onGoTo={(time) => seek(time)}
+                            />
+                           ))
+                        ) : (
+                            <p className="text-sm text-text-tertiary text-center py-4">No logs for this video yet.</p>
+                        )}
+                     </AnimatePresence>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </motion.div>
+        );
+      };
+
+      // --- Advanced Feature Components ---
+      const PlaySelectsModal = ({ isOpen, onClose, videoId }) => {
+        // This is a complex component. For now, a simplified version.
+        // It would need its own video player instance and logic to play segments.
+        const { currentVideo, fetchVideoById } = useVideoStore();
+        const [selects, setSelects] = useState([]);
+        const [currentSelectIndex, setCurrentSelectIndex] = useState(0);
+        const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+        const modalVideoRef = useRef(null);
+
+        useEffect(() => {
+          if (isOpen && videoId) {
+            fetchVideoById(videoId).then(videoData => {
+              if (videoData && videoData.logs) {
+                // Filter logs that are "selects" (e.g., good rating, or specific keyword)
+                const validSelects = videoData.logs.filter(log => log.markIn != null && log.markOut != null && log.markOut > log.markIn && log.rating >=3 ); // Example: rating 3+
+                setSelects(validSelects.sort((a,b) => a.markIn - b.markIn));
+                setCurrentSelectIndex(0);
+                 if (videoData.fileHandle) {
+                    videoData.fileHandle.getFile().then(file => {
+                        if (modalVideoRef.current) modalVideoRef.current.src = URL.createObjectURL(file);
+                    }).catch(err => toast.error("Could not load video for selects."));
+                }
+              }
+            });
+          } else if (!isOpen && modalVideoRef.current && modalVideoRef.current.src) {
+             URL.revokeObjectURL(modalVideoRef.current.src);
+             modalVideoRef.current.src = ""; // Clear src
+             modalVideoRef.current.removeAttribute('src'); // Fully remove
+             modalVideoRef.current.load(); // Reset video element state
+          }
+        }, [isOpen, videoId]);
+
+        useEffect(() => {
+            if (isOpen && selects.length > 0 && modalVideoRef.current && modalVideoRef.current.src) {
+                playSelect(currentSelectIndex);
+            }
+        }, [selects, currentSelectIndex, isOpen, modalVideoRef.current?.src]); // Depend on src actually being set
+
+
+        const playSelect = (index) => {
+            if (!modalVideoRef.current || selects.length === 0 || index < 0 || index >= selects.length) return;
+            
+            const select = selects[index];
+            setCurrentSelectIndex(index);
+            
+            modalVideoRef.current.currentTime = select.markIn;
+            modalVideoRef.current.play()
+                .then(() => setIsVideoPlaying(true))
+                .catch(e => console.error("Play Selects error:", e));
+
+            // Stop at markOut (could use timeupdate event)
+            const checkEndTime = () => {
+                if (modalVideoRef.current && modalVideoRef.current.currentTime >= select.markOut) {
+                    modalVideoRef.current.pause();
+                    setIsVideoPlaying(false);
+                    modalVideoRef.current.removeEventListener('timeupdate', checkEndTime);
+                    // Optionally auto-play next or wait
+                    // playNextSelect(); // Example of auto-play next
+                }
+            };
+            modalVideoRef.current.addEventListener('timeupdate', checkEndTime);
+        };
+        
+        const playNextSelect = () => {
+            if (currentSelectIndex < selects.length - 1) {
+                playSelect(currentSelectIndex + 1);
+            } else {
+                 // Reached end of selects
+                setIsVideoPlaying(false);
+                toast.info("Finished playing all selects.");
+            }
+        };
+        const playPreviousSelect = () => {
+            if (currentSelectIndex > 0) {
+                playSelect(currentSelectIndex - 1);
+            }
+        };
+        const toggleCurrentSelectPlayPause = () => {
+            if (!modalVideoRef.current) return;
+            if (isVideoPlaying) {
+                modalVideoRef.current.pause();
+                setIsVideoPlaying(false);
+            } else {
+                // Ensure it plays within the current select's bounds if paused
+                const currentSelect = selects[currentSelectIndex];
+                if (modalVideoRef.current.currentTime < currentSelect.markIn || modalVideoRef.current.currentTime >= currentSelect.markOut) {
+                    modalVideoRef.current.currentTime = currentSelect.markIn; // Restart current select if outside bounds
+                }
+                modalVideoRef.current.play().then(() => setIsVideoPlaying(true));
+            }
+        };
+        
+        const currentSelectData = selects[currentSelectIndex];
+
+        return (
+          <Modal isOpen={isOpen} onClose={onClose} title={`Play Selects: ${currentVideo?.filename || 'Video'}`} size="xl">
+            {selects.length > 0 ? (
+              <div className="space-y-4">
+                <div className="aspect-video bg-black rounded overflow-hidden">
+                  <video ref={modalVideoRef} className="w-full h-full" onEnded={playNextSelect} controls={false} playsInline />
+                </div>
+                {/* Selects Timeline/Navigation */}
+                <div className="flex items-center justify-center gap-1 overflow-x-auto p-2 bg-bg-tertiary rounded">
+                    {selects.map((sel, idx) => (
+                        <button
+                            key={sel.id}
+                            onClick={() => playSelect(idx)}
+                            title={`Play: ${sel.notes.substring(0,30)}... \n(${formatDuration(sel.markIn)} - ${formatDuration(sel.markOut)})`}
+                            className={`h-6 px-2 text-xs rounded transition-all
+                                ${idx === currentSelectIndex ? 'bg-accent-primary text-white scale-110' : 'bg-gray-600 hover:bg-gray-500 text-text-secondary'}
+                                ${sel.rating >= 4 ? 'border-2 border-yellow-400' : ''}
+                            `}
+                            style={{backgroundColor: idx !== currentSelectIndex ? sel.color : undefined}} // Show color if not active
+                        >
+                           Select {idx + 1}
+                        </button>
+                    ))}
+                </div>
+                {currentSelectData && (
+                    <div className="p-3 bg-bg-tertiary rounded text-sm">
+                        <h4 className="font-semibold text-text-primary">Current Select ({currentSelectIndex + 1} of {selects.length}):</h4>
+                        <p className="text-text-secondary mt-1 whitespace-pre-wrap">Notes: {currentSelectData.notes || 'N/A'}</p>
+                        <div className="mt-1">Rating: <StarRating rating={currentSelectData.rating} editable={false} /></div>
+                        {currentSelectData.keywords && currentSelectData.keywords.length > 0 && <p className="text-text-secondary mt-1">Keywords: {currentSelectData.keywords.join(', ')}</p>}
+                    </div>
+                )}
+                 <div className="flex justify-center items-center gap-4 p-2">
+                    <Button onClick={playPreviousSelect} icon="SkipBack" disabled={currentSelectIndex === 0} aria-label="Previous Select"/>
+                    <Button onClick={toggleCurrentSelectPlayPause} icon={isVideoPlaying ? "Pause" : "Play"} variant="primary" size="lg" aria-label={isVideoPlaying ? "Pause Select" : "Play Select"}/>
+                    <Button onClick={playNextSelect} icon="SkipForward" disabled={currentSelectIndex === selects.length - 1} aria-label="Next Select"/>
+                </div>
+              </div>
+            ) : (
+              <p className="text-text-secondary text-center py-8">No suitable selects (e.g. rating 3+) found in this video to play.</p>
+            )}
+          </Modal>
+        );
+      };
+
+      // === App Controls (Export/Import, Settings) ===
+      const AppControls = {
+        exportAllData: async () => {
+          try {
+            useUIStore.getState().setLoading(true);
+            const projects = await db.projects.toArray();
+            const videos = await db.videos.toArray();
+            const logs = await db.logs.toArray();
+            const settings = await db.settings.toArray();
+
+            // Note: FileSystemFileHandle objects in 'videos' cannot be directly serialized to JSON.
+            // We need to decide how to handle them. For a complete backup, they are essential.
+            // One option for export is to omit them, and for import, re-acquire them.
+            // Or, try to store their 'name' and hope user can re-select same named files from same relative paths.
+            // For simplicity in this example, we'll export them as is, but they might become null or empty objects on import if not handled by Dexie's internals for cloning.
+            // Dexie *can* store them in IndexedDB, but JSON.stringify will likely fail or produce empty objects.
+            // A more robust solution might use a library that can serialize/deserialize them or a custom reviver/replacer.
+            
+            const dataToExport = {
+              exportFormatVersion: 1,
+              exportedAt: new Date().toISOString(),
+              projects,
+              videos: videos.map(v => ({...v, fileHandle: null})), // Strip fileHandle for basic JSON export
+              logs,
+              settings,
+            };
+            const jsonString = JSON.stringify(dataToExport, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `logreel_backup_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            toast.success("All data exported successfully as JSON (file handles excluded).");
+          } catch (error) {
+            console.error("Export failed:", error);
+            toast.error("Data export failed.");
+          } finally {
+            useUIStore.getState().setLoading(false);
+          }
+        },
+        importData: async () => {
+            // This is complex: needs file picker for JSON, parsing, validation, conflict resolution (overwrite/merge?)
+            // For now, a placeholder that logs to console.
+            try {
+                const [fileHandle] = await window.showOpenFilePicker({
+                    types: [{ description: 'LogReel JSON Backup', accept: { 'application/json': ['.json'] }}],
+                    multiple: false,
+                });
+                const file = await fileHandle.getFile();
+                const jsonString = await file.text();
+                const data = JSON.parse(jsonString);
+
+                if (!data.exportFormatVersion || data.exportFormatVersion !== 1) {
+                    toast.error("Invalid or unsupported backup file format.");
+                    return;
+                }
+
+                if (!confirm("Importing data will overwrite existing data with the same IDs. Are you sure you want to proceed?")) {
+                    return;
+                }
+                
+                useUIStore.getState().setLoading(true);
+
+                // Clear existing data (or implement merging strategy)
+                await db.transaction('rw', db.projects, db.videos, db.logs, db.settings, async () => {
+                    await db.projects.clear();
+                    await db.videos.clear();
+                    await db.logs.clear();
+                    await db.settings.clear();
+
+                    if (data.projects) await db.projects.bulkAdd(data.projects.map(p => ({...p, createdAt: new Date(p.createdAt), updatedAt: new Date(p.updatedAt) })));
+                    // Videos import is tricky due to FileSystemFileHandle.
+                    // The exported JSON has 'fileHandle: null'. User would need to re-link files.
+                    // This basic import won't re-link. A more advanced import would guide user through re-linking.
+                    if (data.videos) await db.videos.bulkAdd(data.videos.map(v => ({...v, createdAt: new Date(v.createdAt), updatedAt: new Date(v.updatedAt), fileHandle: null /* Mark as needing relink */})));
+                    if (data.logs) await db.logs.bulkAdd(data.logs.map(l => ({...l, createdAt: new Date(l.createdAt), updatedAt: new Date(l.updatedAt) })));
+                    if (data.settings) await db.settings.bulkAdd(data.settings);
+                });
+                
+                toast.success("Data imported successfully! You may need to re-link video files.");
+                // Force reload or re-fetch all data
+                useProjectStore.getState().fetchProjects();
+                // Navigate to dashboard
+                useUIStore.getState().navigateTo(SCREENS.PROJECT_DASHBOARD);
+
+            } catch (error) {
+                if (error.name === 'AbortError') { /* User cancelled picker */ return; }
+                console.error("Import failed:", error);
+                toast.error("Data import failed. Check console for details.");
+            } finally {
+                useUIStore.getState().setLoading(false);
+            }
+        },
+      };
+
+
+      // === Main App Component ===
+      const App = () => {
+        const { currentScreen, currentProjectId, currentVideoId, globalError, isLoading, navigateTo, setGlobalError } = useUIStore();
+
+        // Basic hash-based routing setup
+        useEffect(() => {
+          const handleHashChange = () => {
+            const hash = window.location.hash.slice(1); // Remove #
+            if (!hash) {
+              navigateTo(SCREENS.PROJECT_DASHBOARD);
+              return;
+            }
+            const [screen, projIdStr, videoIdStr] = hash.split('/');
+            const projId = projIdStr ? parseInt(projIdStr, 10) : null;
+            const vidId = videoIdStr ? parseInt(videoIdStr, 10) : null;
+
+            if (Object.values(SCREENS).includes(screen)) {
+              // Avoid re-navigating if already on the correct screen with correct IDs from internal navigation
+              if (screen !== currentScreen || projId !== currentProjectId || vidId !== currentVideoId) {
+                navigateTo(screen, projId, vidId);
+              }
+            } else {
+              navigateTo(SCREENS.PROJECT_DASHBOARD); // Default to project dashboard if hash is invalid
+            }
+          };
+
+          window.addEventListener('hashchange', handleHashChange);
+          handleHashChange(); // Initial load
+
+          return () => window.removeEventListener('hashchange', handleHashChange);
+        }, []); // Empty dependency array: run once on mount for setup
+
+        // Global keyboard shortcuts (very basic example)
+        useEffect(() => {
+            const handleGlobalKeyDown = (e) => {
+                if (e.metaKey || e.ctrlKey) { // Cmd/Ctrl shortcuts
+                    // Example: Cmd+N for new project (if on dashboard)
+                    // if (e.key === 'n' && currentScreen === SCREENS.PROJECT_DASHBOARD) {
+                    //     e.preventDefault();
+                    //     useUIStore.getState().openModal('projectForm');
+                    // }
+                    // This needs careful management to avoid conflicts with browser/OS shortcuts or input fields
+                }
+                if (e.key === 'Escape') {
+                    // Close modals, popups, or navigate back (simplified)
+                    if (useUIStore.getState().isModalOpen) {
+                        e.preventDefault();
+                        useUIStore.getState().closeModal();
+                    } else if (currentScreen === SCREENS.LOGGING_STATION) {
+                        e.preventDefault();
+                        navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId);
+                    } else if (currentScreen === SCREENS.ASSEMBLY_HUB) {
+                        e.preventDefault();
+                        navigateTo(SCREENS.PROJECT_DASHBOARD);
+                    }
+                }
+            };
+            window.addEventListener('keydown', handleGlobalKeyDown);
+            return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+        }, [currentScreen, currentProjectId]);
+
+        let screenComponent;
+        switch (currentScreen) {
+          case SCREENS.ASSEMBLY_HUB:
+            screenComponent = <AssemblyHubScreen />;
+            break;
+          case SCREENS.LOGGING_STATION:
+            screenComponent = <LoggingStationScreen />;
+            break;
+          case SCREENS.PROJECT_DASHBOARD:
+          default:
+            screenComponent = <ProjectDashboardScreen />;
+            break;
+        }
+
+        return (
+          <Fragment>
+            <Toaster
+                position="bottom-right"
+                toastOptions={{
+                    className: '!bg-bg-tertiary !text-text-primary !shadow-lg',
+                    success: {
+                        iconTheme: { primary: 'var(--accent-success)', secondary: 'var(--text-primary)' },
+                    },
+                    error: {
+                        iconTheme: { primary: 'var(--accent-danger)', secondary: 'var(--text-primary)' },
+                    },
+                     info: {
+                        iconTheme: { primary: 'var(--accent-primary)', secondary: 'var(--text-primary)' },
+                    }
+                }}
+            />
+            {globalError && (
+              <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-accent-danger text-white p-3 rounded-md shadow-lg z-[100] flex items-center gap-2">
+                <Icon name="AlertTriangle" size={20} />
+                <span>Error: {globalError}</span>
+                <Button variant="ghost" size="sm" onClick={() => setGlobalError(null)} icon="X" className="!text-white hover:!bg-red-400 -mr-1" />
+              </div>
+            )}
+            {/* Loading Overlay (optional, more fine-grained loading is better) */}
+            {/* {isLoading && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[999]"><Icon name="Loader2" className="animate-spin" size={48} /></div>} */}
+            
+            <AnimatePresence mode="wait">
+              {React.cloneElement(screenComponent, { key: currentScreen })}
+            </AnimatePresence>
+          </Fragment>
+        );
+      };
+
+      // === Render the App ===
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        ReactDOM.createRoot(rootElement).render(<App />);
+      } else {
+        console.error("Root element not found.");
+      }
+    } // End of Zustand check
+  </script>
 </body>
 </html>
