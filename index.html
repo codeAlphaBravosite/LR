@@ -1,2314 +1,1287 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LogReel - Professional Video Logging</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogReel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Global Styles */
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --accent-color: #e74c3c;
+            --light-gray: #ecf0f1;
+            --medium-gray: #bdc3c7;
+            --dark-gray: #7f8c8d;
+            --text-color: #333;
+            --bg-color: #fff;
+            --card-bg: #f9f9f9;
+        }
 
-  <!-- React 18 -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-gray);
+            color: var(--text-color);
+            line-height: 1.6;
+            font-size: 16px;
+        }
 
-  <!-- Zustand for State Management -->
-  <script type="module">
-    import { create } from 'https://unpkg.com/zustand@4.4.7/esm/index.js';
-    window.zustand = { create }; // Make it globally available for the Babel script
-    
-    import { subscribeWithSelector } from 'https://unpkg.com/zustand@4.4.7/esm/middleware.js';
-    window.zustandMiddleware = { subscribeWithSelector };
-  </script>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 15px;
+        }
 
-  <!-- Dexie.js for IndexedDB -->
-  <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+        header {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        header h1, header h2, header h3 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        header h1 { font-size: 1.8rem; }
 
-  <!-- Lucide React Icons -->
-  <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
+        .screen { display: none; }
+        .screen.active { display: block; }
 
-  <!-- Framer Motion for Animations -->
-  <script src="https://unpkg.com/framer-motion@10/dist/framer-motion.js"></script>
+        button, input[type="submit"] {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s ease;
+            margin: 5px;
+        }
+        button:hover, input[type="submit"]:hover {
+            background-color: #2980b9;
+        }
+        button.secondary {
+            background-color: var(--medium-gray);
+            color: var(--text-color);
+        }
+        button.secondary:hover {
+            background-color: var(--dark-gray);
+        }
+        button.danger {
+            background-color: var(--accent-color);
+        }
+        button.danger:hover {
+            background-color: #c0392b;
+        }
+        button i { margin-right: 5px; }
 
-  <!-- React Hot Toast for Notifications -->
-  <script src="https://unpkg.com/react-hot-toast@2.4.1/dist/index.umd.js"></script>
+        input[type="text"], input[type="search"], textarea, select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid var(--medium-gray);
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        textarea { min-height: 80px; resize: vertical; }
 
-  <!-- Focus Trap React for Accessibility -->
-  <script src="https://unpkg.com/focus-trap-react@10.2.3/dist/focus-trap-react.umd.js"></script>
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--medium-gray);
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card h3 { margin-top: 0; }
 
-  <style>
-    :root {
-      --background-primary: #0a0a0a;
-      --background-secondary: #1a1a1a;
-      --background-tertiary: #2a2a2a;
-      --accent-primary: #3b82f6;
-      --accent-secondary: #8b5cf6;
-      --accent-success: #10b981;
-      --accent-warning: #f59e0b;
-      --accent-danger: #ef4444;
-      --text-primary: #ffffff;
-      --text-secondary: #a1a1aa;
-      --text-tertiary: #71717a;
-    }
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: var(--background-primary);
-      color: var(--text-primary);
-      overscroll-behavior: none;
-    }
-    .glassmorphism {
-      background: rgba(26, 26, 26, 0.6); /* --background-secondary with alpha */
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(42, 42, 42, 0.5); /* --background-tertiary with alpha */
-    }
-    /* Custom scrollbar for webkit browsers */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-      background: var(--background-secondary);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: var(--accent-primary);
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #2563eb; /* Darker blue */
-    }
-    .custom-video-controls::-webkit-media-controls-panel {
-      display: none !important;
-      opacity: 0 !important;
-    }
-    .custom-video-controls::-webkit-media-controls-play-button,
-    .custom-video-controls::-webkit-media-controls-timeline,
-    .custom-video-controls::-webkit-media-controls-current-time-display,
-    .custom-video-controls::-webkit-media-controls-time-remaining-display,
-    .custom-video-controls::-webkit-media-controls-mute-button,
-    .custom-video-controls::-webkit-media-controls-volume-slider,
-    .custom-video-controls::-webkit-media-controls-fullscreen-button {
-        display: none !important;
-        opacity: 0 !important;
-    }
-  </style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background-color: var(--bg-color);
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .close-modal-btn {
+            color: var(--dark-gray);
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+        }
+        .close-modal-btn:hover, .close-modal-btn:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* Star Rating */
+        .rating-stars { margin-bottom: 10px; }
+        .star { font-size: 1.8rem; cursor: pointer; color: var(--medium-gray); margin-right: 2px; }
+        .star.selected, .star:hover { color: #f39c12; } /* Gold color for selected/hover */
+
+        /* Log List Item */
+        .log-item {
+            border-bottom: 1px solid var(--light-gray);
+            padding: 10px 0;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+        .log-item:last-child { border-bottom: none; }
+        .log-item .thumbnail { width: 80px; height: 45px; background-color: var(--light-gray); border: 1px solid var(--medium-gray); object-fit: cover; }
+        .log-item .details { flex-grow: 1; }
+        .log-item .actions { display: flex; gap: 5px; }
+
+        /* Video Player Styling */
+        #video-player-container video, #screen2-video-player video {
+            width: 100%;
+            background-color: black;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .custom-video-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background-color: var(--card-bg);
+            border-radius: 5px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .custom-video-controls input[type="range"] {
+            flex-grow: 1;
+            margin: 0;
+            padding:0;
+        }
+        .custom-video-controls select { width: auto; padding: 5px; margin: 0; }
+
+        /* Screen 2 Layout */
+        #screen-project-videos .content-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        #video-selector-area { max-height: 200px; overflow-y: auto; border: 1px solid var(--medium-gray); padding: 10px; border-radius: 5px; background: white;}
+        #video-selector-area .video-select-item { padding: 8px; cursor: pointer; border-bottom: 1px solid var(--light-gray); }
+        #video-selector-area .video-select-item:hover, #video-selector-area .video-select-item.active { background-color: var(--primary-color); color: white; }
+        #video-selector-area .video-select-item:last-child { border-bottom: none; }
+        #selected-video-area { margin-top: 15px; }
+        #search-results-container { margin-top: 10px; }
+        .search-result-item { border: 1px solid var(--medium-gray); padding: 10px; margin-bottom: 5px; border-radius: 4px; background: white;}
+        
+        /* Utility */
+        .hidden { display: none !important; }
+        .text-sm { font-size: 0.9rem; }
+        .text-muted { color: var(--dark-gray); }
+
+        /* Responsive adjustments */
+        @media (min-width: 768px) {
+            #screen-project-videos .content-wrapper {
+                /* Consider a two-column layout if desired for larger screens */
+            }
+            header h1, header h2, header h3 { font-size: 1.8rem; }
+            header h1 { font-size: 2.2rem; }
+        }
+    </style>
 </head>
 <body>
-  <div id="root"></div>
-
-  <script type="text/babel">
-    // Make sure Zustand is loaded
-    if (!window.zustand || !window.zustand.create) {
-      console.error("Zustand not loaded. App will not run.");
-      document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px;">Error: Zustand not loaded. Please check console and ensure script order is correct.</div>';
-    } else {
-      // Initialize Tailwind CSS configuration
-      tailwind.config = {
-        darkMode: 'class', // Using class for manual toggle if needed, or stick to 'media'
-        theme: {
-          extend: {
-            colors: {
-              'bg-primary': 'var(--background-primary)',
-              'bg-secondary': 'var(--background-secondary)',
-              'bg-tertiary': 'var(--background-tertiary)',
-              'accent-primary': 'var(--accent-primary)',
-              'accent-secondary': 'var(--accent-secondary)',
-              'accent-success': 'var(--accent-success)',
-              'accent-warning': 'var(--accent-warning)',
-              'accent-danger': 'var(--accent-danger)',
-              'text-primary': 'var(--text-primary)',
-              'text-secondary': 'var(--text-secondary)',
-              'text-tertiary': 'var(--text-tertiary)',
-            },
-            fontFamily: {
-              inter: ['Inter', 'sans-serif'],
-            },
-            keyframes: {
-              skeleton: {
-                '0%, 100%': { opacity: 1 },
-                '50%': { opacity: 0.5 },
-              },
-            },
-            animation: {
-              skeleton: 'skeleton 1.5s ease-in-out infinite',
-            },
-          },
-        },
-        plugins: [],
-      };
-
-      // Ensure libraries are available
-      const { create } = window.zustand;
-      const { subscribeWithSelector } = window.zustandMiddleware;
-      const { default: Dexie } = window.Dexie;
-      const { 
-        createElement, useState, useEffect, useCallback, useMemo, useRef, Fragment, memo, lazy, Suspense 
-      } = React;
-      const { render } = ReactDOM;
-      const { 
-        Play, Pause, Settings, PlusCircle, Trash2, Edit3, Search, List, Grid, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Maximize, Minimize, Star, FileVideo, Clock, Tag, Type, ChevronsUpDown, Eye, EyeOff, UploadCloud, Download, AlertTriangle, Info, CheckCircle, Save, Copy, Film, Scissors, SkipForward, SkipBack, Rewind, FastForward, Volume2, VolumeX, Maximize2, Minimize2, ExternalLink, Columns, Layers, Palette, FolderOpen, MoreVertical, ThumbsUp
-      } = lucideReact; // Lucide icons are globally available via lucideReact object
-      const { motion, AnimatePresence } = window.FramerMotion;
-      const { Toaster, toast } = reactHotToast;
-      const FocusTrap = window.FocusTrapReact;
-
-      // === Constants ===
-      const APP_NAME = "LogReel";
-      const SCREENS = {
-        PROJECT_DASHBOARD: 'projects',
-        ASSEMBLY_HUB: 'project',
-        LOGGING_STATION: 'video',
-      };
-
-      // === Animation Definitions ===
-      const animations = {
-        pageTransition: {
-          initial: { opacity: 0, x: 20 },
-          animate: { opacity: 1, x: 0 },
-          exit: { opacity: 0, x: -20 },
-          transition: { duration: 0.2, ease: 'easeOut' }
-        },
-        modalTransition: {
-          initial: { opacity: 0, scale: 0.95 },
-          animate: { opacity: 1, scale: 1 },
-          exit: { opacity: 0, scale: 0.95 },
-          transition: { duration: 0.15 }
-        },
-        listItem: {
-          initial: { opacity: 0, y: 10 },
-          animate: { opacity: 1, y: 0 },
-          exit: { opacity: 0, y: -10 },
-          transition: { duration: 0.2 }
-        }
-      };
-      
-      // === Helper Functions ===
-      const formatDuration = (totalSeconds, showMilliseconds = false) => {
-        if (isNaN(totalSeconds) || totalSeconds < 0) return '00:00:00';
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = Math.floor(totalSeconds % 60);
-        const milliseconds = showMilliseconds ? Math.floor((totalSeconds % 1) * 1000).toString().padStart(3, '0') : '';
-
-        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}${showMilliseconds && milliseconds ? '.' + milliseconds : ''}`;
-      };
-
-      const formatFileSize = (bytes) => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-      };
-
-      const debounce = (func, delay) => {
-        let timeout;
-        return (...args) => {
-          clearTimeout(timeout);
-          timeout = setTimeout(() => func.apply(this, args), delay);
-        };
-      };
-
-      const generateId = () => Date.now() + Math.random().toString(36).substring(2, 9);
-      
-      // === Icon Component ===
-      const Icon = ({ name, size = 20, className = "" }) => {
-        const LucideIcon = lucideReact[name];
-        if (!LucideIcon) {
-          console.warn(`Icon "${name}" not found.`);
-          return <lucideReact.HelpCircle size={size} className={className} />; // Fallback icon
-        }
-        return <LucideIcon size={size} className={className} />;
-      };
-
-      // === Database Setup (Dexie) ===
-      const db = new Dexie('LogReelDB');
-      db.version(2).stores({ // Increased version for fileHandle
-        projects: '++id, name, createdAt, updatedAt', // removed videoCount, totalDuration (will be computed on load or dynamically)
-        videos: '++id, projectId, filename, &fileHandle, fileSize, duration, isImportant, createdAt, updatedAt', // thumbnailBlob removed for simplicity, logCount computed
-        logs: '++id, videoId, notes, rating, keywords, markIn, markOut, createdAt, updatedAt, color',
-        settings: '++id, &key, value' // Key is unique
-      }).upgrade(tx => {
-        // Example upgrade path if needed in the future
-        // For version 2, if there was a version 1 without fileHandle unique index:
-        // No specific data migration needed here for making fileHandle unique if it wasn't before,
-        // but new constraints apply. If old data violates this, it would need manual cleanup or a migration script.
-      });
-
-      // === State Management (Zustand) ===
-      const useUIStore = create(subscribeWithSelector((set, get) => ({
-        currentScreen: SCREENS.PROJECT_DASHBOARD,
-        currentProjectId: null,
-        currentVideoId: null,
-        searchQuery: '',
-        isLoading: true,
-        isModalOpen: null, // e.g., 'newProject', 'editProject', 'playSelects'
-        modalProps: {},
-        notifications: [],
-        globalError: null,
-        theme: 'dark', // Example setting
-        
-        setLoading: (isLoading) => set({ isLoading }),
-        navigateTo: (screen, projectId = null, videoId = null) => {
-          set({ currentScreen: screen, currentProjectId: projectId, currentVideoId: videoId, isLoading: true });
-          // Update URL hash for basic routing/deep linking
-          let hash = `#${screen}`;
-          if (projectId) hash += `/${projectId}`;
-          if (videoId) hash += `/${videoId}`;
-          window.location.hash = hash;
-        },
-        openModal: (modalName, props = {}) => set({ isModalOpen: modalName, modalProps: props }),
-        closeModal: () => set({ isModalOpen: null, modalProps: {} }),
-        setGlobalError: (error) => set({ globalError: error ? (error.message || String(error)) : null }),
-      })));
-
-      const useProjectStore = create((set, get) => ({
-        projects: [],
-        currentProject: null, // Detailed view of current project
-        fetchProjects: async () => {
-          useUIStore.getState().setLoading(true);
-          try {
-            const projects = await db.projects.orderBy('updatedAt').reverse().toArray();
-            // Compute videoCount and totalDuration for each project
-            const projectsWithStats = await Promise.all(projects.map(async project => {
-                const videos = await db.videos.where('projectId').equals(project.id).toArray();
-                const videoCount = videos.length;
-                const totalDuration = videos.reduce((sum, v) => sum + (v.duration || 0), 0);
-                return { ...project, videoCount, totalDuration };
-            }));
-            set({ projects: projectsWithStats });
-          } catch (error) {
-            console.error("Failed to fetch projects:", error);
-            toast.error("Failed to load projects.");
-            useUIStore.getState().setGlobalError(error);
-          } finally {
-            useUIStore.getState().setLoading(false);
-          }
-        },
-        addProject: async (name, description) => {
-          try {
-            const newProject = { 
-              name, 
-              description, 
-              createdAt: new Date(), 
-              updatedAt: new Date(),
-              // videoCount and totalDuration will be 0 initially or computed
-            };
-            const id = await db.projects.add(newProject);
-            // Re-fetch or add to local state
-            await get().fetchProjects(); 
-            toast.success(`Project "${name}" created!`);
-            return { ...newProject, id };
-          } catch (error) {
-            console.error("Failed to add project:", error);
-            toast.error("Failed to create project.");
-            useUIStore.getState().setGlobalError(error);
-            return null;
-          }
-        },
-        updateProject: async (id, updates) => {
-          try {
-            await db.projects.update(id, { ...updates, updatedAt: new Date() });
-            await get().fetchProjects(); // Re-fetch to update list
-            if (get().currentProject && get().currentProject.id === id) {
-                set(state => ({ currentProject: { ...state.currentProject, ...updates, updatedAt: new Date() }}));
-            }
-            toast.success("Project updated.");
-          } catch (error) {
-            console.error("Failed to update project:", error);
-            toast.error("Failed to update project.");
-            useUIStore.getState().setGlobalError(error);
-          }
-        },
-        deleteProject: async (id) => {
-          try {
-            // Also delete associated videos and logs
-            const videosToDelete = await db.videos.where('projectId').equals(id).toArray();
-            for (const video of videosToDelete) {
-              await db.logs.where('videoId').equals(video.id).delete();
-            }
-            await db.videos.where('projectId').equals(id).delete();
-            await db.projects.delete(id);
-            await get().fetchProjects(); // Re-fetch
-            toast.success("Project and its contents deleted.");
-          } catch (error) {
-            console.error("Failed to delete project:", error);
-            toast.error("Failed to delete project.");
-            useUIStore.getState().setGlobalError(error);
-          }
-        },
-        fetchProjectById: async (id) => {
-          useUIStore.getState().setLoading(true);
-          try {
-            const project = await db.projects.get(id);
-            if (project) {
-              const videos = await db.videos.where('projectId').equals(project.id).toArray();
-              const videoCount = videos.length;
-              const totalDuration = videos.reduce((sum, v) => sum + (v.duration || 0), 0);
-              const projectWithStats = { ...project, videoCount, totalDuration, videos };
-              set({ currentProject: projectWithStats });
-              return projectWithStats;
-            } else {
-              throw new Error("Project not found");
-            }
-          } catch (error) {
-            console.error("Failed to fetch project:", error);
-            toast.error(`Failed to load project (ID: ${id}).`);
-            useUIStore.getState().navigateTo(SCREENS.PROJECT_DASHBOARD); // Navigate back
-            useUIStore.getState().setGlobalError(error);
-            return null;
-          } finally {
-            useUIStore.getState().setLoading(false);
-          }
-        },
-      }));
-
-      const useVideoStore = create((set, get) => ({
-        videos: [], // Videos for the current project
-        currentVideo: null, // Detailed view of current video with logs
-        fetchVideosForProject: async (projectId) => {
-          if (!projectId) {
-            set({ videos: [] });
-            return;
-          }
-          useUIStore.getState().setLoading(true);
-          try {
-            const videos = await db.videos.where('projectId').equals(projectId).sortBy('createdAt');
-            const videosWithStats = await Promise.all(videos.map(async video => {
-                const logCount = await db.logs.where('videoId').equals(video.id).count();
-                return { ...video, logCount };
-            }));
-            set({ videos: videosWithStats });
-            // Update project stats in projectStore if currentProject is loaded
-            const projectStore = useProjectStore.getState();
-            if (projectStore.currentProject && projectStore.currentProject.id === projectId) {
-                const videoCount = videos.length;
-                const totalDuration = videos.reduce((sum, v) => sum + (v.duration || 0), 0);
-                projectStore.updateProject(projectId, { videoCount, totalDuration }); // This might re-trigger fetch
-            }
-          } catch (error) {
-            console.error("Failed to fetch videos:", error);
-            toast.error("Failed to load videos for project.");
-            useUIStore.getState().setGlobalError(error);
-          } finally {
-            useUIStore.getState().setLoading(false);
-          }
-        },
-        addVideo: async (projectId, fileHandle) => {
-          try {
-            const file = await fileHandle.getFile();
-            // Check if video already exists by fileHandle (if possible with Dexie query, or by name/size as fallback)
-            // For simplicity, we'll assume fileHandle is unique enough. Dexie can enforce this with `&fileHandle` in schema.
-            // If `fileHandle` cannot be directly queried for uniqueness like this, use filename+size in a compound index.
-            const existingVideoByHandle = await db.videos.get({ fileHandle });
-            if(existingVideoByHandle && existingVideoByHandle.projectId === projectId) {
-                toast.error(`Video "${file.name}" already exists in this project.`);
-                return null;
-            }
-
-            // Get video duration
-            let duration = 0;
-            const videoElementForDuration = document.createElement('video');
-            videoElementForDuration.preload = 'metadata';
-            const url = URL.createObjectURL(file);
-            
-            const durationPromise = new Promise((resolve, reject) => {
-              videoElementForDuration.onloadedmetadata = () => {
-                URL.revokeObjectURL(url);
-                resolve(videoElementForDuration.duration);
-              };
-              videoElementForDuration.onerror = (e) => {
-                URL.revokeObjectURL(url);
-                console.error("Error loading video for duration:", e);
-                reject(new Error("Could not read video metadata."));
-              };
-              videoElementForDuration.src = url;
-            });
-
-            try {
-              duration = await durationPromise;
-            } catch (err) {
-              toast.error(`Could not read metadata for ${file.name}. Adding with 0 duration.`);
-            }
-
-            const newVideo = {
-              projectId,
-              filename: file.name,
-              fileHandle, // Store the handle
-              fileSize: file.size,
-              duration: duration,
-              isImportant: false,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              // logCount will be 0 initially
-            };
-            const id = await db.videos.add(newVideo);
-            await get().fetchVideosForProject(projectId); // Re-fetch
-            useProjectStore.getState().fetchProjects(); // Update project counts on dashboard
-            toast.success(`Video "${file.name}" added.`);
-            return { ...newVideo, id };
-          } catch (error) {
-            console.error("Failed to add video:", error);
-            if (error.name === 'ConstraintError') {
-                 toast.error(`Video "${fileHandle.name}" might already exist across projects or could not be stored uniquely.`);
-            } else {
-                 toast.error("Failed to add video.");
-            }
-            useUIStore.getState().setGlobalError(error);
-            return null;
-          }
-        },
-        updateVideo: async (id, updates) => {
-          try {
-            await db.videos.update(id, { ...updates, updatedAt: new Date() });
-            const video = await db.videos.get(id);
-            if(video) await get().fetchVideosForProject(video.projectId); // Re-fetch for current project
-            if (get().currentVideo && get().currentVideo.id === id) {
-              set(state => ({ currentVideo: { ...state.currentVideo, ...updates, updatedAt: new Date() }}));
-            }
-            toast.success("Video details updated.");
-          } catch (error) {
-            console.error("Failed to update video:", error);
-            toast.error("Failed to update video details.");
-            useUIStore.getState().setGlobalError(error);
-          }
-        },
-        deleteVideo: async (id) => {
-          try {
-            const video = await db.videos.get(id);
-            if (!video) throw new Error("Video not found");
-            
-            await db.logs.where('videoId').equals(id).delete(); // Delete associated logs
-            await db.videos.delete(id);
-            
-            await get().fetchVideosForProject(video.projectId); // Re-fetch
-            useProjectStore.getState().fetchProjects(); // Update project counts on dashboard
-
-            if (get().currentVideo && get().currentVideo.id === id) {
-                set({ currentVideo: null }); // Clear if current video is deleted
-                 // Navigate away if on logging station for this video
-                if(useUIStore.getState().currentScreen === SCREENS.LOGGING_STATION) {
-                    useUIStore.getState().navigateTo(SCREENS.ASSEMBLY_HUB, video.projectId);
-                }
-            }
-            toast.success("Video and its logs deleted.");
-          } catch (error) {
-            console.error("Failed to delete video:", error);
-            toast.error("Failed to delete video.");
-            useUIStore.getState().setGlobalError(error);
-          }
-        },
-        fetchVideoById: async (id) => {
-          useUIStore.getState().setLoading(true);
-          try {
-            const video = await db.videos.get(id);
-            if (video) {
-              const logs = await db.logs.where('videoId').equals(id).sortBy('markIn');
-              const videoWithLogs = { ...video, logs, logCount: logs.length };
-              set({ currentVideo: videoWithLogs });
-              return videoWithLogs;
-            } else {
-              throw new Error("Video not found");
-            }
-          } catch (error) {
-            console.error("Failed to fetch video:", error);
-            toast.error(`Failed to load video (ID: ${id}).`);
-            useUIStore.getState().navigateTo(SCREENS.PROJECT_DASHBOARD); // Navigate back
-            useUIStore.getState().setGlobalError(error);
-            return null;
-          } finally {
-            useUIStore.getState().setLoading(false);
-          }
-        },
-        generateThumbnail: async (videoId, fileHandle) => {
-          // This is a placeholder for actual thumbnail generation logic
-          // Actual implementation would involve creating a video element, seeking, drawing to canvas
-          console.log(`Thumbnail generation requested for video ${videoId}`);
-          try {
-            const file = await fileHandle.getFile();
-            const video = document.createElement('video');
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            return new Promise((resolve, reject) => {
-              video.onloadeddata = () => {
-                video.currentTime = Math.min(1, video.duration / 2); // Seek to 1s or midpoint
-              };
-              video.onseeked = () => {
-                canvas.width = video.videoWidth / 5; // Smaller thumbnail
-                canvas.height = video.videoHeight / 5;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                canvas.toBlob(blob => {
-                  if (blob) {
-                    // db.videos.update(videoId, { thumbnailBlob: blob }); // Update in DB
-                    // For now, just return the blob URL
-                    resolve(URL.createObjectURL(blob)); 
-                  } else {
-                    reject(new Error("Canvas toBlob failed"));
-                  }
-                }, 'image/jpeg', 0.8);
-                URL.revokeObjectURL(video.src); // Clean up
-              };
-              video.onerror = (e) => {
-                URL.revokeObjectURL(video.src);
-                reject(new Error("Video error during thumbnail generation: " + e));
-              };
-              video.src = URL.createObjectURL(file);
-            });
-          } catch (error) {
-            console.error("Error generating thumbnail:", error);
-            toast.error("Could not generate thumbnail.");
-            return null; // Return a placeholder path or null
-          }
-        }
-      }));
-
-      const useLogStore = create((set, get) => ({
-        // Logs are primarily managed within useVideoStore.currentVideo.logs
-        // This store can hold actions or temporary log states if needed outside video context
-        addLog: async (videoId, logData) => {
-          try {
-            const newLog = { 
-              videoId, 
-              ...logData, 
-              createdAt: new Date(), 
-              updatedAt: new Date() 
-            };
-            const id = await db.logs.add(newLog);
-            // Re-fetch current video to update its logs array and logCount
-            const videoStore = useVideoStore.getState();
-            if (videoStore.currentVideo && videoStore.currentVideo.id === videoId) {
-              await videoStore.fetchVideoById(videoId);
-            }
-            // Also update logCount on the video list
-            await videoStore.fetchVideosForProject(useUIStore.getState().currentProjectId);
-            toast.success("Log saved.");
-            return { ...newLog, id };
-          } catch (error) {
-            console.error("Failed to add log:", error);
-            toast.error("Failed to save log.");
-            useUIStore.getState().setGlobalError(error);
-            return null;
-          }
-        },
-        updateLog: async (id, updates) => {
-          try {
-            await db.logs.update(id, { ...updates, updatedAt: new Date() });
-            const log = await db.logs.get(id);
-            // Re-fetch current video to update its logs array
-            const videoStore = useVideoStore.getState();
-            if (log && videoStore.currentVideo && videoStore.currentVideo.id === log.videoId) {
-              await videoStore.fetchVideoById(log.videoId);
-            }
-            toast.success("Log updated.");
-          } catch (error) {
-            console.error("Failed to update log:", error);
-            toast.error("Failed to update log.");
-            useUIStore.getState().setGlobalError(error);
-          }
-        },
-        deleteLog: async (id) => {
-          try {
-            const log = await db.logs.get(id);
-            if (!log) throw new Error("Log not found");
-            await db.logs.delete(id);
-            // Re-fetch current video to update its logs array and logCount
-            const videoStore = useVideoStore.getState();
-            if (videoStore.currentVideo && videoStore.currentVideo.id === log.videoId) {
-              await videoStore.fetchVideoById(log.videoId);
-            }
-            // Also update logCount on the video list
-            await videoStore.fetchVideosForProject(useUIStore.getState().currentProjectId);
-            toast.success("Log deleted.");
-          } catch (error) {
-            console.error("Failed to delete log:", error);
-            toast.error("Failed to delete log.");
-            useUIStore.getState().setGlobalError(error);
-          }
-        },
-      }));
-
-      // === UI Components ===
-
-      // --- Shared Components ---
-      const Button = ({ children, onClick, variant = 'primary', size = 'md', className = '', icon, disabled = false, ...props }) => {
-        const baseStyles = "font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-secondary transition-colors duration-150 flex items-center justify-center gap-2";
-        const variantStyles = {
-          primary: `bg-accent-primary hover:bg-blue-500 text-white focus:ring-accent-primary ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`,
-          secondary: `bg-bg-tertiary hover:bg-gray-700 text-text-secondary focus:ring-accent-secondary ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`,
-          danger: `bg-accent-danger hover:bg-red-500 text-white focus:ring-accent-danger ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`,
-          ghost: `bg-transparent hover:bg-bg-tertiary text-text-secondary focus:ring-accent-primary ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`,
-        };
-        const sizeStyles = {
-          sm: "px-3 py-1.5 text-sm",
-          md: "px-4 py-2 text-base",
-          lg: "px-6 py-3 text-lg",
-        };
-
-        return (
-          <button
-            onClick={onClick}
-            className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
-            disabled={disabled}
-            {...props}
-          >
-            {icon && <Icon name={icon} size={size === 'sm' ? 16 : 20} />}
-            {children}
-          </button>
-        );
-      };
-      
-      const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
-        if (!isOpen) return null;
-
-        const sizeClasses = {
-            sm: 'max-w-sm',
-            md: 'max-w-md',
-            lg: 'max-w-lg',
-            xl: 'max-w-xl',
-            '2xl': 'max-w-2xl',
-            full: 'max-w-full h-full'
-        };
-
-        return (
-          <FocusTrap focusTrapOptions={{ initialFocus: false }}>
-            <motion.div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={onClose} // Close on backdrop click
-            >
-              <motion.div
-                className={`bg-bg-secondary p-6 rounded-lg shadow-xl ${sizeClasses[size]} w-full m-4 overflow-y-auto max-h-[90vh]`}
-                initial={animations.modalTransition.initial}
-                animate={animations.modalTransition.animate}
-                exit={animations.modalTransition.exit}
-                transition={animations.modalTransition.transition}
-                onClick={(e) => e.stopPropagation()} // Prevent close on modal content click
-              >
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-text-primary">{title}</h2>
-                  <Button onClick={onClose} variant="ghost" size="sm" icon="X" aria-label="Close modal" />
+    <div id="app">
+        <!-- Screen 1: Projects List -->
+        <section id="screen-projects" class="screen">
+            <header>
+                <h1>LogReel</h1>
+                <div>
+                    <button id="btn-import-projects"><i class="fas fa-upload"></i> Import</button>
+                    <input type="file" id="import-file-input" accept=".json" class="hidden">
+                    <button id="btn-new-project"><i class="fas fa-plus"></i> New Project</button>
                 </div>
-                {children}
-              </motion.div>
-            </motion.div>
-          </FocusTrap>
-        );
-      };
-
-      const Input = ({ label, type = "text", value, onChange, placeholder, className = "", ...props }) => (
-        <div className="w-full">
-          {label && <label className="block text-sm font-medium text-text-secondary mb-1">{label}</label>}
-          <input
-            type={type}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            className={`w-full bg-bg-tertiary text-text-primary border border-gray-600 rounded-md px-3 py-2 focus:ring-accent-primary focus:border-accent-primary outline-none ${className}`}
-            {...props}
-          />
-        </div>
-      );
-
-      const Textarea = ({ label, value, onChange, placeholder, rows = 3, className = "", ...props }) => (
-         <div className="w-full">
-          {label && <label className="block text-sm font-medium text-text-secondary mb-1">{label}</label>}
-          <textarea
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            rows={rows}
-            className={`w-full bg-bg-tertiary text-text-primary border border-gray-600 rounded-md px-3 py-2 focus:ring-accent-primary focus:border-accent-primary outline-none ${className}`}
-            {...props}
-          />
-        </div>
-      );
-
-      const DropdownMenu = ({ trigger, children, align = 'right' }) => {
-        const [isOpen, setIsOpen] = useState(false);
-        const dropdownRef = useRef(null);
-
-        useEffect(() => {
-          const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-              setIsOpen(false);
-            }
-          };
-          document.addEventListener("mousedown", handleClickOutside);
-          return () => document.removeEventListener("mousedown", handleClickOutside);
-        }, []);
-
-        return (
-          <div className="relative" ref={dropdownRef}>
-            <div onClick={() => setIsOpen(!isOpen)}>{trigger}</div>
-            <AnimatePresence>
-              {isOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`absolute z-20 mt-2 w-48 rounded-md shadow-lg bg-bg-tertiary ring-1 ring-black ring-opacity-5 focus:outline-none ${align === 'right' ? 'right-0' : 'left-0'}`}
-                >
-                  <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                    {React.Children.map(children, child => 
-                      React.cloneElement(child, { onClick: () => { child.props.onClick && child.props.onClick(); setIsOpen(false); } })
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        );
-      };
-
-      const DropdownItem = ({ children, onClick, icon, className = "" }) => (
-        <button
-          onClick={onClick}
-          className={`flex items-center w-full px-4 py-2 text-sm text-text-secondary hover:bg-gray-700 hover:text-text-primary ${className}`}
-          role="menuitem"
-        >
-          {icon && <Icon name={icon} size={16} className="mr-2" />}
-          {children}
-        </button>
-      );
-      
-      const SkeletonLoader = ({ className = "h-4 w-full" }) => (
-        <div className={`bg-bg-tertiary rounded animate-skeleton ${className}`}></div>
-      );
-
-      const StarRating = ({ rating, setRating, maxRating = 5, editable = true }) => {
-        const [hoverRating, setHoverRating] = useState(0);
-        return (
-          <div className="flex items-center">
-            {[...Array(maxRating)].map((_, index) => {
-              const starValue = index + 1;
-              return (
-                <button
-                  key={starValue}
-                  type="button"
-                  disabled={!editable}
-                  className={`text-2xl ${editable ? 'cursor-pointer' : 'cursor-default'}`}
-                  onClick={() => editable && setRating(starValue === rating ? 0 : starValue)} // Click again to clear rating
-                  onMouseEnter={() => editable && setHoverRating(starValue)}
-                  onMouseLeave={() => editable && setHoverRating(0)}
-                >
-                  <Icon 
-                    name="Star" 
-                    size={24} 
-                    className={
-                      (hoverRating || rating) >= starValue 
-                      ? 'text-yellow-400 fill-yellow-400' 
-                      : 'text-gray-500'
-                    } 
-                  />
-                </button>
-              );
-            })}
-          </div>
-        );
-      };
-
-      const ColorPicker = ({ selectedColor, onColorChange, colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#64748b'] }) => {
-        return (
-          <div className="flex space-x-2">
-            {colors.map(color => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => onColorChange(color)}
-                className={`w-6 h-6 rounded-full border-2 ${selectedColor === color ? 'border-text-primary scale-110' : 'border-transparent'} transition-all`}
-                style={{ backgroundColor: color }}
-                aria-label={`Select color ${color}`}
-              />
-            ))}
-             <input 
-                type="color" 
-                value={selectedColor || '#ffffff'} 
-                onChange={(e) => onColorChange(e.target.value)}
-                className="w-6 h-6 p-0 border-none rounded-full cursor-pointer"
-                title="Custom color"
-            />
-          </div>
-        );
-      };
-
-      // --- Project Dashboard Components ---
-      const ProjectCard = ({ project, onOpen, onQuickAdd, onEdit, onDelete }) => {
-        return (
-          <motion.div 
-            layout
-            initial={animations.listItem.initial}
-            animate={animations.listItem.animate}
-            exit={animations.listItem.exit}
-            className="bg-bg-secondary rounded-lg shadow-lg p-5 flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex justify-between items-start">
-                <h3 className="text-lg font-semibold text-text-primary mb-1">{project.name}</h3>
-                <DropdownMenu 
-                  trigger={<Button variant="ghost" size="sm" icon="MoreVertical" aria-label="Project options" />}
-                >
-                  <DropdownItem icon="Edit3" onClick={onEdit}>Edit Project</DropdownItem>
-                  {/* <DropdownItem icon="Copy" onClick={() => console.log("Duplicate project")}>Duplicate Project</DropdownItem> */}
-                  <DropdownItem icon="Trash2" onClick={onDelete} className="text-accent-danger">Delete Project</DropdownItem>
-                </DropdownMenu>
-              </div>
-              <p className="text-sm text-text-tertiary mb-3 h-10 overflow-hidden">{project.description || "No description."}</p>
-              <div className="text-xs text-text-tertiary space-y-1 mb-4">
-                <p><Icon name="FileVideo" size={14} className="inline mr-1" /> {project.videoCount || 0} videos</p>
-                <p><Icon name="Clock" size={14} className="inline mr-1" /> {formatDuration(project.totalDuration || 0)} total</p>
-                <p><Icon name="Layers" size={14} className="inline mr-1" /> Last modified: {new Date(project.updatedAt).toLocaleDateString()}</p>
-              </div>
-              {/* Mini thumbnails (Placeholder) */}
-              {/* <div className="flex space-x-1 mb-4 h-10 bg-bg-tertiary rounded">
-                {[...Array(Math.min(3, project.videoCount || 0))].map((_, i) => (
-                  <div key={i} className="w-1/3 h-full bg-gray-600 rounded-sm"></div>
-                ))}
-                {(project.videoCount || 0) === 0 && <p className="text-xs text-text-tertiary p-2">No videos yet</p>}
-              </div> */}
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 mt-auto">
-              <Button onClick={onOpen} variant="primary" className="flex-1">Open Project</Button>
-              <Button onClick={onQuickAdd} variant="secondary" className="flex-1" icon="PlusCircle">Add Videos</Button>
-            </div>
-          </motion.div>
-        );
-      };
-
-      const ProjectFormModal = ({ isOpen, onClose, project, onSave }) => {
-        const [name, setName] = useState('');
-        const [description, setDescription] = useState('');
-
-        useEffect(() => {
-          if (project) {
-            setName(project.name);
-            setDescription(project.description || '');
-          } else {
-            setName('');
-            setDescription('');
-          }
-        }, [project, isOpen]);
-
-        const handleSubmit = (e) => {
-          e.preventDefault();
-          if (!name.trim()) {
-            toast.error("Project name cannot be empty.");
-            return;
-          }
-          onSave({ id: project?.id, name, description });
-          onClose();
-        };
-
-        return (
-          <Modal isOpen={isOpen} onClose={onClose} title={project ? "Edit Project" : "Create New Project"}>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input label="Project Name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Documentary Shoot - Day 1" required />
-              <Textarea label="Description (Optional)" value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief overview of the project" />
-              <div className="flex justify-end space-x-2 pt-2">
-                <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-                <Button type="submit" variant="primary">{project ? "Save Changes" : "Create Project"}</Button>
-              </div>
-            </form>
-          </Modal>
-        );
-      };
-
-      const ProjectDashboardScreen = () => {
-        const { projects, fetchProjects, addProject, updateProject, deleteProject } = useProjectStore();
-        const { navigateTo, openModal, closeModal, isModalOpen, modalProps } = useUIStore();
-        const isLoading = useUIStore(state => state.isLoading);
-        const [searchTerm, setSearchTerm] = useState('');
-        const [sortOption, setSortOption] = useState('updatedAt_desc'); // e.g. name_asc, updatedAt_desc
-
-        useEffect(() => {
-          fetchProjects();
-        }, []);
-
-        const handleSaveProject = async (projectData) => {
-          if (projectData.id) {
-            await updateProject(projectData.id, { name: projectData.name, description: projectData.description });
-          } else {
-            await addProject(projectData.name, projectData.description);
-          }
-        };
-
-        const filteredAndSortedProjects = useMemo(() => {
-          let SPREAD_PROJECTS = [...projects]; // Ensure it's a new array for sorting
-          if (searchTerm) {
-            SPREAD_PROJECTS = SPREAD_PROJECTS.filter(p => 
-              p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase()))
-            );
-          }
-
-          const [key, order] = sortOption.split('_');
-          SPREAD_PROJECTS.sort((a, b) => {
-            let valA = a[key];
-            let valB = b[key];
-
-            if (key === 'name') {
-                valA = valA.toLowerCase();
-                valB = valB.toLowerCase();
-            }
-            if (key === 'updatedAt' || key === 'createdAt') {
-                valA = new Date(valA).getTime();
-                valB = new Date(valB).getTime();
-            }
-
-            if (valA < valB) return order === 'asc' ? -1 : 1;
-            if (valA > valB) return order === 'asc' ? 1 : -1;
-            return 0;
-          });
-          return SPREAD_PROJECTS;
-        }, [projects, searchTerm, sortOption]);
-
-        const openProject = (projectId) => {
-          navigateTo(SCREENS.ASSEMBLY_HUB, projectId);
-        };
-        
-        const handleQuickAddVideos = async (projectId) => {
-           // For quick add, go to assembly hub and trigger file dialog
-           navigateTo(SCREENS.ASSEMBLY_HUB, projectId, null, { autoOpenFileDialog: true });
-        };
-        
-        // Stats
-        const totalProjects = projects.length;
-        const totalVideosAcrossProjects = projects.reduce((sum, p) => sum + (p.videoCount || 0), 0);
-
-        return (
-          <motion.div {...animations.pageTransition} className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-            {/* Header */}
-            <header className="sticky top-0 z-10 py-4 mb-6 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 glassmorphism">
-              <div className="flex flex-col sm:flex-row justify-between items-center max-w-7xl mx-auto">
-                <div className="flex items-center">
-                  <Icon name="Film" size={32} className="text-accent-primary mr-2" />
-                  <h1 className="text-3xl font-bold text-text-primary">{APP_NAME}</h1>
-                </div>
-                <div className="flex items-center gap-4 mt-4 sm:mt-0">
-                  <div className="text-sm text-text-secondary">
-                    <p>Projects: {totalProjects}</p>
-                    <p>Total Videos: {totalVideosAcrossProjects}</p>
-                  </div>
-                  <Button onClick={() => openModal('projectForm')} icon="PlusCircle" variant="primary">New Project</Button>
-                </div>
-              </div>
             </header>
-
-            {/* Controls */}
-            <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
-              <div className="relative flex-grow w-full sm:w-auto">
-                <Input 
-                    type="search" 
-                    placeholder="Search projects..." 
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                />
-                <Icon name="Search" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
-              </div>
-              <select 
-                value={sortOption} 
-                onChange={e => setSortOption(e.target.value)}
-                className="bg-bg-tertiary text-text-primary border border-gray-600 rounded-md px-3 py-2 focus:ring-accent-primary focus:border-accent-primary outline-none"
-              >
-                <option value="updatedAt_desc">Sort by: Last Modified (Newest)</option>
-                <option value="updatedAt_asc">Sort by: Last Modified (Oldest)</option>
-                <option value="name_asc">Sort by: Name (A-Z)</option>
-                <option value="name_desc">Sort by: Name (Z-A)</option>
-                <option value="createdAt_desc">Sort by: Date Created (Newest)</option>
-                <option value="createdAt_asc">Sort by: Date Created (Oldest)</option>
-                <option value="videoCount_desc">Sort by: Video Count (Most)</option>
-                <option value="videoCount_asc">Sort by: Video Count (Least)</option>
-              </select>
-              {/* Grid/List toggle can be added here */}
-            </div>
-
-            {/* Project Grid/List */}
-            {isLoading && projects.length === 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(3)].map((_, i) => <SkeletonLoader key={i} className="h-60 rounded-lg" />)}
-              </div>
-            ) : filteredAndSortedProjects.length > 0 ? (
-              <AnimatePresence>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredAndSortedProjects.map(project => (
-                    <ProjectCard
-                      key={project.id}
-                      project={project}
-                      onOpen={() => openProject(project.id)}
-                      onQuickAdd={() => handleQuickAddVideos(project.id)}
-                      onEdit={() => openModal('projectForm', { project })}
-                      onDelete={() => {
-                        if (confirm(`Are you sure you want to delete project "${project.name}" and all its videos and logs? This cannot be undone.`)) {
-                          deleteProject(project.id);
-                        }
-                      }}
-                    />
-                  ))}
+            <main class="container">
+                <h2>My Projects</h2>
+                <div id="projects-list-container">
+                    <!-- Project cards will be rendered here -->
+                    <p class="empty-state hidden">No projects yet. Create one to get started!</p>
                 </div>
-              </AnimatePresence>
-            ) : (
-              <div className="text-center py-12">
-                <Icon name="FolderOpen" size={64} className="mx-auto text-text-tertiary mb-4" />
-                <h2 className="text-2xl font-semibold text-text-secondary mb-2">No Projects Found</h2>
-                {searchTerm ? 
-                    <p className="text-text-tertiary">Try adjusting your search or sort criteria.</p> :
-                    <p className="text-text-tertiary">Get started by creating your first project.</p>
-                }
-                {!searchTerm && <Button onClick={() => openModal('projectForm')} icon="PlusCircle" variant="primary" className="mt-6">Create Your First Project</Button>}
-              </div>
-            )}
-            
-            <ProjectFormModal 
-              isOpen={isModalOpen === 'projectForm'}
-              onClose={() => closeModal()}
-              project={modalProps.project}
-              onSave={handleSaveProject}
-            />
-
-            {/* Footer - Basic example for Export/Import All */}
-            <footer className="mt-12 pt-6 border-t border-bg-tertiary text-center">
-                <div className="flex gap-4 justify-center">
-                    <Button onClick={() => AppControls.exportAllData()} icon="Download" variant="secondary">Export All Data (JSON)</Button>
-                    <Button onClick={() => AppControls.importData()} icon="UploadCloud" variant="secondary">Import Data (JSON)</Button>
-                    {/* Settings button could open a settings modal */}
-                    {/* <Button icon="Settings" variant="ghost">Settings</Button> */}
-                </div>
-                <p className="text-xs text-text-tertiary mt-4">LogReel v0.1.0 - Client-Side Video Logging</p>
-            </footer>
-          </motion.div>
-        );
-      };
-
-      // --- Assembly Hub Components ---
-      const VideoCard = React.memo(({ video, onLogVideo, onPlaySelects, onToggleImportant, onDeleteVideo, onOpenVideoSettings }) => {
-        const { updateVideo } = useVideoStore();
-        const [thumbnailUrl, setThumbnailUrl] = useState(null); // Placeholder for actual thumbnail
-
-        useEffect(() => {
-          // Rudimentary thumbnail - ideally use generated one
-          // This is a simplified approach. A real one would use canvas and store blob.
-          // For now, let's assume video.thumbnailBlobUrl might exist if pre-generated
-          if (video.fileHandle && !video.thumbnailBlobUrl) {
-            // Placeholder: could try to generate a quick one here, but might be slow for many cards
-            // useVideoStore.getState().generateThumbnail(video.id, video.fileHandle).then(url => setThumbnailUrl(url));
-          } else if (video.thumbnailBlobUrl) {
-            setThumbnailUrl(video.thumbnailBlobUrl);
-          }
-          return () => {
-            if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
-              URL.revokeObjectURL(thumbnailUrl);
-            }
-          };
-        }, [video.id, video.fileHandle, video.thumbnailBlobUrl]);
-        
-        const handleToggleImportant = (e) => {
-            e.stopPropagation(); // Prevent card click
-            updateVideo(video.id, { isImportant: !video.isImportant });
-        };
-        
-        const handleLogVideo = (e) => {
-            e.stopPropagation();
-            onLogVideo(video.id);
-        };
-
-        const handlePlaySelects = (e) => {
-            e.stopPropagation();
-            onPlaySelects(video.id);
-        }
-
-        return (
-          <motion.div 
-            layout
-            initial={animations.listItem.initial}
-            animate={animations.listItem.animate}
-            exit={animations.listItem.exit}
-            className="bg-bg-secondary rounded-lg shadow-lg overflow-hidden flex flex-col cursor-pointer hover:shadow-accent-primary/20 transition-shadow"
-            onClick={() => onLogVideo(video.id)} // Click card to go to logging station
-          >
-            <div className="relative aspect-video bg-bg-tertiary">
-              {thumbnailUrl ? (
-                <img src={thumbnailUrl} alt={video.filename} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Icon name="Film" size={48} className="text-text-tertiary" />
-                </div>
-              )}
-              <div className="absolute top-2 right-2 flex gap-1">
-                <button 
-                    onClick={handleToggleImportant} 
-                    className={`p-1.5 rounded-full transition-colors ${video.isImportant ? 'bg-yellow-500/80 hover:bg-yellow-400' : 'bg-black/30 hover:bg-black/50'}`}
-                    title={video.isImportant ? "Mark as not important" : "Mark as important"}
-                >
-                    <Icon name="Star" size={16} className={` ${video.isImportant ? 'text-white fill-white' : 'text-gray-300'}`} />
-                </button>
-              </div>
-              <div className="absolute bottom-2 left-2 bg-black/50 text-white px-1.5 py-0.5 rounded text-xs">
-                {formatDuration(video.duration)}
-              </div>
-              {/* Quick Play button (could open a small preview modal) */}
-              {/* <button className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                <Icon name="Play" size={48} className="text-white bg-black/30 rounded-full p-2" />
-              </button> */}
-            </div>
-            
-            <div className="p-4 flex flex-col flex-grow">
-              <div className="flex justify-between items-start mb-1">
-                <h4 className="font-semibold text-text-primary truncate" title={video.filename}>{video.filename}</h4>
-                <DropdownMenu 
-                  trigger={<Button variant="ghost" size="sm" icon="MoreVertical" aria-label="Video options" onClick={e => e.stopPropagation()} />}
-                >
-                  <DropdownItem icon="Edit3" onClick={(e) => { e.stopPropagation(); onOpenVideoSettings(video.id); }}>Video Settings</DropdownItem>
-                  <DropdownItem icon="Trash2" onClick={(e) => { e.stopPropagation(); onDeleteVideo(video.id); }} className="text-accent-danger">Delete Video</DropdownItem>
-                </DropdownMenu>
-              </div>
-              
-              <div className="text-xs text-text-tertiary space-y-0.5 mb-2">
-                <p>Size: {formatFileSize(video.fileSize)}</p>
-                <p>Logs: {video.logCount || 0}</p>
-                {/* <p>Last Logged: {video.lastLogged ? new Date(video.lastLogged).toLocaleDateString() : 'N/A'}</p> */}
-              </div>
-
-              {/* Logs Preview (simplified) */}
-              {/* <div className="text-xs text-text-tertiary mt-1">
-                {video.logCount > 0 ? `${video.logCount} logs` : "No logs yet"}
-              </div> */}
-
-              <div className="mt-auto pt-3 flex flex-col sm:flex-row gap-2">
-                <Button onClick={handleLogVideo} variant="primary" size="sm" className="flex-1">Log Video</Button>
-                <Button onClick={handlePlaySelects} variant="secondary" size="sm" className="flex-1" disabled={!video.logCount || video.logCount === 0}>
-                  Play Selects ({video.logCount || 0})
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        );
-      });
-
-      const AssemblyHubScreen = () => {
-        const { currentProjectId, navigateTo, openModal, closeModal, isModalOpen, modalProps } = useUIStore();
-        const { currentProject, fetchProjectById } = useProjectStore();
-        const { videos, fetchVideosForProject, addVideo, deleteVideo, updateVideo } = useVideoStore();
-        const isLoading = useUIStore(state => state.isLoading);
-        const [searchTerm, setSearchTerm] = useState('');
-        // Add more filters: isImportant, hasLogs, etc.
-        const fileInputRef = useRef(null);
-
-        useEffect(() => {
-          if (currentProjectId) {
-            fetchProjectById(currentProjectId); // Fetches project details
-            fetchVideosForProject(currentProjectId); // Fetches videos for this project
-          } else {
-            navigateTo(SCREENS.PROJECT_DASHBOARD); // Should not happen if routed correctly
-          }
-           // Check for autoOpenFileDialog flag from navigation (passed via modalProps for simplicity)
-            if (modalProps.autoOpenFileDialog) {
-                handleAddVideosClick();
-                // Clear the flag after use
-                openModal(isModalOpen, { ...modalProps, autoOpenFileDialog: false });
-            }
-        }, [currentProjectId, modalProps.autoOpenFileDialog]);
-
-        const handleAddVideosClick = async () => {
-          if (typeof window.showOpenFilePicker === 'function') {
-            try {
-              const fileHandles = await window.showOpenFilePicker({
-                multiple: true,
-                types: [{ description: 'Video Files', accept: { 'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm'] } }],
-              });
-              useUIStore.getState().setLoading(true);
-              for (const handle of fileHandles) {
-                await addVideo(currentProjectId, handle);
-              }
-            } catch (err) {
-              if (err.name !== 'AbortError') {
-                console.error("Error picking files:", err);
-                toast.error("Could not open files. Ensure permissions are granted.");
-              }
-            } finally {
-              useUIStore.getState().setLoading(false);
-            }
-          } else {
-            // Fallback for browsers not supporting File System Access API
-            toast.error("Your browser doesn't support modern file access. For the best experience, use a compatible browser like Chrome or Edge.");
-            // Optionally, could use <input type="file"> but without persistent handles
-             fileInputRef.current.click();
-          }
-        };
-        
-        const handleFallbackAddVideos = async (event) => {
-            const files = event.target.files;
-            if (!files) return;
-            useUIStore.getState().setLoading(true);
-            for (const file of files) {
-                // This path won't have fileHandle persistence, so it's a degraded experience
-                // Need to decide how to handle this. For now, we'll just show an error
-                // or proceed by storing the File object directly (not recommended for large files / persistence)
-                // For this example, we'll assume fileHandle is key, so this path is mostly for notification.
-                toast.warn(`File "${file.name}" selected via fallback. Persistent access may not be available. AddVideo function expects a FileHandle.`);
-                // If you want to proceed without FileHandle (not per spec but for broader support):
-                // await addVideo(currentProjectId, file); // addVideo would need to handle File object too
-            }
-             useUIStore.getState().setLoading(false);
-             event.target.value = null; // Reset file input
-        };
-
-        const filteredVideos = useMemo(() => {
-          return videos.filter(v => 
-            v.filename.toLowerCase().includes(searchTerm.toLowerCase())
-            // Add more filter conditions here based on UI state
-          );
-        }, [videos, searchTerm]);
-
-        const projectStats = useMemo(() => {
-            if (!currentProject) return { totalVideos: 0, importantVideos: 0, totalLogs: 0, totalDuration: 0};
-            const importantVideos = videos.filter(v => v.isImportant).length;
-            const totalLogs = videos.reduce((sum, v) => sum + (v.logCount || 0), 0);
-            return {
-                totalVideos: videos.length,
-                importantVideos,
-                totalLogs,
-                totalDuration: videos.reduce((sum, v) => sum + v.duration, 0)
-            };
-        }, [videos, currentProject]);
-
-        if (isLoading && !currentProject) return <div className="p-8"><SkeletonLoader className="h-12 w-1/2 mb-4" /><SkeletonLoader className="h-8 w-full mb-8" /> <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{[...Array(4)].map((_,i) => <SkeletonLoader key={i} className="h-72" />)}</div></div>;
-        if (!currentProject) return <div className="p-8 text-center text-text-secondary">Project not found or failed to load. <Button onClick={() => navigateTo(SCREENS.PROJECT_DASHBOARD)}>Back to Projects</Button></div>;
-
-        return (
-          <motion.div {...animations.pageTransition} className="flex flex-col h-screen">
-            {/* Header */}
-            <header className="sticky top-0 z-20 p-4 glassmorphism">
-              <div className="max-w-full mx-auto">
-                <div className="flex justify-between items-center mb-3">
-                  {/* Breadcrumbs */}
-                  <div className="text-sm text-text-secondary flex items-center">
-                    <button onClick={() => navigateTo(SCREENS.PROJECT_DASHBOARD)} className="hover:text-accent-primary">Projects</button>
-                    <Icon name="ChevronRight" size={16} className="mx-1" />
-                    <span className="font-semibold text-text-primary">{currentProject.name}</span>
-                  </div>
-                   <Button onClick={() => navigateTo(SCREENS.PROJECT_DASHBOARD)} variant="ghost" size="sm" icon="ChevronLeft">Back to Dashboard</Button>
-                </div>
-                <div className="flex flex-col md:flex-row justify-between items-center gap-2">
-                  <h1 className="text-2xl font-bold text-text-primary truncate" title={currentProject.name}>{currentProject.name}</h1>
-                  <div className="flex items-center gap-2">
-                     <Input 
-                        type="search" 
-                        placeholder="Search videos..." 
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        className="pl-8 text-sm h-10 w-full md:w-64"
-                    />
-                    <Icon name="Search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary hidden" /> {/* Hidden for now, needs relative parent */}
-                    <Button onClick={handleAddVideosClick} icon="UploadCloud" variant="primary">Add Videos</Button>
-                    <input type="file" ref={fileInputRef} onChange={handleFallbackAddVideos} multiple accept="video/*" className="hidden" />
-                  </div>
-                </div>
-              </div>
-            </header>
-            
-            {/* Quick Stats Bar */}
-            <div className="bg-bg-secondary p-3 sticky top-[calc(theme(spacing.16)+theme(spacing.8))] z-10 shadow-md"> {/* Adjust top based on header height */}
-                <div className="max-w-full mx-auto flex flex-wrap justify-around gap-2 text-sm text-center">
-                    <span><Icon name="Film" className="inline mr-1" size={16}/>Total Videos: <strong className="text-text-primary">{projectStats.totalVideos}</strong></span>
-                    <span><Icon name="Star" className="inline mr-1 text-yellow-400" size={16}/>Important: <strong className="text-text-primary">{projectStats.importantVideos}</strong></span>
-                    <span><Icon name="List" className="inline mr-1" size={16}/>Total Logs: <strong className="text-text-primary">{projectStats.totalLogs}</strong></span>
-                    <span><Icon name="Clock" className="inline mr-1" size={16}/>Total Duration: <strong className="text-text-primary">{formatDuration(projectStats.totalDuration)}</strong></span>
-                </div>
-            </div>
-
-            {/* Video Grid/List */}
-            <main className="flex-grow overflow-y-auto p-4 sm:p-6 lg:p-8">
-              {isLoading && videos.length === 0 && currentProject ? ( // Loading videos for current project
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {[...Array(videos.length || 4)].map((_, i) => <SkeletonLoader key={i} className="h-80 rounded-lg" />)}
-                </div>
-              ) : filteredVideos.length > 0 ? (
-                <AnimatePresence>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredVideos.map(video => (
-                      <VideoCard
-                        key={video.id}
-                        video={video}
-                        onLogVideo={(videoId) => navigateTo(SCREENS.LOGGING_STATION, currentProjectId, videoId)}
-                        onPlaySelects={(videoId) => openModal('playSelects', { videoId })}
-                        onToggleImportant={() => { /* Implemented in VideoCard directly */ }}
-                        onDeleteVideo={(videoId) => {
-                          if (confirm(`Are you sure you want to delete video "${video.filename}" and all its logs?`)) {
-                            deleteVideo(videoId);
-                          }
-                        }}
-                        onOpenVideoSettings={(videoId) => openModal('videoSettings', { videoId })}
-                      />
-                    ))}
-                  </div>
-                </AnimatePresence>
-              ) : (
-                <div className="text-center py-12">
-                  <Icon name="FileVideo" size={64} className="mx-auto text-text-tertiary mb-4" />
-                  <h2 className="text-2xl font-semibold text-text-secondary mb-2">
-                    {videos.length === 0 ? "No Videos in This Project" : "No Videos Match Your Search"}
-                  </h2>
-                  <p className="text-text-tertiary">
-                    {videos.length === 0 ? "Click 'Add Videos' to get started." : "Try adjusting your search or filters."}
-                  </p>
-                  {videos.length === 0 && !searchTerm && <Button onClick={handleAddVideosClick} icon="UploadCloud" variant="primary" className="mt-6">Add Videos</Button>}
-                </div>
-              )}
             </main>
-            
-            {/* Modals for Assembly Hub - e.g. Video Settings, Play Selects */}
-            <PlaySelectsModal 
-                isOpen={isModalOpen === 'playSelects'} 
-                onClose={closeModal} 
-                videoId={modalProps.videoId} 
-            />
-            {/* <VideoSettingsModal isOpen={isModalOpen === 'videoSettings'} onClose={closeModal} videoId={modalProps.videoId} /> */}
-          </motion.div>
-        );
-      };
+        </section>
 
-      // --- Logging Station Components ---
-      const EnhancedTimeline = ({ duration, logs, currentTime, onSeek, onMark, markIn, markOut, videoRef }) => {
-        const timelineRef = useRef(null);
-
-        const handleTimelineClick = (e) => {
-            if (!timelineRef.current || duration === 0) return;
-            const rect = timelineRef.current.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const percentage = clickX / rect.width;
-            onSeek(percentage * duration);
-        };
-
-        // Draggable playhead, markIn, markOut would be more complex, involving event listeners for mousemove/mouseup
-        // For simplicity, this example only has click-to-seek on timeline.
-
-        return (
-          <div className="w-full select-none py-2">
-            {/* Time Ruler (simplified) */}
-            <div className="h-4 bg-bg-tertiary rounded-t-md flex items-center justify-between px-2 text-xs text-text-tertiary">
-                <span>{formatDuration(0)}</span>
-                <span>{formatDuration(duration)}</span>
-            </div>
-            {/* Main timeline bar */}
-            <div ref={timelineRef} className="relative h-8 bg-gray-700 cursor-pointer rounded-b-md" onClick={handleTimelineClick}>
-              {/* Log Segments */}
-              {logs.map(log => {
-                if (log.markIn == null || log.markOut == null || log.markOut <= log.markIn) return null;
-                const left = (log.markIn / duration) * 100;
-                const width = ((log.markOut - log.markIn) / duration) * 100;
-                return (
-                  <div
-                    key={log.id}
-                    className="absolute h-full opacity-70 hover:opacity-100 transition-opacity"
-                    style={{ 
-                        left: `${left}%`, 
-                        width: `${width}%`, 
-                        backgroundColor: log.color || 'var(--accent-secondary)',
-                        borderLeft: '1px solid rgba(255,255,255,0.2)',
-                        borderRight: '1px solid rgba(255,255,255,0.2)',
-                    }}
-                    title={`${log.notes.substring(0,50)}... (${formatDuration(log.markIn)} - ${formatDuration(log.markOut)})`}
-                    onClick={(e) => { e.stopPropagation(); onSeek(log.markIn); }}
-                  />
-                );
-              })}
-              {/* Mark In/Out Range */}
-              {markIn != null && markOut != null && markOut > markIn && (
-                <div 
-                    className="absolute h-full bg-accent-primary opacity-40 pointer-events-none"
-                    style={{
-                        left: `${(markIn / duration) * 100}%`,
-                        width: `${((markOut - markIn) / duration) * 100}%`
-                    }}
-                />
-              )}
-              {/* Playhead */}
-              <div 
-                className="absolute top-0 h-full w-1 bg-accent-danger pointer-events-none rounded"
-                style={{ left: `${(currentTime / duration) * 100}%` }} 
-              />
-              {/* Mark In Handle (simplified, not draggable) */}
-              {markIn != null && (
-                 <div 
-                    className="absolute top-0 h-full w-1 bg-green-500 pointer-events-none"
-                    style={{ left: `${(markIn / duration) * 100}%` }} 
-                    title={`Mark In: ${formatDuration(markIn, true)}`}
-                  />
-              )}
-              {/* Mark Out Handle (simplified, not draggable) */}
-              {markOut != null && (
-                 <div 
-                    className="absolute top-0 h-full w-1 bg-red-500 pointer-events-none"
-                    style={{ left: `${(markOut / duration) * 100}%` }} 
-                    title={`Mark Out: ${formatDuration(markOut, true)}`}
-                  />
-              )}
-            </div>
-          </div>
-        );
-      };
-
-      const LoggingForm = ({ currentLog, onSave, onClear, videoCurrentTime, onMarkIn, onMarkOut, markInTime, markOutTime }) => {
-        const [notes, setNotes] = useState('');
-        const [rating, setRating] = useState(0);
-        const [keywords, setKeywords] = useState(''); // Comma-separated string
-        const [color, setColor] = useState(useUIStore.getState().theme === 'dark' ? '#3b82f6' : '#3b82f6'); // Default blue
-
-        useEffect(() => {
-          if (currentLog) {
-            setNotes(currentLog.notes || '');
-            setRating(currentLog.rating || 0);
-            setKeywords(currentLog.keywords ? currentLog.keywords.join(', ') : '');
-            setColor(currentLog.color || '#3b82f6');
-          } else { // New log
-            setNotes('');
-            setRating(0);
-            setKeywords('');
-            // Retain color or reset to default for new logs
-          }
-        }, [currentLog]);
-
-        const handleSubmit = (e, andContinue = false) => {
-          e.preventDefault();
-          if (!notes.trim() && !keywords.trim() && rating === 0 && (markInTime == null || markOutTime == null)) {
-            toast.error("Please add some information or set marks for the log.");
-            return;
-          }
-          if (markInTime != null && markOutTime != null && markOutTime <= markInTime) {
-            toast.error("Mark Out time must be after Mark In time.");
-            return;
-          }
-
-          onSave({
-            id: currentLog?.id,
-            notes,
-            rating,
-            keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
-            color,
-            markIn: markInTime,
-            markOut: markOutTime,
-          }, andContinue);
-          
-          if(!currentLog || andContinue) { // If it was a new log, or save & continue
-            setNotes('');
-            setRating(0);
-            setKeywords('');
-            // Don't reset marks here, that's up to onClear or new markIn/Out actions
-          }
-        };
-        
-        const defaultLogColors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#64748b'];
-
-        return (
-          <form className="space-y-4 p-4 bg-bg-secondary rounded-lg">
-            <div className="flex gap-2">
-                <Button onClick={onMarkIn} icon="Scissors" variant="secondary" className="flex-1" title={`Set Mark In (I) - ${markInTime != null ? formatDuration(markInTime, true) : 'Not set'}`}>
-                  Mark In {markInTime != null ? `(${formatDuration(markInTime, true)})` : ''}
-                </Button>
-                <Button onClick={onMarkOut} icon="Scissors" variant="secondary" className="flex-1" title={`Set Mark Out (O) - ${markOutTime != null ? formatDuration(markOutTime, true) : 'Not set'}`}>
-                  Mark Out {markOutTime != null ? `(${formatDuration(markOutTime, true)})` : ''}
-                </Button>
-            </div>
-             <Button onClick={onClear} variant="ghost" size="sm" className="w-full text-xs" title="Clear Marks (Delete/Backspace)">Clear Marks</Button>
-
-
-            <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Log details, comments, transcription..." rows={4} />
-            <Input label="Keywords (comma-separated)" value={keywords} onChange={e => setKeywords(e.target.value)} placeholder="e.g., b-roll, interview, good take" />
-            
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="w-full sm:w-auto">
-                    <label className="block text-sm font-medium text-text-secondary mb-1">Rating</label>
-                    <StarRating rating={rating} setRating={setRating} />
+        <!-- Screen 2: Project Videos -->
+        <section id="screen-project-videos" class="screen">
+            <header>
+                <button id="btn-back-to-projects"><i class="fas fa-arrow-left"></i> Projects</button>
+                <h2 id="project-name-header-s2"></h2>
+                <div>
+                    <button id="btn-export-project"><i class="fas fa-download"></i> Export Project</button>
+                    <button id="btn-add-videos-s2"><i class="fas fa-video"></i> Add Videos</button>
+                    <input type="file" id="add-videos-input-s2" multiple accept="video/*" class="hidden">
                 </div>
-                <div className="w-full sm:w-auto">
-                    <label className="block text-sm font-medium text-text-secondary mb-1">Color Tag</label>
-                    <ColorPicker selectedColor={color} onColorChange={setColor} colors={defaultLogColors} />
-                </div>
-            </div>
+            </header>
+            <main class="container">
+                <input type="search" id="search-logs-input-s2" placeholder="Search clips (notes, tags, filename)...">
+                <div id="search-results-container-s2" class="hidden"></div>
 
-            <div className="flex flex-col sm:flex-row gap-2 pt-2">
-              <Button type="button" onClick={(e) => handleSubmit(e, false)} variant="primary" className="flex-1" icon="Save">
-                {currentLog ? 'Save Changes' : 'Save Log'}
-              </Button>
-              <Button type="button" onClick={(e) => handleSubmit(e, true)} variant="secondary" className="flex-1" icon="PlusCircle">
-                Save & New
-              </Button>
-            </div>
-            {currentLog && <Button type="button" onClick={onClear} variant="ghost" size="sm" className="w-full">Cancel Edit / New Log</Button>}
-          </form>
-        );
-      };
-      
-      const LogItem = ({ log, onEdit, onDelete, onGoTo }) => {
-        return (
-            <motion.div
-                layout
-                initial={animations.listItem.initial}
-                animate={animations.listItem.animate}
-                exit={animations.listItem.exit}
-                className="p-3 bg-bg-tertiary rounded-md mb-2"
-            >
-                <div className="flex justify-between items-start">
+                <div class="content-wrapper">
                     <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            {log.markIn != null && log.markOut != null && (
-                                <button 
-                                    onClick={() => onGoTo(log.markIn)} 
-                                    className="text-xs font-mono px-2 py-0.5 rounded bg-accent-primary/20 hover:bg-accent-primary/40 text-accent-primary"
-                                    title="Go to Mark In"
-                                >
-                                    {formatDuration(log.markIn, true)} - {formatDuration(log.markOut, true)}
-                                </button>
-                            )}
-                            <StarRating rating={log.rating} editable={false} />
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: log.color || 'transparent' }} title={`Color: ${log.color}`}></div>
+                        <h3>Videos in Project</h3>
+                        <div id="video-selector-area">
+                             <p class="empty-state hidden">No videos in this project. Add some!</p>
                         </div>
-                        <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{log.notes || "No notes."}</p>
-                        {log.keywords && log.keywords.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                                {log.keywords.map(kw => (
-                                    <span key={kw} className="text-xs bg-gray-600 text-text-secondary px-1.5 py-0.5 rounded-full">{kw}</span>
-                                ))}
-                            </div>
-                        )}
                     </div>
-                    <DropdownMenu
-                        trigger={<Button variant="ghost" size="sm" icon="MoreVertical" aria-label="Log options" />}
-                    >
-                        <DropdownItem icon="Edit3" onClick={onEdit}>Edit Log</DropdownItem>
-                        <DropdownItem icon="Copy" onClick={() => { /* TODO: Duplicate Log */ toast.info("Duplicate not yet implemented")}}>Duplicate Log</DropdownItem>
-                        <DropdownItem icon="Trash2" onClick={onDelete} className="text-accent-danger">Delete Log</DropdownItem>
-                    </DropdownMenu>
+                    <div id="selected-video-area" class="card hidden">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom:10px;">
+                            <h4 id="selected-video-filename-s2"></h4>
+                            <div>
+                                <button id="btn-delete-selected-video-s2" class="danger secondary"><i class="fas fa-trash"></i> Delete Video</button>
+                                <button id="btn-go-to-logging-s3"><i class="fas fa-marker"></i> Edit/Add Logs</button>
+                            </div>
+                        </div>
+                        <div id="screen2-video-player-container">
+                            <video id="screen2-video-player" controls></video>
+                             <!-- Basic controls. Custom controls if needed for specific segment playback features. -->
+                        </div>
+                        <h4>Logged Clips</h4>
+                        <div id="screen2-logs-list">
+                            <p class="empty-state hidden">No logs for this video yet.</p>
+                        </div>
+                    </div>
                 </div>
-                <p className="text-xs text-text-tertiary mt-2 text-right">Created: {new Date(log.createdAt).toLocaleString()}</p>
-            </motion.div>
-        );
-      };
+            </main>
+        </section>
 
-
-      const LoggingStationScreen = () => {
-        const { currentProjectId, currentVideoId, navigateTo, openModal, closeModal, isModalOpen } = useUIStore();
-        const { currentVideo, fetchVideoById } = useVideoStore();
-        const { addLog, updateLog, deleteLog } = useLogStore();
-        const isLoading = useUIStore(state => state.isLoading);
-        const project = useProjectStore(state => state.projects.find(p => p.id === currentProjectId));
-
-        const videoRef = useRef(null);
-        const [videoSrc, setVideoSrc] = useState(null);
-        const [isPlaying, setIsPlaying] = useState(false);
-        const [currentTime, setCurrentTime] = useState(0);
-        const [duration, setDuration] = useState(0);
-        const [volume, setVolume] = useState(1);
-        const [playbackRate, setPlaybackRate] = useState(1);
-        const [isMuted, setIsMuted] = useState(false);
-        const [isFullScreen, setIsFullScreen] = useState(false);
-        const playerContainerRef = useRef(null);
-
-
-        const [markIn, setMarkIn] = useState(null);
-        const [markOut, setMarkOut] = useState(null);
-        const [currentEditingLog, setCurrentEditingLog] = useState(null); // Log object being edited
-
-        useEffect(() => {
-          if (currentVideoId) {
-            fetchVideoById(currentVideoId).then(videoData => {
-              if (videoData && videoData.fileHandle) {
-                videoData.fileHandle.getFile().then(file => {
-                  const url = URL.createObjectURL(file);
-                  setVideoSrc(url);
-                }).catch(err => {
-                    console.error("Error getting file from handle:", err);
-                    toast.error("Could not load video file. Permissions might have changed.");
-                    navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId);
-                });
-              }
-            });
-          } else {
-             navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId); // Should not happen
-          }
-          // Cleanup video URL on unmount
-          return () => {
-            if (videoSrc) {
-              URL.revokeObjectURL(videoSrc);
-            }
-          };
-        }, [currentVideoId]);
-        
-        // Keyboard shortcuts for logging screen
-        useEffect(() => {
-            const handleKeyDown = (e) => {
-                // Ensure focus is not in an input field before triggering player/logging shortcuts
-                const activeElement = document.activeElement;
-                const isInputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement.tagName) || activeElement.isContentEditable;
-
-                if (useUIStore.getState().currentScreen !== SCREENS.LOGGING_STATION) return;
+        <!-- Screen 3: Video Logging -->
+        <section id="screen-video-logging" class="screen">
+            <header>
+                <button id="btn-back-to-project-videos-s3"><i class="fas fa-arrow-left"></i> Back to Project</button>
+                <h3 id="video-filename-header-s3"></h3>
+            </header>
+            <main class="container">
+                <div id="video-player-container-s3">
+                    <video id="main-video-player-s3" preload="metadata"></video>
+                    <div class="custom-video-controls">
+                        <button id="btn-play-pause-s3"><i class="fas fa-play"></i></button>
+                        <span id="current-time-display-s3">00:00:00</span>
+                        <input type="range" id="timeline-slider-s3" value="0" step="0.1" style="flex-grow: 1;">
+                        <span id="duration-display-s3">00:00:00</span>
+                        <select id="speed-control-s3">
+                            <option value="0.5">0.5x</option>
+                            <option value="0.75">0.75x</option>
+                            <option value="1" selected>1x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="2">2x</option>
+                        </select>
+                    </div>
+                </div>
                 
-                // Player controls (even if input focused for spacebar if video player itself is 'focused' conceptually)
-                if (e.code === 'Space' && !isInputFocused) { // Space for play/pause
-                    e.preventDefault();
-                    togglePlayPause();
-                }
-                if (e.key.toLowerCase() === 'm' && !isInputFocused) { // M for mute/unmute
-                    e.preventDefault();
-                    toggleMute();
-                }
-                if (e.key === 'ArrowLeft' && !isInputFocused) { // Left arrow for seek back
-                    e.preventDefault();
-                    seekRelative(e.shiftKey ? -30 : -5);
-                }
-                if (e.key === 'ArrowRight' && !isInputFocused) { // Right arrow for seek forward
-                    e.preventDefault();
-                    seekRelative(e.shiftKey ? 30 : 5);
-                }
-                // J K L keys are also common for -10s, play/pause, +10s
-                if (e.key.toLowerCase() === 'j' && !isInputFocused) { e.preventDefault(); seekRelative(-10); }
-                if (e.key.toLowerCase() === 'k' && !isInputFocused) { e.preventDefault(); togglePlayPause(); }
-                if (e.key.toLowerCase() === 'l' && !isInputFocused) { e.preventDefault(); seekRelative(10); }
-
-
-                // Logging controls (usually safe even if input focused for specific keys like Enter with modifiers)
-                if (e.key.toLowerCase() === 'i' && !isInputFocused) { // I for Mark In
-                    e.preventDefault();
-                    handleMarkIn();
-                }
-                if (e.key.toLowerCase() === 'o' && !isInputFocused) { // O for Mark Out
-                    e.preventDefault();
-                    handleMarkOut();
-                }
-                 if ((e.key === 'Delete' || e.key === 'Backspace') && !isInputFocused) { // Delete/Backspace to clear marks
-                    e.preventDefault();
-                    handleClearMarks();
-                }
-                // Enter to save log could be handled in form, Cmd/Ctrl+Enter for Save & New
-            };
-
-            window.addEventListener('keydown', handleKeyDown);
-            return () => window.removeEventListener('keydown', handleKeyDown);
-        }, [isPlaying, currentTime, duration, markIn, markOut]); // Add other relevant dependencies if they affect shortcuts
-
-        const handleLoadedMetadata = () => {
-          if (videoRef.current) {
-            setDuration(videoRef.current.duration);
-          }
-        };
-        const handleTimeUpdate = () => {
-          if (videoRef.current) {
-            setCurrentTime(videoRef.current.currentTime);
-          }
-        };
-        const handleVideoEnded = () => setIsPlaying(false);
-
-        const togglePlayPause = () => {
-          if (videoRef.current) {
-            if (videoRef.current.paused || videoRef.current.ended) {
-              videoRef.current.play().then(() => setIsPlaying(true)).catch(e => console.error("Play error:", e));
-            } else {
-              videoRef.current.pause();
-              setIsPlaying(false);
-            }
-          }
-        };
-        const seek = (time) => {
-          if (videoRef.current) {
-            videoRef.current.currentTime = Math.max(0, Math.min(time, duration));
-            setCurrentTime(videoRef.current.currentTime); // Ensure UI updates immediately
-          }
-        };
-        const seekRelative = (offset) => seek(currentTime + offset);
-        
-        const handleVolumeChange = (newVolume) => {
-            if (videoRef.current) {
-                videoRef.current.volume = newVolume;
-                setVolume(newVolume);
-                setIsMuted(newVolume === 0);
-            }
-        };
-        const toggleMute = () => {
-            if (videoRef.current) {
-                const newMuted = !videoRef.current.muted;
-                videoRef.current.muted = newMuted;
-                setIsMuted(newMuted);
-                if (!newMuted && volume === 0) { // If unmuting and volume was 0, set to a default
-                    handleVolumeChange(0.5);
-                } else if (newMuted) {
-                    // Store current volume before muting to restore it later? Optional.
-                }
-            }
-        };
-        const handlePlaybackRateChange = (rate) => {
-            if (videoRef.current) {
-                videoRef.current.playbackRate = rate;
-                setPlaybackRate(rate);
-            }
-        };
-        const toggleFullScreen = () => {
-            if (!playerContainerRef.current) return;
-            if (!document.fullscreenElement) {
-                playerContainerRef.current.requestFullscreen().then(() => setIsFullScreen(true)).catch(err => console.error(err));
-            } else {
-                document.exitFullscreen().then(() => setIsFullScreen(false)).catch(err => console.error(err));
-            }
-        };
-         useEffect(() => {
-            const fsChangeHandler = () => setIsFullScreen(!!document.fullscreenElement);
-            document.addEventListener('fullscreenchange', fsChangeHandler);
-            return () => document.removeEventListener('fullscreenchange', fsChangeHandler);
-        }, []);
-
-
-        const handleMarkIn = () => {
-          if (videoRef.current) {
-            setMarkIn(videoRef.current.currentTime);
-            toast(`Mark In set: ${formatDuration(videoRef.current.currentTime, true)}`, { icon: <Icon name="Scissors" />});
-          }
-        };
-        const handleMarkOut = () => {
-          if (videoRef.current) {
-            const newMarkOut = videoRef.current.currentTime;
-            if (markIn != null && newMarkOut <= markIn) {
-                toast.error("Mark Out must be after Mark In.");
-                return;
-            }
-            setMarkOut(newMarkOut);
-            toast(`Mark Out set: ${formatDuration(newMarkOut, true)}`, { icon: <Icon name="Scissors" />});
-          }
-        };
-        const handleClearMarks = () => {
-          setMarkIn(null);
-          setMarkOut(null);
-          setCurrentEditingLog(null); // Also clear editing state if marks are cleared
-          toast.info("Marks cleared.");
-        };
-
-        const handleSaveLog = async (logData, andContinue = false) => {
-          if (logData.id) { // Updating existing log
-            await updateLog(logData.id, logData);
-          } else { // Adding new log
-            await addLog(currentVideoId, logData);
-          }
-          if (!logData.id || andContinue) { // If new log or "save and new"
-            handleClearMarks(); // Clear marks and form for next log
-            setCurrentEditingLog(null);
-          } else if (logData.id && !andContinue) { // Saved an existing log and NOT continuing
-            setCurrentEditingLog(null); // Clear editing state but keep marks if they were from the edited log
-          }
-        };
-        
-        const handleEditLog = (log) => {
-            setCurrentEditingLog(log);
-            setMarkIn(log.markIn);
-            setMarkOut(log.markOut);
-            seek(log.markIn); // Optionally seek to log start when editing
-            toast.info("Editing log. Form populated.");
-        };
-        
-        const handleDeleteLog = async (logId) => {
-            if (confirm("Are you sure you want to delete this log?")) {
-                await deleteLog(logId);
-                if (currentEditingLog && currentEditingLog.id === logId) {
-                    handleClearMarks(); // Clear form if deleted log was being edited
-                }
-            }
-        };
-
-        if (isLoading && !currentVideo) return <div className="p-8"><SkeletonLoader className="h-12 w-1/2 mb-4" /><SkeletonLoader className="h-[60vh] w-full mb-4" /><SkeletonLoader className="h-24 w-full" /></div>;
-        if (!currentVideo || !videoSrc) return <div className="p-8 text-center text-text-secondary">Video not found or failed to load. <Button onClick={() => navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId)}>Back to Project</Button></div>;
-        
-        const logsForTimeline = currentVideo.logs || [];
-
-        return (
-          <motion.div {...animations.pageTransition} className="flex flex-col lg:flex-row h-screen max-h-screen overflow-hidden">
-            {/* Main Content: Video Player and Timeline (takes up remaining space) */}
-            <div className="flex-grow flex flex-col bg-bg-primary overflow-hidden relative" ref={playerContainerRef}>
-              {/* Sticky Header */}
-              <header className="p-3 border-b border-bg-tertiary">
-                <div className="flex justify-between items-center">
-                    <div className="text-sm text-text-secondary flex items-center overflow-hidden">
-                        <button onClick={() => navigateTo(SCREENS.PROJECT_DASHBOARD)} className="hover:text-accent-primary hidden sm:inline">Projects</button>
-                        <Icon name="ChevronRight" size={16} className="mx-1 hidden sm:inline" />
-                        <button onClick={() => navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId)} className="hover:text-accent-primary truncate max-w-[150px] sm:max-w-[200px]">
-                            {project ? project.name : 'Project'}
-                        </button>
-                        <Icon name="ChevronRight" size={16} className="mx-1" />
-                        <span className="font-semibold text-text-primary truncate max-w-[150px] sm:max-w-[300px]" title={currentVideo.filename}>{currentVideo.filename}</span>
+                <div class="card">
+                    <h4>Create Log</h4>
+                    <div id="logging-controls-s3" style="margin-bottom: 15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <button id="btn-mark-in-s3"><i class="fas fa-arrow-down"></i> Mark In</button> <span id="mark-in-timecode-s3">00:00:00.000</span>
+                        <button id="btn-mark-out-s3"><i class="fas fa-arrow-up"></i> Mark Out</button> <span id="mark-out-timecode-s3">00:00:00.000</span>
                     </div>
-                  <div className="flex items-center gap-2">
-                     <span className="text-xs text-text-tertiary hidden md:block">
-                        {formatDuration(currentTime, true)} / {formatDuration(duration, true)}
-                     </span>
-                     {/* Quick Actions (Export logs for this video, etc) */}
-                     {/* <Button variant="ghost" size="sm" icon="Download" title="Export Logs for this Video">Export</Button> */}
-                     <Button onClick={() => navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId)} variant="ghost" size="sm" icon="ChevronLeft">Back to Assembly</Button>
-                  </div>
-                </div>
-              </header>
-
-              {/* Video Player Section */}
-              <div className="relative flex-grow flex items-center justify-center bg-black group">
-                <video
-                  ref={videoRef}
-                  src={videoSrc}
-                  onLoadedMetadata={handleLoadedMetadata}
-                  onTimeUpdate={handleTimeUpdate}
-                  onEnded={handleVideoEnded}
-                  onClick={togglePlayPause} // Click on video to play/pause
-                  onDoubleClick={toggleFullScreen} // Double click for fullscreen
-                  className="max-w-full max-h-[calc(100%-160px)] object-contain custom-video-controls" // Adjust max-h based on controls/timeline
-                  playsInline // Important for mobile
-                />
-                {/* Custom Controls Overlay (shown on hover/focus) */}
-                <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300">
-                    <EnhancedTimeline
-                        duration={duration}
-                        logs={logsForTimeline}
-                        currentTime={currentTime}
-                        onSeek={seek}
-                        markIn={markIn}
-                        markOut={markOut}
-                        videoRef={videoRef}
-                    />
-                    <div className="flex items-center justify-between gap-2 sm:gap-4 mt-2">
-                        <div className="flex items-center gap-1 sm:gap-2">
-                            <Button onClick={togglePlayPause} variant="ghost" icon={isPlaying ? "Pause" : "Play"} size="sm" aria-label={isPlaying ? "Pause" : "Play"} />
-                            <Button onClick={() => seekRelative(-10)} variant="ghost" icon="Rewind" size="sm" aria-label="Rewind 10s" />
-                            <Button onClick={() => seekRelative(10)} variant="ghost" icon="FastForward" size="sm" aria-label="Fast Forward 10s" />
-                            
-                            <div className="flex items-center group/volume">
-                                <Button onClick={toggleMute} variant="ghost" icon={isMuted || volume === 0 ? "VolumeX" : "Volume2"} size="sm" aria-label={isMuted ? "Unmute" : "Mute"} />
-                                <input 
-                                    type="range" min="0" max="1" step="0.05" 
-                                    value={isMuted ? 0 : volume} 
-                                    onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                                    className="w-0 group-hover/volume:w-20 ml-1 transition-all duration-200 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-accent-primary"
-                                    aria-label="Volume"
-                                />
-                            </div>
+                    <div id="logging-form-s3">
+                        <textarea id="log-notes-s3" placeholder="Notes..."></textarea>
+                        <div id="rating-stars-s3" class="rating-stars">
+                            <span>Rate: </span>
+                            <span class="star" data-value="1"><i class="far fa-star"></i></span>
+                            <span class="star" data-value="2"><i class="far fa-star"></i></span>
+                            <span class="star" data-value="3"><i class="far fa-star"></i></span>
+                            <span class="star" data-value="4"><i class="far fa-star"></i></span>
+                            <span class="star" data-value="5"><i class="far fa-star"></i></span>
                         </div>
-                        <div className="text-xs sm:text-sm text-text-primary font-mono">
-                            {formatDuration(currentTime, true)} / {formatDuration(duration, true)}
-                        </div>
-                        <div className="flex items-center gap-1 sm:gap-2">
-                            <select 
-                                value={playbackRate} 
-                                onChange={e => handlePlaybackRateChange(parseFloat(e.target.value))}
-                                className="bg-transparent text-text-primary text-xs sm:text-sm focus:outline-none hover:bg-bg-tertiary p-1 rounded"
-                                aria-label="Playback speed"
-                            >
-                                {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => <option key={rate} value={rate} className="bg-bg-secondary text-text-primary">{rate}x</option>)}
-                            </select>
-                            <Button onClick={toggleFullScreen} variant="ghost" icon={isFullScreen ? "Minimize2" : "Maximize2"} size="sm" aria-label={isFullScreen ? "Exit Fullscreen" : "Enter Fullscreen"} />
+                        <input type="text" id="log-keywords-s3" placeholder="Keywords (comma-separated)">
+                        <div style="display:flex; gap:10px;">
+                            <button id="btn-save-log-s3"><i class="fas fa-save"></i> Save Log</button>
+                            <button id="btn-clear-log-form-s3" class="secondary"><i class="fas fa-eraser"></i> Clear Form</button>
                         </div>
                     </div>
                 </div>
-              </div>
+
+                <div class="card">
+                    <h4>Saved Logs</h4>
+                    <div id="saved-logs-list-s3">
+                         <p class="empty-state hidden">No logs saved for this video yet.</p>
+                    </div>
+                </div>
+            </main>
+        </section>
+    </div>
+
+    <!-- Modal for New Project Name -->
+    <div id="new-project-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal-btn" data-target-modal="new-project-modal">×</span>
+            <h3>Create New Project</h3>
+            <input type="text" id="new-project-name-input" placeholder="Project Name">
+            <div style="text-align: right;">
+                <button id="btn-cancel-new-project" class="secondary">Cancel</button>
+                <button id="btn-confirm-new-project">Create</button>
             </div>
+        </div>
+    </div>
 
-            {/* Sidebar: Logging Panel & Logs List (collapsible on smaller screens) */}
-            <aside className="w-full lg:w-[400px] xl:w-[450px] flex-shrink-0 bg-bg-secondary flex flex-col h-full max-h-screen border-l border-bg-tertiary">
-              <div className="p-1 border-b border-bg-tertiary"> {/* Tab-like controls can go here if panel becomes collapsible */}
-                <h3 className="text-lg font-semibold p-3 text-center">Logging Panel</h3>
-              </div>
-              <div className="overflow-y-auto flex-grow">
-                <LoggingForm
-                  currentLog={currentEditingLog}
-                  onSave={handleSaveLog}
-                  onClear={() => { handleClearMarks(); setCurrentEditingLog(null);}}
-                  videoCurrentTime={currentTime}
-                  onMarkIn={handleMarkIn}
-                  onMarkOut={handleMarkOut}
-                  markInTime={markIn}
-                  markOutTime={markOut}
-                />
-                
-                <div className="p-4">
-                  <h4 className="text-md font-semibold mb-2 text-text-secondary">Logs ({currentVideo.logs ? currentVideo.logs.length : 0})</h4>
-                   {/* TODO: List Controls: Search Logs, Filter by Rating, Sort Options */}
-                  <div className="max-h-[calc(100vh-500px)] overflow-y-auto pr-1"> {/* Adjust max-h based on form height */}
-                     <AnimatePresence>
-                        {currentVideo.logs && currentVideo.logs.length > 0 ? (
-                           currentVideo.logs.slice().reverse().map(log => ( // Show newest first, or sort by markIn
-                            <LogItem 
-                                key={log.id} 
-                                log={log}
-                                onEdit={() => handleEditLog(log)}
-                                onDelete={() => handleDeleteLog(log.id)}
-                                onGoTo={(time) => seek(time)}
-                            />
-                           ))
-                        ) : (
-                            <p className="text-sm text-text-tertiary text-center py-4">No logs for this video yet.</p>
-                        )}
-                     </AnimatePresence>
-                  </div>
-                </div>
-              </div>
-            </aside>
-          </motion.div>
-        );
-      };
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal-btn" data-target-modal="confirmation-modal">×</span>
+            <p id="confirmation-message"></p>
+            <div style="text-align: right;">
+                <button id="btn-cancel-action" class="secondary">No</button>
+                <button id="btn-confirm-action" class="danger">Yes</button>
+            </div>
+        </div>
+    </div>
 
-      // --- Advanced Feature Components ---
-      const PlaySelectsModal = ({ isOpen, onClose, videoId }) => {
-        // This is a complex component. For now, a simplified version.
-        // It would need its own video player instance and logic to play segments.
-        const { currentVideo, fetchVideoById } = useVideoStore();
-        const [selects, setSelects] = useState([]);
-        const [currentSelectIndex, setCurrentSelectIndex] = useState(0);
-        const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-        const modalVideoRef = useRef(null);
+    <!-- Re-select Video Modal -->
+    <div id="reselect-video-modal" class="modal">
+        <div class="modal-content">
+             <span class="close-modal-btn" data-target-modal="reselect-video-modal">×</span>
+            <h4 id="reselect-video-title">Video File Needed</h4>
+            <p id="reselect-video-message"></p>
+            <input type="file" id="reselect-video-input" accept="video/*">
+            <div style="text-align: right; margin-top:15px;">
+                <button id="btn-cancel-reselect" class="secondary">Cancel</button>
+                <button id="btn-confirm-reselect-video">Load Video</button>
+            </div>
+        </div>
+    </div>
 
-        useEffect(() => {
-          if (isOpen && videoId) {
-            fetchVideoById(videoId).then(videoData => {
-              if (videoData && videoData.logs) {
-                // Filter logs that are "selects" (e.g., good rating, or specific keyword)
-                const validSelects = videoData.logs.filter(log => log.markIn != null && log.markOut != null && log.markOut > log.markIn && log.rating >=3 ); // Example: rating 3+
-                setSelects(validSelects.sort((a,b) => a.markIn - b.markIn));
-                setCurrentSelectIndex(0);
-                 if (videoData.fileHandle) {
-                    videoData.fileHandle.getFile().then(file => {
-                        if (modalVideoRef.current) modalVideoRef.current.src = URL.createObjectURL(file);
-                    }).catch(err => toast.error("Could not load video for selects."));
-                }
-              }
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Global State & Config ---
+            let appData = { projects: [] };
+            let currentScreen = 'screen-projects';
+            let currentProjectId = null;
+            let currentVideoId_S2 = null; // For screen 2 selected video
+            let currentVideoData_S3 = null; // For screen 3 { id, name, fileObject (transient), logs: [] }
+            
+            // In-memory store for File objects this session
+            // Key: videoId, Value: File object
+            let videoFileObjects = {}; 
+            
+            // Logging form state for Screen 3
+            let s3_markInTime = 0;
+            let s3_markOutTime = 0;
+            let s3_currentRating = 0;
+            let s3_editingLogId = null;
+
+            const LOCAL_STORAGE_KEY = 'logReelData';
+
+            // --- DOM Elements Cache ---
+            const screens = {
+                projects: document.getElementById('screen-projects'),
+                projectVideos: document.getElementById('screen-project-videos'),
+                videoLogging: document.getElementById('screen-video-logging'),
+            };
+            const modals = {
+                newProject: document.getElementById('new-project-modal'),
+                confirmation: document.getElementById('confirmation-modal'),
+                reselectVideo: document.getElementById('reselect-video-modal'),
+            };
+            // Screen 1
+            const btnNewProject = document.getElementById('btn-new-project');
+            const btnImportProjects = document.getElementById('btn-import-projects');
+            const importFileInput = document.getElementById('import-file-input');
+            const projectsListContainer = document.getElementById('projects-list-container');
+            const newProjectNameInput = document.getElementById('new-project-name-input');
+            const btnConfirmNewProject = document.getElementById('btn-confirm-new-project');
+            const btnCancelNewProject = document.getElementById('btn-cancel-new-project');
+
+            // Screen 2
+            const btnBackToProjects = document.getElementById('btn-back-to-projects');
+            const projectNameHeaderS2 = document.getElementById('project-name-header-s2');
+            const btnAddVideosS2 = document.getElementById('btn-add-videos-s2');
+            const addVideosInputS2 = document.getElementById('add-videos-input-s2');
+            const btnExportProject = document.getElementById('btn-export-project');
+            const searchLogsInputS2 = document.getElementById('search-logs-input-s2');
+            const searchResultsContainerS2 = document.getElementById('search-results-container-s2');
+            const videoSelectorArea = document.getElementById('video-selector-area');
+            const selectedVideoArea = document.getElementById('selected-video-area');
+            const selectedVideoFilenameS2 = document.getElementById('selected-video-filename-s2');
+            const screen2VideoPlayer = document.getElementById('screen2-video-player');
+            const screen2LogsList = document.getElementById('screen2-logs-list');
+            const btnGoToLoggingS3 = document.getElementById('btn-go-to-logging-s3');
+            const btnDeleteSelectedVideoS2 = document.getElementById('btn-delete-selected-video-s2');
+
+
+            // Screen 3
+            const btnBackToProjectVideosS3 = document.getElementById('btn-back-to-project-videos-s3');
+            const videoFilenameHeaderS3 = document.getElementById('video-filename-header-s3');
+            const mainVideoPlayerS3 = document.getElementById('main-video-player-s3');
+            const btnPlayPauseS3 = document.getElementById('btn-play-pause-s3');
+            const currentTimeDisplayS3 = document.getElementById('current-time-display-s3');
+            const timelineSliderS3 = document.getElementById('timeline-slider-s3');
+            const durationDisplayS3 = document.getElementById('duration-display-s3');
+            const speedControlS3 = document.getElementById('speed-control-s3');
+            const btnMarkInS3 = document.getElementById('btn-mark-in-s3');
+            const markInTimecodeS3 = document.getElementById('mark-in-timecode-s3');
+            const btnMarkOutS3 = document.getElementById('btn-mark-out-s3');
+            const markOutTimecodeS3 = document.getElementById('mark-out-timecode-s3');
+            const logNotesS3 = document.getElementById('log-notes-s3');
+            const ratingStarsS3 = document.getElementById('rating-stars-s3');
+            const logKeywordsS3 = document.getElementById('log-keywords-s3');
+            const btnSaveLogS3 = document.getElementById('btn-save-log-s3');
+            const btnClearLogFormS3 = document.getElementById('btn-clear-log-form-s3');
+            const savedLogsListS3 = document.getElementById('saved-logs-list-s3');
+            
+            // Modals
+            const confirmationMessage = document.getElementById('confirmation-message');
+            const btnConfirmAction = document.getElementById('btn-confirm-action');
+            const btnCancelAction = document.getElementById('btn-cancel-action');
+            document.querySelectorAll('.close-modal-btn').forEach(btn => {
+                btn.onclick = () => modals[btn.dataset.targetModal].classList.remove('active');
             });
-          } else if (!isOpen && modalVideoRef.current && modalVideoRef.current.src) {
-             URL.revokeObjectURL(modalVideoRef.current.src);
-             modalVideoRef.current.src = ""; // Clear src
-             modalVideoRef.current.removeAttribute('src'); // Fully remove
-             modalVideoRef.current.load(); // Reset video element state
-          }
-        }, [isOpen, videoId]);
+            const reselectVideoModal = document.getElementById('reselect-video-modal');
+            const reselectVideoMsg = document.getElementById('reselect-video-message');
+            const reselectVideoInput = document.getElementById('reselect-video-input');
+            const btnConfirmReselectVideo = document.getElementById('btn-confirm-reselect-video');
+            const btnCancelReselect = document.getElementById('btn-cancel-reselect');
+            let reselectVideoPromiseResolve = null;
 
-        useEffect(() => {
-            if (isOpen && selects.length > 0 && modalVideoRef.current && modalVideoRef.current.src) {
-                playSelect(currentSelectIndex);
+
+            // --- Utility Functions ---
+            const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substring(2);
+            
+            function formatTime(totalSeconds, includeMillis = false) {
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = Math.floor(totalSeconds % 60);
+                const millis = Math.floor((totalSeconds % 1) * 1000);
+
+                const hh = String(hours).padStart(2, '0');
+                const mm = String(minutes).padStart(2, '0');
+                const ss = String(seconds).padStart(2, '0');
+                const ms = String(millis).padStart(3, '0');
+
+                return includeMillis ? `${hh}:${mm}:${ss}.${ms}` : `${hh}:${mm}:${ss}`;
             }
-        }, [selects, currentSelectIndex, isOpen, modalVideoRef.current?.src]); // Depend on src actually being set
 
-
-        const playSelect = (index) => {
-            if (!modalVideoRef.current || selects.length === 0 || index < 0 || index >= selects.length) return;
-            
-            const select = selects[index];
-            setCurrentSelectIndex(index);
-            
-            modalVideoRef.current.currentTime = select.markIn;
-            modalVideoRef.current.play()
-                .then(() => setIsVideoPlaying(true))
-                .catch(e => console.error("Play Selects error:", e));
-
-            // Stop at markOut (could use timeupdate event)
-            const checkEndTime = () => {
-                if (modalVideoRef.current && modalVideoRef.current.currentTime >= select.markOut) {
-                    modalVideoRef.current.pause();
-                    setIsVideoPlaying(false);
-                    modalVideoRef.current.removeEventListener('timeupdate', checkEndTime);
-                    // Optionally auto-play next or wait
-                    // playNextSelect(); // Example of auto-play next
+            function toggleEmptyState(container, dataArray) {
+                const emptyStateEl = container.querySelector('.empty-state');
+                if (emptyStateEl) {
+                    emptyStateEl.classList.toggle('hidden', dataArray && dataArray.length > 0);
                 }
-            };
-            modalVideoRef.current.addEventListener('timeupdate', checkEndTime);
-        };
-        
-        const playNextSelect = () => {
-            if (currentSelectIndex < selects.length - 1) {
-                playSelect(currentSelectIndex + 1);
-            } else {
-                 // Reached end of selects
-                setIsVideoPlaying(false);
-                toast.info("Finished playing all selects.");
             }
-        };
-        const playPreviousSelect = () => {
-            if (currentSelectIndex > 0) {
-                playSelect(currentSelectIndex - 1);
-            }
-        };
-        const toggleCurrentSelectPlayPause = () => {
-            if (!modalVideoRef.current) return;
-            if (isVideoPlaying) {
-                modalVideoRef.current.pause();
-                setIsVideoPlaying(false);
-            } else {
-                // Ensure it plays within the current select's bounds if paused
-                const currentSelect = selects[currentSelectIndex];
-                if (modalVideoRef.current.currentTime < currentSelect.markIn || modalVideoRef.current.currentTime >= currentSelect.markOut) {
-                    modalVideoRef.current.currentTime = currentSelect.markIn; // Restart current select if outside bounds
-                }
-                modalVideoRef.current.play().then(() => setIsVideoPlaying(true));
-            }
-        };
-        
-        const currentSelectData = selects[currentSelectIndex];
-
-        return (
-          <Modal isOpen={isOpen} onClose={onClose} title={`Play Selects: ${currentVideo?.filename || 'Video'}`} size="xl">
-            {selects.length > 0 ? (
-              <div className="space-y-4">
-                <div className="aspect-video bg-black rounded overflow-hidden">
-                  <video ref={modalVideoRef} className="w-full h-full" onEnded={playNextSelect} controls={false} playsInline />
-                </div>
-                {/* Selects Timeline/Navigation */}
-                <div className="flex items-center justify-center gap-1 overflow-x-auto p-2 bg-bg-tertiary rounded">
-                    {selects.map((sel, idx) => (
-                        <button
-                            key={sel.id}
-                            onClick={() => playSelect(idx)}
-                            title={`Play: ${sel.notes.substring(0,30)}... \n(${formatDuration(sel.markIn)} - ${formatDuration(sel.markOut)})`}
-                            className={`h-6 px-2 text-xs rounded transition-all
-                                ${idx === currentSelectIndex ? 'bg-accent-primary text-white scale-110' : 'bg-gray-600 hover:bg-gray-500 text-text-secondary'}
-                                ${sel.rating >= 4 ? 'border-2 border-yellow-400' : ''}
-                            `}
-                            style={{backgroundColor: idx !== currentSelectIndex ? sel.color : undefined}} // Show color if not active
-                        >
-                           Select {idx + 1}
-                        </button>
-                    ))}
-                </div>
-                {currentSelectData && (
-                    <div className="p-3 bg-bg-tertiary rounded text-sm">
-                        <h4 className="font-semibold text-text-primary">Current Select ({currentSelectIndex + 1} of {selects.length}):</h4>
-                        <p className="text-text-secondary mt-1 whitespace-pre-wrap">Notes: {currentSelectData.notes || 'N/A'}</p>
-                        <div className="mt-1">Rating: <StarRating rating={currentSelectData.rating} editable={false} /></div>
-                        {currentSelectData.keywords && currentSelectData.keywords.length > 0 && <p className="text-text-secondary mt-1">Keywords: {currentSelectData.keywords.join(', ')}</p>}
-                    </div>
-                )}
-                 <div className="flex justify-center items-center gap-4 p-2">
-                    <Button onClick={playPreviousSelect} icon="SkipBack" disabled={currentSelectIndex === 0} aria-label="Previous Select"/>
-                    <Button onClick={toggleCurrentSelectPlayPause} icon={isVideoPlaying ? "Pause" : "Play"} variant="primary" size="lg" aria-label={isVideoPlaying ? "Pause Select" : "Play Select"}/>
-                    <Button onClick={playNextSelect} icon="SkipForward" disabled={currentSelectIndex === selects.length - 1} aria-label="Next Select"/>
-                </div>
-              </div>
-            ) : (
-              <p className="text-text-secondary text-center py-8">No suitable selects (e.g. rating 3+) found in this video to play.</p>
-            )}
-          </Modal>
-        );
-      };
-
-      // === App Controls (Export/Import, Settings) ===
-      const AppControls = {
-        exportAllData: async () => {
-          try {
-            useUIStore.getState().setLoading(true);
-            const projects = await db.projects.toArray();
-            const videos = await db.videos.toArray();
-            const logs = await db.logs.toArray();
-            const settings = await db.settings.toArray();
-
-            // Note: FileSystemFileHandle objects in 'videos' cannot be directly serialized to JSON.
-            // We need to decide how to handle them. For a complete backup, they are essential.
-            // One option for export is to omit them, and for import, re-acquire them.
-            // Or, try to store their 'name' and hope user can re-select same named files from same relative paths.
-            // For simplicity in this example, we'll export them as is, but they might become null or empty objects on import if not handled by Dexie's internals for cloning.
-            // Dexie *can* store them in IndexedDB, but JSON.stringify will likely fail or produce empty objects.
-            // A more robust solution might use a library that can serialize/deserialize them or a custom reviver/replacer.
             
-            const dataToExport = {
-              exportFormatVersion: 1,
-              exportedAt: new Date().toISOString(),
-              projects,
-              videos: videos.map(v => ({...v, fileHandle: null})), // Strip fileHandle for basic JSON export
-              logs,
-              settings,
-            };
-            const jsonString = JSON.stringify(dataToExport, null, 2);
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `logreel_backup_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            toast.success("All data exported successfully as JSON (file handles excluded).");
-          } catch (error) {
-            console.error("Export failed:", error);
-            toast.error("Data export failed.");
-          } finally {
-            useUIStore.getState().setLoading(false);
-          }
-        },
-        importData: async () => {
-            // This is complex: needs file picker for JSON, parsing, validation, conflict resolution (overwrite/merge?)
-            // For now, a placeholder that logs to console.
-            try {
-                const [fileHandle] = await window.showOpenFilePicker({
-                    types: [{ description: 'LogReel JSON Backup', accept: { 'application/json': ['.json'] }}],
-                    multiple: false,
+            // --- Local Storage ---
+            function saveData() {
+                try {
+                    // Create a deep copy of appData without File objects for serialization
+                    const serializableAppData = JSON.parse(JSON.stringify(appData));
+                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(serializableAppData));
+                } catch (error) {
+                    console.error("Error saving data to local storage:", error);
+                    alert("Error saving data. Your changes might not persist.");
+                }
+            }
+
+            function loadData() {
+                const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (data) {
+                    appData = JSON.parse(data);
+                    // Initialize transient File object store. User will need to re-select files.
+                    videoFileObjects = {}; 
+                } else {
+                    appData = { projects: [] };
+                }
+            }
+
+            // --- Navigation ---
+            function showScreen(screenId) {
+                Object.values(screens).forEach(s => s.classList.remove('active'));
+                screens[screenId].classList.add('active');
+                currentScreen = screenId;
+                window.scrollTo(0, 0); // Scroll to top on screen change
+            }
+
+            // --- Modal Management ---
+            function showModal(modalId) { modals[modalId].classList.add('active'); }
+            function hideModal(modalId) { modals[modalId].classList.remove('active'); }
+
+            function showConfirmation(message, onConfirm) {
+                confirmationMessage.textContent = message;
+                btnConfirmAction.onclick = () => {
+                    onConfirm();
+                    hideModal('confirmation');
+                };
+                showModal('confirmation');
+            }
+            btnCancelAction.onclick = () => hideModal('confirmation');
+
+            // --- Reselect Video File Logic ---
+            function promptForVideoFile(videoName) {
+                return new Promise((resolve) => {
+                    reselectVideoPromiseResolve = resolve;
+                    reselectVideoMsg.textContent = `Please select the video file: "${videoName}" to continue.`;
+                    reselectVideoInput.value = ''; // Clear previous selection
+                    showModal('reselectVideo');
                 });
-                const file = await fileHandle.getFile();
-                const jsonString = await file.text();
-                const data = JSON.parse(jsonString);
+            }
 
-                if (!data.exportFormatVersion || data.exportFormatVersion !== 1) {
-                    toast.error("Invalid or unsupported backup file format.");
-                    return;
+            btnConfirmReselectVideo.onclick = () => {
+                if (reselectVideoInput.files.length > 0) {
+                    const file = reselectVideoInput.files[0];
+                    if (reselectVideoPromiseResolve) {
+                        reselectVideoPromiseResolve(file);
+                    }
+                    hideModal('reselectVideo');
+                } else {
+                    alert("Please select a file.");
                 }
+            };
+            btnCancelReselect.onclick = () => {
+                 if (reselectVideoPromiseResolve) {
+                    reselectVideoPromiseResolve(null); // Indicate cancellation
+                }
+                hideModal('reselectVideo');
+            }
 
-                if (!confirm("Importing data will overwrite existing data with the same IDs. Are you sure you want to proceed?")) {
+
+            // --- Thumbnail Generation ---
+            async function generateThumbnail(videoElement, time) {
+                return new Promise((resolve) => {
+                    if (!videoElement.src || videoElement.readyState < 2) { // HAVE_CURRENT_DATA or more
+                        resolve(null); // Cannot generate thumbnail if video not ready
+                        return;
+                    }
+                    
+                    const wasPaused = videoElement.paused;
+                    const originalTime = videoElement.currentTime;
+
+                    videoElement.currentTime = time;
+
+                    const onSeeked = () => {
+                        videoElement.removeEventListener('seeked', onSeeked);
+                        const canvas = document.createElement('canvas');
+                        // Standard thumbnail aspect ratio 16:9, e.g., 160x90
+                        canvas.width = 160; 
+                        canvas.height = 90; 
+                        
+                        const ctx = canvas.getContext('2d');
+                        // Calculate dimensions to maintain aspect ratio
+                        const videoAspect = videoElement.videoWidth / videoElement.videoHeight;
+                        const canvasAspect = canvas.width / canvas.height;
+                        let drawWidth, drawHeight, offsetX, offsetY;
+
+                        if (videoAspect > canvasAspect) { // Video wider than canvas
+                            drawHeight = canvas.height;
+                            drawWidth = drawHeight * videoAspect;
+                            offsetX = (canvas.width - drawWidth) / 2;
+                            offsetY = 0;
+                        } else { // Video taller than canvas or same aspect
+                            drawWidth = canvas.width;
+                            drawHeight = drawWidth / videoAspect;
+                            offsetY = (canvas.height - drawHeight) / 2;
+                            offsetX = 0;
+                        }
+                        ctx.drawImage(videoElement, offsetX, offsetY, drawWidth, drawHeight);
+                        
+                        // Restore video state
+                        if (wasPaused) videoElement.pause(); else videoElement.play();
+                        videoElement.currentTime = originalTime;
+                        
+                        resolve(canvas.toDataURL('image/jpeg', 0.7)); // Quality 0.7
+                    };
+                    
+                    videoElement.addEventListener('seeked', onSeeked, { once: true });
+
+                    // If already at the correct time and seeked, manually trigger
+                    if (videoElement.currentTime === time && videoElement.seekable.length > 0) {
+                         // A small timeout to ensure the frame is rendered
+                        setTimeout(onSeeked, 50);
+                    }
+                });
+            }
+
+            // --- Screen 1: Projects List ---
+            function renderProjectsScreen() {
+                projectsListContainer.innerHTML = ''; // Clear existing
+                if (appData.projects.length === 0) {
+                    toggleEmptyState(projectsListContainer, appData.projects);
                     return;
                 }
                 
-                useUIStore.getState().setLoading(true);
-
-                // Clear existing data (or implement merging strategy)
-                await db.transaction('rw', db.projects, db.videos, db.logs, db.settings, async () => {
-                    await db.projects.clear();
-                    await db.videos.clear();
-                    await db.logs.clear();
-                    await db.settings.clear();
-
-                    if (data.projects) await db.projects.bulkAdd(data.projects.map(p => ({...p, createdAt: new Date(p.createdAt), updatedAt: new Date(p.updatedAt) })));
-                    // Videos import is tricky due to FileSystemFileHandle.
-                    // The exported JSON has 'fileHandle: null'. User would need to re-link files.
-                    // This basic import won't re-link. A more advanced import would guide user through re-linking.
-                    if (data.videos) await db.videos.bulkAdd(data.videos.map(v => ({...v, createdAt: new Date(v.createdAt), updatedAt: new Date(v.updatedAt), fileHandle: null /* Mark as needing relink */})));
-                    if (data.logs) await db.logs.bulkAdd(data.logs.map(l => ({...l, createdAt: new Date(l.createdAt), updatedAt: new Date(l.updatedAt) })));
-                    if (data.settings) await db.settings.bulkAdd(data.settings);
+                appData.projects.forEach(project => {
+                    const card = document.createElement('div');
+                    card.className = 'card project-card';
+                    card.innerHTML = `
+                        <h3>${project.name}</h3>
+                        <p>Videos: ${project.videos.length}</p>
+                        <div class="actions">
+                            <button class="btn-open-project" data-project-id="${project.id}"><i class="fas fa-folder-open"></i> Open</button>
+                            <button class="btn-delete-project danger" data-project-id="${project.id}"><i class="fas fa-trash"></i> Delete</button>
+                        </div>
+                    `;
+                    projectsListContainer.appendChild(card);
                 });
-                
-                toast.success("Data imported successfully! You may need to re-link video files.");
-                // Force reload or re-fetch all data
-                useProjectStore.getState().fetchProjects();
-                // Navigate to dashboard
-                useUIStore.getState().navigateTo(SCREENS.PROJECT_DASHBOARD);
+                toggleEmptyState(projectsListContainer, appData.projects);
 
-            } catch (error) {
-                if (error.name === 'AbortError') { /* User cancelled picker */ return; }
-                console.error("Import failed:", error);
-                toast.error("Data import failed. Check console for details.");
-            } finally {
-                useUIStore.getState().setLoading(false);
+                document.querySelectorAll('.btn-open-project').forEach(btn => {
+                    btn.onclick = () => openProject(btn.dataset.projectId);
+                });
+                document.querySelectorAll('.btn-delete-project').forEach(btn => {
+                    btn.onclick = () => deleteProject(btn.dataset.projectId);
+                });
+                showScreen('projects');
             }
-        },
-      };
 
+            btnNewProject.onclick = () => {
+                newProjectNameInput.value = '';
+                showModal('newProject');
+            };
+            btnCancelNewProject.onclick = () => hideModal('newProject');
 
-      // === Main App Component ===
-      const App = () => {
-        const { currentScreen, currentProjectId, currentVideoId, globalError, isLoading, navigateTo, setGlobalError } = useUIStore();
-
-        // Basic hash-based routing setup
-        useEffect(() => {
-          const handleHashChange = () => {
-            const hash = window.location.hash.slice(1); // Remove #
-            if (!hash) {
-              navigateTo(SCREENS.PROJECT_DASHBOARD);
-              return;
-            }
-            const [screen, projIdStr, videoIdStr] = hash.split('/');
-            const projId = projIdStr ? parseInt(projIdStr, 10) : null;
-            const vidId = videoIdStr ? parseInt(videoIdStr, 10) : null;
-
-            if (Object.values(SCREENS).includes(screen)) {
-              // Avoid re-navigating if already on the correct screen with correct IDs from internal navigation
-              if (screen !== currentScreen || projId !== currentProjectId || vidId !== currentVideoId) {
-                navigateTo(screen, projId, vidId);
-              }
-            } else {
-              navigateTo(SCREENS.PROJECT_DASHBOARD); // Default to project dashboard if hash is invalid
-            }
-          };
-
-          window.addEventListener('hashchange', handleHashChange);
-          handleHashChange(); // Initial load
-
-          return () => window.removeEventListener('hashchange', handleHashChange);
-        }, []); // Empty dependency array: run once on mount for setup
-
-        // Global keyboard shortcuts (very basic example)
-        useEffect(() => {
-            const handleGlobalKeyDown = (e) => {
-                if (e.metaKey || e.ctrlKey) { // Cmd/Ctrl shortcuts
-                    // Example: Cmd+N for new project (if on dashboard)
-                    // if (e.key === 'n' && currentScreen === SCREENS.PROJECT_DASHBOARD) {
-                    //     e.preventDefault();
-                    //     useUIStore.getState().openModal('projectForm');
-                    // }
-                    // This needs careful management to avoid conflicts with browser/OS shortcuts or input fields
+            btnConfirmNewProject.onclick = () => {
+                const name = newProjectNameInput.value.trim();
+                if (name) {
+                    const newProject = {
+                        id: generateId(),
+                        name: name,
+                        videos: []
+                    };
+                    appData.projects.unshift(newProject); // Add to beginning
+                    saveData();
+                    renderProjectsScreen();
+                    hideModal('newProject');
+                } else {
+                    alert('Project name cannot be empty.');
                 }
-                if (e.key === 'Escape') {
-                    // Close modals, popups, or navigate back (simplified)
-                    if (useUIStore.getState().isModalOpen) {
-                        e.preventDefault();
-                        useUIStore.getState().closeModal();
-                    } else if (currentScreen === SCREENS.LOGGING_STATION) {
-                        e.preventDefault();
-                        navigateTo(SCREENS.ASSEMBLY_HUB, currentProjectId);
-                    } else if (currentScreen === SCREENS.ASSEMBLY_HUB) {
-                        e.preventDefault();
-                        navigateTo(SCREENS.PROJECT_DASHBOARD);
+            };
+
+            function openProject(projectId) {
+                currentProjectId = projectId;
+                const project = appData.projects.find(p => p.id === projectId);
+                if (project) {
+                    projectNameHeaderS2.textContent = project.name;
+                    currentVideoId_S2 = null; // Reset selected video for the project
+                    selectedVideoArea.classList.add('hidden'); // Hide video details initially
+                    searchLogsInputS2.value = ''; // Clear search
+                    searchResultsContainerS2.classList.add('hidden'); // Hide search results
+                    renderVideoSelectorS2();
+                    showScreen('projectVideos');
+                }
+            }
+
+            function deleteProject(projectId) {
+                const project = appData.projects.find(p => p.id === projectId);
+                showConfirmation(`Are you sure you want to delete project "${project.name}" and all its data? This cannot be undone.`, () => {
+                    appData.projects = appData.projects.filter(p => p.id !== projectId);
+                    // Also clear any associated file objects for videos in this project
+                    project.videos.forEach(v => delete videoFileObjects[v.id]);
+                    saveData();
+                    renderProjectsScreen();
+                });
+            }
+
+            btnImportProjects.onclick = () => importFileInput.click();
+            importFileInput.onchange = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const importedData = JSON.parse(e.target.result);
+                            if (importedData && Array.isArray(importedData.projects)) {
+                                // Simple merge: add imported projects to existing ones.
+                                // Could add more sophisticated merging/conflict resolution later.
+                                importedData.projects.forEach(p => {
+                                    if (!appData.projects.find(existingP => existingP.id === p.id)) {
+                                        appData.projects.push(p);
+                                    } else {
+                                        // TODO: Handle conflicts, e.g. overwrite or skip
+                                        console.warn(`Project with ID ${p.id} already exists. Skipping import for this project.`);
+                                    }
+                                });
+                                saveData();
+                                renderProjectsScreen();
+                                alert('Projects imported successfully! Note: Video files will need to be re-linked manually if not already loaded.');
+                            } else {
+                                alert('Invalid import file format.');
+                            }
+                        } catch (err) {
+                            alert('Error reading or parsing import file: ' + err.message);
+                        }
+                        importFileInput.value = ''; // Reset file input
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            
+            // --- Screen 2: Project Videos ---
+            btnBackToProjects.onclick = () => {
+                currentProjectId = null;
+                currentVideoId_S2 = null;
+                screen2VideoPlayer.src = ''; // Clear player
+                showScreen('projects');
+            };
+
+            function getCurrentProjectS2() {
+                return appData.projects.find(p => p.id === currentProjectId);
+            }
+
+            function renderVideoSelectorS2() {
+                videoSelectorArea.innerHTML = '';
+                const project = getCurrentProjectS2();
+                if (!project || project.videos.length === 0) {
+                    toggleEmptyState(videoSelectorArea, project ? project.videos : []);
+                    selectedVideoArea.classList.add('hidden'); // Ensure detail area is hidden
+                    return;
+                }
+
+                project.videos.forEach(video => {
+                    const item = document.createElement('div');
+                    item.className = 'video-select-item';
+                    item.textContent = video.name;
+                    item.dataset.videoId = video.id;
+                    if (video.id === currentVideoId_S2) {
+                        item.classList.add('active');
+                    }
+                    item.onclick = () => {
+                        selectVideoS2(video.id);
+                        searchResultsContainerS2.classList.add('hidden'); // Hide search results when new video selected
+                        searchLogsInputS2.value = '';
+                    };
+                    videoSelectorArea.appendChild(item);
+                });
+                toggleEmptyState(videoSelectorArea, project.videos);
+
+                // If a video was previously selected, re-render its details
+                if (currentVideoId_S2) {
+                     selectVideoS2(currentVideoId_S2); // This will re-render details
+                } else {
+                    selectedVideoArea.classList.add('hidden');
+                }
+            }
+            
+            async function selectVideoS2(videoId) {
+                currentVideoId_S2 = videoId;
+                const project = getCurrentProjectS2();
+                const videoData = project.videos.find(v => v.id === videoId);
+
+                if (!videoData) {
+                    selectedVideoArea.classList.add('hidden');
+                    return;
+                }
+                
+                document.querySelectorAll('#video-selector-area .video-select-item').forEach(el => {
+                    el.classList.toggle('active', el.dataset.videoId === videoId);
+                });
+
+                selectedVideoFilenameS2.textContent = videoData.name;
+                selectedVideoArea.classList.remove('hidden');
+                
+                // Load video into player
+                if (videoFileObjects[videoId]) {
+                    screen2VideoPlayer.src = URL.createObjectURL(videoFileObjects[videoId]);
+                } else {
+                    const reselectedFile = await promptForVideoFile(videoData.name);
+                    if (reselectedFile) {
+                        videoFileObjects[videoId] = reselectedFile;
+                        screen2VideoPlayer.src = URL.createObjectURL(reselectedFile);
+                         // Optionally verify filename match, though for now trust user
+                    } else {
+                        screen2VideoPlayer.src = ''; // Clear src if no file selected
+                        alert(`Video file for "${videoData.name}" not available. Some functions may be limited.`);
+                    }
+                }
+                renderLogsListS2(videoData.logs || []);
+            }
+            
+            function renderLogsListS2(logs) {
+                screen2LogsList.innerHTML = '';
+                if (!logs || logs.length === 0) {
+                    toggleEmptyState(screen2LogsList, logs);
+                    return;
+                }
+                logs.forEach((log, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'log-item';
+                    const ratingHtml = Array(5).fill(0).map((_, i) => 
+                        `<i class="${i < log.rating ? 'fas' : 'far'} fa-star" style="color: #f39c12;"></i>`
+                    ).join('');
+
+                    item.innerHTML = `
+                        ${log.thumbnail ? `<img src="${log.thumbnail}" class="thumbnail" alt="Log thumbnail">` : '<div class="thumbnail">No Preview</div>'}
+                        <div class="details">
+                            <p><strong>#${index + 1}: ${log.notes.substring(0, 50)}${log.notes.length > 50 ? '...' : ''}</strong></p>
+                            <p class="text-sm text-muted">Time: ${formatTime(log.markIn)} - ${formatTime(log.markOut)} | Rating: ${ratingHtml}</p>
+                            ${log.keywords && log.keywords.length > 0 ? `<p class="text-sm text-muted">Keywords: ${log.keywords.join(', ')}</p>` : ''}
+                        </div>
+                        <div class="actions">
+                            <button class="btn-play-clip-s2 secondary" data-log-id="${log.id}"><i class="fas fa-play"></i> Play Clip</button>
+                        </div>
+                    `;
+                    screen2LogsList.appendChild(item);
+                });
+                toggleEmptyState(screen2LogsList, logs);
+
+                document.querySelectorAll('.btn-play-clip-s2').forEach(btn => {
+                    btn.onclick = () => {
+                        const project = getCurrentProjectS2();
+                        const videoData = project.videos.find(v => v.id === currentVideoId_S2);
+                        const log = videoData.logs.find(l => l.id === btn.dataset.logId);
+                        if (log && screen2VideoPlayer.src) {
+                            screen2VideoPlayer.currentTime = log.markIn;
+                            screen2VideoPlayer.play();
+                            // Optional: auto-pause at markOut
+                            const onTimeUpdate = () => {
+                                if (screen2VideoPlayer.currentTime >= log.markOut) {
+                                    screen2VideoPlayer.pause();
+                                    screen2VideoPlayer.removeEventListener('timeupdate', onTimeUpdate);
+                                }
+                            };
+                            screen2VideoPlayer.addEventListener('timeupdate', onTimeUpdate);
+                        }
+                    };
+                });
+            }
+
+            btnAddVideosS2.onclick = () => addVideosInputS2.click();
+            addVideosInputS2.onchange = (event) => {
+                const project = getCurrentProjectS2();
+                if (!project) return;
+
+                Array.from(event.target.files).forEach(file => {
+                    const videoId = generateId();
+                    const videoData = {
+                        id: videoId,
+                        name: file.name,
+                        type: file.type,
+                        logs: []
+                    };
+                    // Check for duplicates by name in current project
+                    if (project.videos.some(v => v.name === file.name)) {
+                        alert(`Video "${file.name}" already exists in this project. Skipping.`);
+                        return;
+                    }
+                    project.videos.push(videoData);
+                    videoFileObjects[videoId] = file; // Store File object in session
+                });
+                saveData();
+                renderVideoSelectorS2();
+                addVideosInputS2.value = ''; // Reset input
+            };
+
+            btnDeleteSelectedVideoS2.onclick = () => {
+                if (!currentVideoId_S2) return;
+                const project = getCurrentProjectS2();
+                const video = project.videos.find(v => v.id === currentVideoId_S2);
+                showConfirmation(`Are you sure you want to delete video "${video.name}" and all its logs?`, () => {
+                    project.videos = project.videos.filter(v => v.id !== currentVideoId_S2);
+                    delete videoFileObjects[currentVideoId_S2]; // Remove from session store
+                    saveData();
+                    currentVideoId_S2 = null; // Reset selection
+                    selectedVideoArea.classList.add('hidden');
+                    renderVideoSelectorS2();
+                });
+            };
+
+            btnExportProject.onclick = () => {
+                const project = getCurrentProjectS2();
+                if (project) {
+                    const filename = `${project.name.replace(/\s+/g, '_')}_LogReel_Export.json`;
+                    const dataStr = JSON.stringify({ projects: [project] }, null, 2); // Export as an array with one project for consistency
+                    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                    
+                    const linkElement = document.createElement('a');
+                    linkElement.setAttribute('href', dataUri);
+                    linkElement.setAttribute('download', filename);
+                    linkElement.click();
+                }
+            };
+            
+            btnGoToLoggingS3.onclick = () => {
+                if (currentVideoId_S2) {
+                    const project = getCurrentProjectS2();
+                    const videoData = project.videos.find(v => v.id === currentVideoId_S2);
+                    if (videoData) {
+                        currentVideoData_S3 = { // Prepare data for Screen 3
+                            id: videoData.id,
+                            name: videoData.name,
+                            logs: videoData.logs || [], // Ensure logs array exists
+                            fileObject: videoFileObjects[videoData.id] // Pass the File object if available
+                        };
+                        setupVideoLoggingScreen();
                     }
                 }
             };
-            window.addEventListener('keydown', handleGlobalKeyDown);
-            return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-        }, [currentScreen, currentProjectId]);
 
-        let screenComponent;
-        switch (currentScreen) {
-          case SCREENS.ASSEMBLY_HUB:
-            screenComponent = <AssemblyHubScreen />;
-            break;
-          case SCREENS.LOGGING_STATION:
-            screenComponent = <LoggingStationScreen />;
-            break;
-          case SCREENS.PROJECT_DASHBOARD:
-          default:
-            screenComponent = <ProjectDashboardScreen />;
-            break;
-        }
+            searchLogsInputS2.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase().trim();
+                const project = getCurrentProjectS2();
+                searchResultsContainerS2.innerHTML = '';
 
-        return (
-          <Fragment>
-            <Toaster
-                position="bottom-right"
-                toastOptions={{
-                    className: '!bg-bg-tertiary !text-text-primary !shadow-lg',
-                    success: {
-                        iconTheme: { primary: 'var(--accent-success)', secondary: 'var(--text-primary)' },
-                    },
-                    error: {
-                        iconTheme: { primary: 'var(--accent-danger)', secondary: 'var(--text-primary)' },
-                    },
-                     info: {
-                        iconTheme: { primary: 'var(--accent-primary)', secondary: 'var(--text-primary)' },
+                if (!searchTerm || !project) {
+                    searchResultsContainerS2.classList.add('hidden');
+                    // Show default view (video selector and selected video details)
+                    videoSelectorArea.classList.remove('hidden');
+                    if(currentVideoId_S2) selectedVideoArea.classList.remove('hidden'); else selectedVideoArea.classList.add('hidden');
+                    return;
+                }
+
+                videoSelectorArea.classList.add('hidden');
+                selectedVideoArea.classList.add('hidden');
+                searchResultsContainerS2.classList.remove('hidden');
+
+                let resultsFound = false;
+                project.videos.forEach(video => {
+                    (video.logs || []).forEach(log => {
+                        const matchNotes = log.notes.toLowerCase().includes(searchTerm);
+                        const matchKeywords = log.keywords && log.keywords.some(k => k.toLowerCase().includes(searchTerm));
+                        const matchFilename = video.name.toLowerCase().includes(searchTerm);
+
+                        if (matchNotes || matchKeywords || matchFilename) {
+                            resultsFound = true;
+                            const item = document.createElement('div');
+                            item.className = 'search-result-item card';
+                            item.innerHTML = `
+                                <p><strong>Video:</strong> ${video.name}</p>
+                                <p><strong>Log:</strong> ${log.notes.substring(0,100)}...</p>
+                                <p class="text-sm text-muted">Time: ${formatTime(log.markIn)} - ${formatTime(log.markOut)}</p>
+                                <button class="btn-goto-log-from-search" data-video-id="${video.id}" data-log-id="${log.id}"><i class="fas fa-eye"></i> View/Play Clip</button>
+                            `;
+                            searchResultsContainerS2.appendChild(item);
+                        }
+                    });
+                });
+                
+                if (!resultsFound) {
+                    searchResultsContainerS2.innerHTML = '<p class="text-muted">No clips found matching your search.</p>';
+                }
+
+                document.querySelectorAll('.btn-goto-log-from-search').forEach(btn => {
+                    btn.onclick = async () => {
+                        const videoId = btn.dataset.videoId;
+                        const logId = btn.dataset.logId;
+                        await selectVideoS2(videoId); // Selects video, loads it, and shows its logs
+                        
+                        // Scroll to log and play (optional, might be complex for S2)
+                        // For now, selecting the video and showing its logs is the main action.
+                        // The user can then find the log in the list and play it.
+                        // Or, could enhance selectVideoS2 to highlight a specific log.
+                        const logToHighlight = screen2LogsList.querySelector(`.btn-play-clip-s2[data-log-id="${logId}"]`);
+                        if (logToHighlight) {
+                             logToHighlight.closest('.log-item').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                             logToHighlight.click(); // Auto-play the clip
+                        }
+                        searchLogsInputS2.value = ''; // Clear search after navigating
+                        searchResultsContainerS2.classList.add('hidden');
+                        videoSelectorArea.classList.remove('hidden');
+                        selectedVideoArea.classList.remove('hidden');
+                    };
+                });
+            });
+
+            // --- Screen 3: Video Logging ---
+            btnBackToProjectVideosS3.onclick = () => {
+                mainVideoPlayerS3.pause();
+                mainVideoPlayerS3.src = ''; // Release video resources
+                currentVideoData_S3 = null;
+                showScreen('projectVideos');
+                // Ensure Screen 2 is correctly re-rendered if needed (e.g., if logs were updated)
+                if (currentProjectId) {
+                   renderVideoSelectorS2(); // Re-render video list (shows updated log counts)
+                   if(currentVideoId_S2) selectVideoS2(currentVideoId_S2); // Re-render selected video details
+                }
+            };
+
+            async function setupVideoLoggingScreen() {
+                if (!currentVideoData_S3) return;
+
+                videoFilenameHeaderS3.textContent = currentVideoData_S3.name;
+                resetLogFormS3();
+                renderSavedLogsS3();
+
+                if (currentVideoData_S3.fileObject) {
+                    mainVideoPlayerS3.src = URL.createObjectURL(currentVideoData_S3.fileObject);
+                } else {
+                    const reselectedFile = await promptForVideoFile(currentVideoData_S3.name);
+                    if (reselectedFile) {
+                        currentVideoData_S3.fileObject = reselectedFile;
+                        // Persist this re-selected file in the session store
+                        videoFileObjects[currentVideoData_S3.id] = reselectedFile;
+                        mainVideoPlayerS3.src = URL.createObjectURL(reselectedFile);
+                    } else {
+                        mainVideoPlayerS3.src = '';
+                        alert(`Cannot load video "${currentVideoData_S3.name}". Logging screen may not function fully.`);
+                        // Potentially disable logging controls or navigate back
+                        btnBackToProjectVideosS3.click(); // Go back if no video
+                        return;
                     }
-                }}
-            />
-            {globalError && (
-              <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-accent-danger text-white p-3 rounded-md shadow-lg z-[100] flex items-center gap-2">
-                <Icon name="AlertTriangle" size={20} />
-                <span>Error: {globalError}</span>
-                <Button variant="ghost" size="sm" onClick={() => setGlobalError(null)} icon="X" className="!text-white hover:!bg-red-400 -mr-1" />
-              </div>
-            )}
-            {/* Loading Overlay (optional, more fine-grained loading is better) */}
-            {/* {isLoading && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[999]"><Icon name="Loader2" className="animate-spin" size={48} /></div>} */}
-            
-            <AnimatePresence mode="wait">
-              {React.cloneElement(screenComponent, { key: currentScreen })}
-            </AnimatePresence>
-          </Fragment>
-        );
-      };
+                }
+                showScreen('videoLogging');
+            }
 
-      // === Render the App ===
-      const rootElement = document.getElementById('root');
-      if (rootElement) {
-        ReactDOM.createRoot(rootElement).render(<App />);
-      } else {
-        console.error("Root element not found.");
-      }
-    } // End of Zustand check
-  </script>
+            // Screen 3 Video Player Listeners
+            mainVideoPlayerS3.onloadedmetadata = () => {
+                durationDisplayS3.textContent = formatTime(mainVideoPlayerS3.duration);
+                timelineSliderS3.max = mainVideoPlayerS3.duration;
+                // Set initial Mark Out to duration if not already set, or sensible default
+                if (s3_markOutTime === 0 || s3_markOutTime > mainVideoPlayerS3.duration) {
+                     s3_markOutTime = mainVideoPlayerS3.duration; // Default mark out to end
+                     markOutTimecodeS3.textContent = formatTime(s3_markOutTime, true);
+                }
+                 // Reset mark in to 0
+                s3_markInTime = 0;
+                markInTimecodeS3.textContent = formatTime(s3_markInTime, true);
+            };
+            mainVideoPlayerS3.ontimeupdate = () => {
+                currentTimeDisplayS3.textContent = formatTime(mainVideoPlayerS3.currentTime);
+                timelineSliderS3.value = mainVideoPlayerS3.currentTime;
+            };
+            mainVideoPlayerS3.onplay = () => btnPlayPauseS3.innerHTML = '<i class="fas fa-pause"></i>';
+            mainVideoPlayerS3.onpause = () => btnPlayPauseS3.innerHTML = '<i class="fas fa-play"></i>';
+
+            btnPlayPauseS3.onclick = () => {
+                if(mainVideoPlayerS3.src) mainVideoPlayerS3.paused ? mainVideoPlayerS3.play() : mainVideoPlayerS3.pause();
+            };
+            timelineSliderS3.oninput = () => {
+                if(mainVideoPlayerS3.src) mainVideoPlayerS3.currentTime = timelineSliderS3.value;
+            };
+            speedControlS3.onchange = () => {
+                if(mainVideoPlayerS3.src) mainVideoPlayerS3.playbackRate = parseFloat(speedControlS3.value);
+            };
+
+            btnMarkInS3.onclick = () => {
+                if (!mainVideoPlayerS3.src) return;
+                s3_markInTime = mainVideoPlayerS3.currentTime;
+                markInTimecodeS3.textContent = formatTime(s3_markInTime, true);
+                if (s3_markInTime > s3_markOutTime && s3_markOutTime !== 0) { // If Mark In is after Mark Out
+                    s3_markOutTime = s3_markInTime; // Set Mark Out to Mark In
+                    markOutTimecodeS3.textContent = formatTime(s3_markOutTime, true);
+                }
+            };
+            btnMarkOutS3.onclick = () => {
+                if (!mainVideoPlayerS3.src) return;
+                s3_markOutTime = mainVideoPlayerS3.currentTime;
+                 if (s3_markOutTime < s3_markInTime) { // If Mark Out is before Mark In
+                    s3_markInTime = s3_markOutTime; // Set Mark In to Mark Out
+                    markInTimecodeS3.textContent = formatTime(s3_markInTime, true);
+                }
+                markOutTimecodeS3.textContent = formatTime(s3_markOutTime, true);
+            };
+
+            // Star Rating Logic S3
+            ratingStarsS3.querySelectorAll('.star').forEach(star => {
+                star.onclick = () => {
+                    s3_currentRating = parseInt(star.dataset.value);
+                    updateStarDisplayS3();
+                };
+                 star.onmouseover = () => { // Hover effect
+                    const hoverValue = parseInt(star.dataset.value);
+                    ratingStarsS3.querySelectorAll('.star').forEach((s, i) => {
+                        s.innerHTML = `<i class="${i < hoverValue ? 'fas' : 'far'} fa-star"></i>`;
+                    });
+                };
+                star.onmouseout = () => updateStarDisplayS3(); // Revert to current rating on mouse out
+            });
+
+            function updateStarDisplayS3() {
+                ratingStarsS3.querySelectorAll('.star').forEach((star, index) => {
+                    star.innerHTML = `<i class="${index < s3_currentRating ? 'fas' : 'far'} fa-star"></i>`;
+                    star.classList.toggle('selected', index < s3_currentRating);
+                });
+            }
+            
+            function resetLogFormS3() {
+                logNotesS3.value = '';
+                logKeywordsS3.value = '';
+                s3_currentRating = 0;
+                updateStarDisplayS3();
+                s3_markInTime = 0;
+                s3_markOutTime = mainVideoPlayerS3.duration || 0; // Default to video duration if available
+                markInTimecodeS3.textContent = formatTime(s3_markInTime, true);
+                markOutTimecodeS3.textContent = formatTime(s3_markOutTime, true);
+                s3_editingLogId = null;
+                btnSaveLogS3.innerHTML = '<i class="fas fa-save"></i> Save Log';
+                timelineSliderS3.value = 0;
+                if(mainVideoPlayerS3.src) mainVideoPlayerS3.currentTime = 0;
+            }
+            btnClearLogFormS3.onclick = resetLogFormS3;
+
+            btnSaveLogS3.onclick = async () => {
+                if (!currentVideoData_S3 || !mainVideoPlayerS3.src) {
+                    alert("No video loaded to save a log for.");
+                    return;
+                }
+                if (s3_markOutTime <= s3_markInTime && (s3_markOutTime !== 0 || s3_markInTime !==0)) { // Allow 0-0 for full video if needed, but typically not.
+                    if (s3_markInTime === 0 && s3_markOutTime === 0 && mainVideoPlayerS3.duration > 0) {
+                         // If both are 0, and video has duration, assume they want to log full video.
+                         s3_markOutTime = mainVideoPlayerS3.duration;
+                    } else if (s3_markOutTime <= s3_markInTime) {
+                        alert('Mark Out time must be after Mark In time.');
+                        return;
+                    }
+                }
+
+                const notes = logNotesS3.value.trim();
+                const keywords = logKeywordsS3.value.split(',').map(k => k.trim()).filter(k => k);
+
+                if (!notes && s3_currentRating === 0 && keywords.length === 0) {
+                    alert("Please provide notes, rating, or keywords for the log.");
+                    return;
+                }
+                
+                // Thumbnail generation
+                mainVideoPlayerS3.pause(); // Pause for stable thumbnail
+                const thumbnail = await generateThumbnail(mainVideoPlayerS3, s3_markInTime);
+
+                const logEntry = {
+                    id: s3_editingLogId || generateId(),
+                    markIn: s3_markInTime,
+                    markOut: s3_markOutTime,
+                    notes: notes,
+                    rating: s3_currentRating,
+                    keywords: keywords,
+                    thumbnail: thumbnail
+                };
+
+                const project = getCurrentProjectS2(); // Get project from S2's currentProjectId
+                const videoInProject = project.videos.find(v => v.id === currentVideoData_S3.id);
+
+                if (s3_editingLogId) { // Update existing log
+                    const logIndex = videoInProject.logs.findIndex(l => l.id === s3_editingLogId);
+                    if (logIndex > -1) videoInProject.logs[logIndex] = logEntry;
+                } else { // Add new log
+                    if(!videoInProject.logs) videoInProject.logs = []; // Ensure logs array exists
+                    videoInProject.logs.push(logEntry);
+                }
+                
+                // Sort logs by Mark In time
+                videoInProject.logs.sort((a,b) => a.markIn - b.markIn);
+
+                currentVideoData_S3.logs = videoInProject.logs; // Update S3's copy
+                saveData();
+                renderSavedLogsS3();
+                resetLogFormS3();
+            };
+
+            function renderSavedLogsS3() {
+                savedLogsListS3.innerHTML = '';
+                if (!currentVideoData_S3 || !currentVideoData_S3.logs || currentVideoData_S3.logs.length === 0) {
+                    toggleEmptyState(savedLogsListS3, currentVideoData_S3 ? currentVideoData_S3.logs : []);
+                    return;
+                }
+                
+                currentVideoData_S3.logs.forEach(log => {
+                    const item = document.createElement('div');
+                    item.className = 'log-item';
+                    const ratingHtml = Array(5).fill(0).map((_, i) => 
+                        `<i class="${i < log.rating ? 'fas' : 'far'} fa-star" style="color: #f39c12;"></i>`
+                    ).join('');
+
+                    item.innerHTML = `
+                        ${log.thumbnail ? `<img src="${log.thumbnail}" class="thumbnail" alt="Log thumbnail">` : '<div class="thumbnail">No Preview</div>'}
+                        <div class="details">
+                            <p><strong>${log.notes.substring(0, 50)}${log.notes.length > 50 ? '...' : ''}</strong></p>
+                            <p class="text-sm text-muted">Time: ${formatTime(log.markIn, true)} - ${formatTime(log.markOut, true)}</p>
+                            <p class="text-sm text-muted">Rating: ${ratingHtml}</p>
+                            ${log.keywords && log.keywords.length > 0 ? `<p class="text-sm text-muted">Keywords: ${log.keywords.join(', ')}</p>` : ''}
+                        </div>
+                        <div class="actions">
+                            <button class="btn-goto-log-s3 secondary" data-log-id="${log.id}"><i class="fas fa-search-location"></i> Go To</button>
+                            <button class="btn-edit-log-s3 secondary" data-log-id="${log.id}"><i class="fas fa-edit"></i> Edit</button>
+                            <button class="btn-delete-log-s3 danger" data-log-id="${log.id}"><i class="fas fa-trash"></i> Delete</button>
+                        </div>
+                    `;
+                    savedLogsListS3.appendChild(item);
+                });
+                toggleEmptyState(savedLogsListS3, currentVideoData_S3.logs);
+
+                // Attach event listeners for log items
+                document.querySelectorAll('.btn-goto-log-s3').forEach(btn => {
+                    btn.onclick = () => {
+                        const log = currentVideoData_S3.logs.find(l => l.id === btn.dataset.logId);
+                        if (log && mainVideoPlayerS3.src) {
+                            mainVideoPlayerS3.currentTime = log.markIn;
+                            mainVideoPlayerS3.play();
+                            // Optional: auto-pause at markOut
+                            const onTimeUpdateGoTo = () => {
+                                if (mainVideoPlayerS3.currentTime >= log.markOut) {
+                                    mainVideoPlayerS3.pause();
+                                    mainVideoPlayerS3.removeEventListener('timeupdate', onTimeUpdateGoTo);
+                                }
+                            };
+                            if (log.markOut > log.markIn) { // Only set listener if it's a segment
+                                mainVideoPlayerS3.addEventListener('timeupdate', onTimeUpdateGoTo);
+                            }
+                        }
+                    };
+                });
+                document.querySelectorAll('.btn-edit-log-s3').forEach(btn => {
+                    btn.onclick = () => {
+                        const log = currentVideoData_S3.logs.find(l => l.id === btn.dataset.logId);
+                        if (log) {
+                            s3_editingLogId = log.id;
+                            logNotesS3.value = log.notes;
+                            logKeywordsS3.value = log.keywords.join(', ');
+                            s3_currentRating = log.rating;
+                            updateStarDisplayS3();
+                            s3_markInTime = log.markIn;
+                            s3_markOutTime = log.markOut;
+                            markInTimecodeS3.textContent = formatTime(s3_markInTime, true);
+                            markOutTimecodeS3.textContent = formatTime(s3_markOutTime, true);
+                            btnSaveLogS3.innerHTML = '<i class="fas fa-save"></i> Update Log';
+                            mainVideoPlayerS3.currentTime = log.markIn;
+                            logNotesS3.focus();
+                        }
+                    };
+                });
+                document.querySelectorAll('.btn-delete-log-s3').forEach(btn => {
+                    btn.onclick = () => {
+                        const logId = btn.dataset.logId;
+                        const log = currentVideoData_S3.logs.find(l => l.id === logId);
+                        showConfirmation(`Are you sure you want to delete this log? "${log.notes.substring(0,20)}..."`, () => {
+                            const project = getCurrentProjectS2();
+                            const videoInProject = project.videos.find(v => v.id === currentVideoData_S3.id);
+                            videoInProject.logs = videoInProject.logs.filter(l => l.id !== logId);
+                            currentVideoData_S3.logs = videoInProject.logs; // Update S3's copy
+                            saveData();
+                            renderSavedLogsS3();
+                        });
+                    };
+                });
+            }
+
+            // --- Initial Load ---
+            loadData();
+            renderProjectsScreen(); // Start on projects screen
+            // If there's only one project and it's empty, perhaps guide user to create new.
+            if (appData.projects.length === 0) {
+                 projectsListContainer.querySelector('.empty-state').classList.remove('hidden');
+            }
+
+        }); // End DOMContentLoaded
+    </script>
 </body>
 </html>
