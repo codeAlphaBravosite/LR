@@ -56,7 +56,7 @@
             color: var(--text-color);
         }
 
-        button, input[type="text"], textarea {
+        button, input[type="text"], textarea, select {
             font-family: inherit;
             font-size: 1rem;
             padding: 0.6em 1em;
@@ -431,6 +431,12 @@
 
         #preview-selects-player { width: 100%; margin-bottom: 1em; }
         #preview-selects-info { text-align: center; margin-bottom: 1em; color: var(--text-muted-color); }
+        #preview-selects-notes-label {
+            color: var(--text-color);
+            font-weight: bold;
+            display: block;
+            margin-bottom: 0.3em;
+        }
         #preview-selects-notes {
             background-color: #333;
             padding: 0.5em;
@@ -439,6 +445,7 @@
             margin-bottom: 1em;
             font-size: 0.9em;
             white-space: pre-wrap;
+            color: var(--text-color);
         }
 
         /* Notifications */
@@ -481,7 +488,7 @@
 <body>
     <div id="app">
         <!-- Screen A: Project Dashboard -->
-        <section id="project-dashboard-screen" class="screen">
+        <section id="project-dashboard-screen" class="screen hidden">
             <div class="screen-header">
                 <h1>LogReel</h1>
                 <button id="export-all-data-btn" class="secondary">Export All Data</button>
@@ -544,8 +551,8 @@
             </div>
 
             <div class="logging-controls">
-                <button id="mark-in-btn">Mark In <span class="mark-time" id="mark-in-time-display">00:00:00</span></button>
-                <button id="mark-out-btn">Mark Out <span class="mark-time" id="mark-out-time-display">00:00:00</span></button>
+                <button id="mark-in-btn">Mark In <span class="mark-time" id="mark-in-time-display">00:00:00.000</span></button>
+                <button id="mark-out-btn">Mark Out <span class="mark-time" id="mark-out-time-display">00:00:00.000</span></button>
             </div>
 
             <div class="log-form">
@@ -619,18 +626,17 @@
 
     // --- App State ---
     const state = {
-        currentScreen: 'project-dashboard',
+        currentScreen: null, // Will be set by navigateTo
         currentProjectId: null,
         currentProjectName: '',
         currentVideoId: null,
-        currentVideoFile: null, // Actual File object for current video
+        currentVideoFile: null,
         currentVideoFilename: '',
         currentVideoDuration: 0,
         currentMarkIn: null,
         currentMarkOut: null,
         currentLogRating: 0,
-        currentLogKeywords: [],
-        tempFileCache: {} // To store File objects temporarily by generated ID if not putting in IDB
+        // currentLogKeywords: [], // This will be managed locally in the log form section
     };
 
     // --- DOM Elements Cache ---
@@ -638,139 +644,169 @@
 
     // --- Database (IndexedDB) ---
     const DB_NAME = 'LogReelDB';
-    const DB_VERSION = 1;
+    const DB_VERSION = 1; // Increment if schema changes
     const STORE_PROJECTS = 'projects';
-    const STORE_VIDEOS = 'videos';
+    const STORE_VIDEOS = 'videos'; // Stores video metadata AND File objects
     const STORE_LOGS = 'logs';
     let db;
 
     async function initDB() {
+        console.log("[DB] Initializing Database...");
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(DB_NAME, DB_VERSION);
 
             request.onerror = (event) => {
-                console.error("Database error:", event.target.error);
+                console.error("[DB] Database error:", event.target.error);
                 reject("Database error: " + event.target.error);
             };
 
             request.onupgradeneeded = (event) => {
+                console.log("[DB] Upgrade needed or DB creation.");
                 db = event.target.result;
                 if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
+                    console.log("[DB] Creating object store:", STORE_PROJECTS);
                     db.createObjectStore(STORE_PROJECTS, { keyPath: 'id', autoIncrement: true });
                 }
                 if (!db.objectStoreNames.contains(STORE_VIDEOS)) {
+                    console.log("[DB] Creating object store:", STORE_VIDEOS);
                     const videoStore = db.createObjectStore(STORE_VIDEOS, { keyPath: 'id', autoIncrement: true });
                     videoStore.createIndex('projectId', 'projectId', { unique: false });
+                     // It's good practice to also index filename if you search by it often, though full text search is complex in IDB
+                    videoStore.createIndex('filename', 'filename', { unique: false });
                 }
                 if (!db.objectStoreNames.contains(STORE_LOGS)) {
+                    console.log("[DB] Creating object store:", STORE_LOGS);
                     const logStore = db.createObjectStore(STORE_LOGS, { keyPath: 'id', autoIncrement: true });
                     logStore.createIndex('videoId', 'videoId', { unique: false });
-                    logStore.createIndex('projectId', 'projectId', { unique: false });
+                    logStore.createIndex('projectId', 'projectId', { unique: false }); // For easier cleanup/export
                 }
+                 console.log("[DB] Upgrade complete.");
             };
 
             request.onsuccess = (event) => {
                 db = event.target.result;
+                console.log("[DB] Database initialized successfully.");
+                db.onerror = (event) => { // Generic error handler for the DB connection
+                    console.error("[DB] Generic Database Error:", event.target.error);
+                    showNotification("A database error occurred. Some operations might fail.", "error");
+                };
                 resolve(db);
             };
         });
     }
 
+    // --- DB Helper Functions with more logging ---
+    async function dbOperation(storeName, mode, operation, ...args) {
+        return new Promise((resolve, reject) => {
+            if (!db) {
+                console.error(`[DB OP] DB not initialized for ${storeName} ${operation.name}`);
+                return reject("DB not initialized");
+            }
+            try {
+                const transaction = db.transaction([storeName], mode);
+                const store = transaction.objectStore(storeName);
+                const request = operation(store, ...args);
+
+                request.onsuccess = (event) => resolve(event.target.result);
+                request.onerror = (event) => {
+                    console.error(`[DB OP ERROR] ${storeName} ${mode} ${operation.name}:`, event.target.error, "Args:", args);
+                    reject(`Error in ${operation.name}: ${event.target.error}`);
+                };
+            } catch (error) {
+                 console.error(`[DB OP EXCEPTION] ${storeName} ${mode} ${operation.name}:`, error, "Args:", args);
+                 reject(`Exception in ${operation.name}: ${error.message}`);
+            }
+        });
+    }
+
     async function dbAdd(storeName, item) {
-        return new Promise((resolve, reject) => {
-            if (!db) return reject("DB not initialized");
-            const transaction = db.transaction([storeName], 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.add(item);
-            request.onsuccess = (event) => resolve(event.target.result); // Returns the new key
-            request.onerror = (event) => reject("Error adding item: " + event.target.error);
-        });
+        return dbOperation(storeName, 'readwrite', (store, item) => store.add(item), item);
     }
-
     async function dbGetAll(storeName) {
-        return new Promise((resolve, reject) => {
-            if (!db) return reject("DB not initialized");
-            const transaction = db.transaction([storeName], 'readonly');
-            const store = transaction.objectStore(storeName);
-            const request = store.getAll();
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = (event) => reject("Error getting all items: " + event.target.error);
-        });
+        return dbOperation(storeName, 'readonly', (store) => store.getAll());
     }
-    
     async function dbGetById(storeName, id) {
-        return new Promise((resolve, reject) => {
-            if (!db) return reject("DB not initialized");
-            const transaction = db.transaction([storeName], 'readonly');
-            const store = transaction.objectStore(storeName);
-            const request = store.get(id);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = (event) => reject("Error getting item by ID: " + event.target.error);
-        });
+        return dbOperation(storeName, 'readonly', (store, id) => store.get(id), id);
     }
-
     async function dbGetByIndex(storeName, indexName, query) {
-        return new Promise((resolve, reject) => {
-            if (!db) return reject("DB not initialized");
-            const transaction = db.transaction([storeName], 'readonly');
-            const store = transaction.objectStore(storeName);
-            const index = store.index(indexName);
-            const request = index.getAll(query);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = (event) => reject("Error getting items by index: " + event.target.error);
-        });
+        return dbOperation(storeName, 'readonly', (store, indexName, query) => store.index(indexName).getAll(query), indexName, query);
     }
-
     async function dbUpdate(storeName, item) {
-        return new Promise((resolve, reject) => {
-            if (!db) return reject("DB not initialized");
-            const transaction = db.transaction([storeName], 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.put(item); // put = update if key exists, else add
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = (event) => reject("Error updating item: " + event.target.error);
-        });
+        return dbOperation(storeName, 'readwrite', (store, item) => store.put(item), item);
+    }
+    async function dbDelete(storeName, key) {
+        return dbOperation(storeName, 'readwrite', (store, key) => store.delete(key), key);
     }
 
-    async function dbDelete(storeName, key) {
-        return new Promise((resolve, reject) => {
-            if (!db) return reject("DB not initialized");
-            const transaction = db.transaction([storeName], 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.delete(key);
-            request.onsuccess = () => resolve();
-            request.onerror = (event) => reject("Error deleting item: " + event.target.error);
-        });
-    }
 
     // --- Router ---
     function navigateTo(screenId, params = {}) {
-        document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
-        DOMElements[screenId + 'Screen'].classList.remove('hidden');
-        state.currentScreen = screenId;
+        console.log(`[NAVIGATE] Attempting to navigate to: ${screenId} with params:`, params);
 
-        window.scrollTo(0, 0); // Scroll to top on navigation
+        document.querySelectorAll('.screen').forEach(s => {
+            // console.log(`[NAVIGATE] Hiding screen: ${s.id}`);
+            if (s) s.classList.add('hidden');
+        });
+
+        const targetScreenElement = DOMElements[screenId + 'Screen'];
+
+        if (targetScreenElement) {
+            console.log(`[NAVIGATE] Showing screen: ${targetScreenElement.id}`);
+            targetScreenElement.classList.remove('hidden');
+        } else {
+            console.error(`[NAVIGATE] Target screen element NOT FOUND in DOMElements for screenId: "${screenId}". DOMElements object:`, DOMElements);
+            showNotification(`Error: Could not find screen UI for "${screenId}".`, "error");
+            // Fallback to dashboard if intended screen isn't found, to prevent blank page.
+            if (screenId !== 'project-dashboard' && DOMElements.projectDashboardScreen) {
+                console.warn(`[NAVIGATE] Fallback: Navigating to project-dashboard as ${screenId} was not found.`);
+                DOMElements.projectDashboardScreen.classList.remove('hidden');
+                state.currentScreen = 'project-dashboard';
+                loadAndRenderProjects(); // Load its content
+            }
+            return;
+        }
+
+        state.currentScreen = screenId;
+        window.scrollTo(0, 0);
+        console.log(`[NAVIGATE] Current screen state set to: ${state.currentScreen}`);
 
         // Handle specific screen initializations
         if (screenId === 'project-dashboard') {
+            console.log("[NAVIGATE] Loading projects for dashboard...");
             loadAndRenderProjects();
         } else if (screenId === 'assembly-hub') {
             state.currentProjectId = params.projectId;
-            state.currentProjectName = params.projectName;
-            DOMElements.assemblyProjectTitle.textContent = state.currentProjectName;
+            // Ensure project name is also fetched/passed if needed for title, or fetch it here.
+            // For now, assume params.projectName is provided.
+            state.currentProjectName = params.projectName || "Project"; // Fallback name
+            if (DOMElements.assemblyProjectTitle) {
+                DOMElements.assemblyProjectTitle.textContent = sanitizeHTML(state.currentProjectName);
+            } else {
+                 console.warn("[NAVIGATE] assemblyProjectTitle DOM element not found for Assembly Hub.");
+            }
+            console.log(`[NAVIGATE] Loading videos for project: ${state.currentProjectName} (ID: ${state.currentProjectId})`);
             loadAndRenderVideosForProject(state.currentProjectId);
+            if (DOMElements.assemblySearchBar) DOMElements.assemblySearchBar.value = ''; // Clear search bar
         } else if (screenId === 'logging-station') {
+            state.currentProjectId = params.projectId; // Keep track of project context
+            state.currentProjectName = params.projectName;
             state.currentVideoId = params.videoId;
             state.currentVideoFilename = params.videoFilename;
-            state.currentVideoFile = params.videoFile; // Pass the File object
-            DOMElements.loggingVideoFilename.textContent = state.currentVideoFilename;
+            state.currentVideoFile = params.videoFile;
+            if (DOMElements.loggingVideoFilename) {
+                 DOMElements.loggingVideoFilename.textContent = sanitizeHTML(state.currentVideoFilename);
+            } else {
+                console.warn("[NAVIGATE] loggingVideoFilename DOM element not found for Logging Station.");
+            }
+            console.log(`[NAVIGATE] Setting up logging station for video: ${state.currentVideoFilename}`);
             setupLoggingStation();
         }
+        console.log(`[NAVIGATE] Navigation to ${screenId} complete.`);
     }
 
     // --- Utility Functions ---
     function formatTime(totalSeconds, showMilliseconds = false) {
-        if (isNaN(totalSeconds) || totalSeconds < 0) return "00:00:00";
+        if (isNaN(totalSeconds) || totalSeconds < 0) totalSeconds = 0;
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = Math.floor(totalSeconds % 60);
@@ -784,13 +820,16 @@
     }
 
     function showNotification(message, type = 'info', duration = 3000) {
+        if (!DOMElements.notificationsContainer) {
+            console.warn("Notifications container not found. Message:", message);
+            return;
+        }
         const container = DOMElements.notificationsContainer;
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.textContent = message;
         
         container.appendChild(notification);
-        // Trigger reflow for transition
         void notification.offsetWidth; 
         notification.classList.add('show');
 
@@ -800,29 +839,47 @@
                 if (container.contains(notification)) {
                      container.removeChild(notification);
                 }
-            }, 300); // Wait for transition to finish
+            }, 300);
         }, duration);
     }
 
-    function showConfirmDialog(title, message, onConfirm) {
+    function showConfirmDialog(title, message, onConfirmCallback) { // Modified to use callback directly
+        if (!DOMElements.confirmDialog || !DOMElements.confirmDialogTitle || !DOMElements.confirmDialogMessage || !DOMElements.confirmDialogConfirmBtn || !DOMElements.confirmDialogCancelBtn) {
+            console.error("Confirm dialog elements not found.");
+            // Fallback to browser confirm if UI is broken
+            if (window.confirm(`${title}\n${message}`)) {
+                if (onConfirmCallback) onConfirmCallback(true);
+            } else {
+                if (onConfirmCallback) onConfirmCallback(false);
+            }
+            return;
+        }
         DOMElements.confirmDialogTitle.textContent = title;
         DOMElements.confirmDialogMessage.textContent = message;
         DOMElements.confirmDialog.classList.remove('hidden');
 
-        return new Promise((resolve) => {
-            DOMElements.confirmDialogConfirmBtn.onclick = () => {
-                DOMElements.confirmDialog.classList.add('hidden');
-                if (onConfirm) onConfirm();
-                resolve(true);
-            };
-            DOMElements.confirmDialogCancelBtn.onclick = () => {
-                DOMElements.confirmDialog.classList.add('hidden');
-                resolve(false);
-            };
-        });
+        // Remove previous listeners to avoid multiple fires
+        const newConfirmBtn = DOMElements.confirmDialogConfirmBtn.cloneNode(true);
+        DOMElements.confirmDialogConfirmBtn.parentNode.replaceChild(newConfirmBtn, DOMElements.confirmDialogConfirmBtn);
+        DOMElements.confirmDialogConfirmBtn = newConfirmBtn;
+        
+        const newCancelBtn = DOMElements.confirmDialogCancelBtn.cloneNode(true);
+        DOMElements.confirmDialogCancelBtn.parentNode.replaceChild(newCancelBtn, DOMElements.confirmDialogCancelBtn);
+        DOMElements.confirmDialogCancelBtn = newCancelBtn;
+
+
+        DOMElements.confirmDialogConfirmBtn.onclick = () => {
+            DOMElements.confirmDialog.classList.add('hidden');
+            if (onConfirmCallback) onConfirmCallback(true);
+        };
+        DOMElements.confirmDialogCancelBtn.onclick = () => {
+            DOMElements.confirmDialog.classList.add('hidden');
+            if (onConfirmCallback) onConfirmCallback(false);
+        };
     }
     
     function sanitizeHTML(str) {
+        if (typeof str !== 'string') return '';
         const temp = document.createElement('div');
         temp.textContent = str;
         return temp.innerHTML;
@@ -831,21 +888,32 @@
 
     // --- Project Dashboard (Screen A) ---
     async function loadAndRenderProjects() {
+        console.log("[PROJECTS] Loading and rendering projects...");
+        if (!DOMElements.projectList || !DOMElements.projectDashboardEmptyState) {
+            console.error("[PROJECTS] Project list or empty state DOM elements not found.");
+            return;
+        }
         try {
             const projects = await dbGetAll(STORE_PROJECTS);
-            DOMElements.projectList.innerHTML = ''; // Clear existing list
+            DOMElements.projectList.innerHTML = ''; 
             if (projects.length === 0) {
                 DOMElements.projectDashboardEmptyState.classList.remove('hidden');
             } else {
                 DOMElements.projectDashboardEmptyState.classList.add('hidden');
-                for (const project of projects) {
-                    const videosInProject = await dbGetByIndex(STORE_VIDEOS, 'projectId', project.id);
-                    const videoCount = videosInProject.length;
+                // Use Promise.all to handle async video counts correctly
+                const projectItemsPromises = projects.map(async (project) => {
+                    let videoCount = 0;
+                    try {
+                        const videosInProject = await dbGetByIndex(STORE_VIDEOS, 'projectId', project.id);
+                        videoCount = videosInProject.length;
+                    } catch (countError) {
+                        console.error(`[PROJECTS] Error counting videos for project ${project.id}:`, countError);
+                    }
 
                     const li = document.createElement('li');
                     li.className = 'project-item';
                     li.dataset.projectId = project.id;
-                    li.dataset.projectName = project.name;
+                    li.dataset.projectName = project.name; // Store name for navigation
                     li.innerHTML = `
                         <div class="project-item-info">
                             <h3>${sanitizeHTML(project.name)}</h3>
@@ -855,15 +923,24 @@
                             <button class="danger delete-project-btn" data-project-id="${project.id}">Delete</button>
                         </div>
                     `;
-                    li.querySelector('.project-item-info').addEventListener('click', () => {
-                        navigateTo('assembly-hub', { projectId: project.id, projectName: project.name });
-                    });
-                    DOMElements.projectList.appendChild(li);
-                }
+                    // Add event listener to the info part for navigation
+                    const infoDiv = li.querySelector('.project-item-info');
+                    if (infoDiv) {
+                        infoDiv.addEventListener('click', () => {
+                            navigateTo('assembly-hub', { projectId: project.id, projectName: project.name });
+                        });
+                    }
+                    return li;
+                });
+                const projectListItems = await Promise.all(projectItemsPromises);
+                projectListItems.forEach(item => DOMElements.projectList.appendChild(item));
             }
+            console.log("[PROJECTS] Projects rendered.");
         } catch (error) {
-            console.error("Error loading projects:", error);
+            console.error("[PROJECTS] Error loading projects:", error);
             showNotification("Failed to load projects.", "error");
+            DOMElements.projectDashboardEmptyState.classList.remove('hidden'); // Show empty state on error
+            DOMElements.projectList.innerHTML = '<li>Error loading projects.</li>';
         }
     }
 
@@ -871,8 +948,9 @@
         const projectName = prompt("Enter project name:");
         if (projectName && projectName.trim() !== "") {
             try {
-                await dbAdd(STORE_PROJECTS, { name: projectName.trim(), createdAt: new Date() });
-                showNotification(`Project "${projectName.trim()}" created.`, "success");
+                const newProject = { name: projectName.trim(), createdAt: new Date().toISOString() };
+                await dbAdd(STORE_PROJECTS, newProject);
+                showNotification(`Project "${sanitizeHTML(newProject.name)}" created.`, "success");
                 loadAndRenderProjects();
             } catch (error) {
                 console.error("Error creating project:", error);
@@ -883,212 +961,251 @@
 
     async function handleDeleteProject(projectId) {
         const project = await dbGetById(STORE_PROJECTS, projectId);
-        if (!project) return;
-
-        const confirmed = await showConfirmDialog(
-            "Delete Project",
-            `Are you sure you want to delete project "${sanitizeHTML(project.name)}" and all its videos and logs? This action cannot be undone.`,
-            null
-        );
-
-        if (confirmed) {
-            try {
-                // Delete logs for this project
-                const logs = await dbGetByIndex(STORE_LOGS, 'projectId', projectId);
-                for (const log of logs) {
-                    await dbDelete(STORE_LOGS, log.id);
-                }
-                // Delete videos for this project
-                const videos = await dbGetByIndex(STORE_VIDEOS, 'projectId', projectId);
-                for (const video of videos) {
-                    await dbDelete(STORE_VIDEOS, video.id);
-                }
-                // Delete project
-                await dbDelete(STORE_PROJECTS, projectId);
-                showNotification(`Project "${sanitizeHTML(project.name)}" deleted.`, "success");
-                loadAndRenderProjects();
-            } catch (error) {
-                console.error("Error deleting project:", error);
-                showNotification("Failed to delete project.", "error");
-            }
+        if (!project) {
+            showNotification("Project not found for deletion.", "error");
+            return;
         }
+        
+        showConfirmDialog(
+            "Delete Project",
+            `Are you sure you want to delete project "${sanitizeHTML(project.name)}" and all its ${project.videoCount || ''} videos and logs? This action cannot be undone.`,
+            async (confirmed) => {
+                if (confirmed) {
+                    try {
+                        console.log(`[PROJECTS] Deleting project ID: ${projectId}`);
+                        // Delete logs associated with this project
+                        const logs = await dbGetByIndex(STORE_LOGS, 'projectId', projectId);
+                        for (const log of logs) {
+                            await dbDelete(STORE_LOGS, log.id);
+                        }
+                        console.log(`[PROJECTS] Deleted ${logs.length} logs for project ${projectId}.`);
+
+                        // Delete videos associated with this project
+                        const videos = await dbGetByIndex(STORE_VIDEOS, 'projectId', projectId);
+                        for (const video of videos) {
+                            await dbDelete(STORE_VIDEOS, video.id);
+                        }
+                        console.log(`[PROJECTS] Deleted ${videos.length} videos for project ${projectId}.`);
+
+                        // Delete the project itself
+                        await dbDelete(STORE_PROJECTS, projectId);
+                        showNotification(`Project "${sanitizeHTML(project.name)}" deleted.`, "success");
+                        loadAndRenderProjects(); // Refresh the list
+                    } catch (error) {
+                        console.error("Error deleting project assets:", error);
+                        showNotification("Failed to delete project and its assets.", "error");
+                    }
+                }
+            }
+        );
     }
 
     // --- Assembly Hub (Screen B) ---
     async function loadAndRenderVideosForProject(projectId, searchTerm = '') {
+        console.log(`[ASSEMBLY] Loading videos for project ID: ${projectId}, search: "${searchTerm}"`);
+        if (!DOMElements.videoList || !DOMElements.assemblyHubEmptyState) {
+             console.error("[ASSEMBLY] Video list or empty state DOM elements not found.");
+             return;
+        }
         try {
             let videos = await dbGetByIndex(STORE_VIDEOS, 'projectId', projectId);
             DOMElements.videoList.innerHTML = '';
 
             if (searchTerm) {
-                searchTerm = searchTerm.toLowerCase();
+                searchTerm = searchTerm.toLowerCase().trim();
                 const videoIdsWithMatchingLogs = new Set();
-                const allLogsForProject = await dbGetByIndex(STORE_LOGS, 'projectId', projectId);
-                
-                for (const log of allLogsForProject) {
-                    if ( (log.notes && log.notes.toLowerCase().includes(searchTerm)) ||
-                         (log.keywords && log.keywords.some(k => k.toLowerCase().includes(searchTerm))) ) {
-                        videoIdsWithMatchingLogs.add(log.videoId);
+                if (searchTerm) { // Only search logs if there's a search term
+                    const allLogsForProject = await dbGetByIndex(STORE_LOGS, 'projectId', projectId);
+                    for (const log of allLogsForProject) {
+                        if ( (log.notes && log.notes.toLowerCase().includes(searchTerm)) ||
+                             (log.keywords && log.keywords.some(k => k.toLowerCase().includes(searchTerm))) ) {
+                            videoIdsWithMatchingLogs.add(log.videoId);
+                        }
                     }
                 }
-
                 videos = videos.filter(video => 
                     video.filename.toLowerCase().includes(searchTerm) || videoIdsWithMatchingLogs.has(video.id)
                 );
             }
             
-            videos.sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+            videos.sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt)); // Sort by creation time
 
-
-            if (videos.length === 0 && !searchTerm) {
-                DOMElements.assemblyHubEmptyState.classList.remove('hidden');
-            } else {
-                DOMElements.assemblyHubEmptyState.classList.add('hidden');
-            }
-
+            DOMElements.assemblyHubEmptyState.classList.toggle('hidden', videos.length > 0 || searchTerm);
             if (videos.length === 0 && searchTerm) {
-                 DOMElements.videoList.innerHTML = `<p class="text-muted-color text-center">No videos match your search criteria.</p>`;
+                 DOMElements.videoList.innerHTML = `<p class="text-muted-color text-center" style="grid-column: 1 / -1;">No videos match your search: "${sanitizeHTML(searchTerm)}".</p>`;
+            } else if (videos.length === 0 && !searchTerm) {
+                DOMElements.assemblyHubEmptyState.classList.remove('hidden');
             }
 
-            videos.forEach(async (video, index) => {
-                const logs = await dbGetByIndex(STORE_LOGS, 'videoId', video.id);
-                const logCount = logs.length;
 
-                const card = document.createElement('div');
-                card.className = 'video-card';
-                card.dataset.videoId = video.id;
-                card.innerHTML = `
-                    <div class="video-card-header">
-                        <span class="video-number">${index + 1}.</span>
-                        <h4>${sanitizeHTML(video.filename)}</h4>
-                        <span class="star-toggle ${video.isImportant ? 'important' : ''}" data-video-id="${video.id}">★</span>
-                    </div>
-                    <div class="video-thumbnail-placeholder">
-                        <span>Video Preview</span>
-                    </div>
-                    <div class="video-card-meta">
-                        <span>${logCount} log(s)</span>
-                    </div>
-                    <div class="video-card-actions">
-                        <button class="log-video-btn">Log Video</button>
-                        <button class="preview-selects-btn" ${logCount === 0 ? 'disabled' : ''}>Preview Selects</button>
-                    </div>
-                    <button class="secondary view-video-logs-btn mt-1">View Logs (${logCount})</button>
-                    <div class="video-card-logs-summary hidden">
-                        <!-- Summarized logs will go here -->
-                    </div>
-                    <button class="danger delete-video-btn mt-1">Delete Video</button>
-                `;
+            const videoCardPromises = videos.map(async (video, index) => {
+                try {
+                    const logs = await dbGetByIndex(STORE_LOGS, 'videoId', video.id);
+                    const logCount = logs.length;
 
-                card.querySelector('.log-video-btn').addEventListener('click', () => {
-                    // Critical: Retrieve the File object to pass it
-                    const videoFile = video.fileObject; // Assuming fileObject is stored
-                    if (!videoFile && state.tempFileCache[video.id]) { // Fallback if not directly in video obj
-                        video.fileObject = state.tempFileCache[video.id];
-                    }
-                    if (!video.fileObject) {
-                        showNotification("Video file data not found. Please re-add the video.", "error");
-                        // Ideally, prompt to re-select the file using its stored name.
-                        // For now, simple error.
-                        return;
-                    }
-                    navigateTo('logging-station', { 
-                        videoId: video.id, 
-                        videoFilename: video.filename,
-                        videoFile: video.fileObject // Pass the File object
+                    const card = document.createElement('div');
+                    card.className = 'video-card';
+                    card.dataset.videoId = video.id;
+                    card.innerHTML = `
+                        <div class="video-card-header">
+                            <span class="video-number">${index + 1}.</span>
+                            <h4>${sanitizeHTML(video.filename)}</h4>
+                            <span class="star-toggle ${video.isImportant ? 'important' : ''}" data-video-id="${video.id}">★</span>
+                        </div>
+                        <div class="video-thumbnail-placeholder">
+                            <span>Video Preview</span>
+                        </div>
+                        <div class="video-card-meta">
+                            <span>${logCount} log(s)</span>
+                        </div>
+                        <div class="video-card-actions">
+                            <button class="log-video-btn">Log Video</button>
+                            <button class="preview-selects-btn" ${logCount === 0 ? 'disabled' : ''}>Preview Selects</button>
+                        </div>
+                        <button class="secondary view-video-logs-btn mt-1">View Logs (${logCount})</button>
+                        <div class="video-card-logs-summary hidden"></div>
+                        <button class="danger delete-video-btn mt-1">Delete Video</button>
+                    `;
+                    
+                    card.querySelector('.log-video-btn').addEventListener('click', async () => {
+                        // Re-fetch video to ensure fileObject is current, as it might not be passed if list is re-rendered
+                        const currentVideoData = await dbGetById(STORE_VIDEOS, video.id);
+                        if (!currentVideoData || !currentVideoData.fileObject) {
+                            showNotification("Video file data not found. Please try re-adding the video.", "error");
+                            console.error("Missing fileObject for video ID:", video.id, "Data:", currentVideoData);
+                            return;
+                        }
+                        navigateTo('logging-station', { 
+                            projectId: projectId, // Pass current project context
+                            projectName: state.currentProjectName,
+                            videoId: video.id, 
+                            videoFilename: video.filename,
+                            videoFile: currentVideoData.fileObject 
+                        });
                     });
-                });
-                
-                card.querySelector('.star-toggle').addEventListener('click', () => toggleVideoImportant(video.id));
-                card.querySelector('.preview-selects-btn').addEventListener('click', () => handlePreviewSelects(video.id));
-                card.querySelector('.view-video-logs-btn').addEventListener('click', (e) => toggleLogsSummary(video.id, e.target));
-                card.querySelector('.delete-video-btn').addEventListener('click', () => handleDeleteVideo(video.id, projectId));
-
-
-                DOMElements.videoList.appendChild(card);
+                    
+                    card.querySelector('.star-toggle').addEventListener('click', () => toggleVideoImportant(video.id, projectId));
+                    card.querySelector('.preview-selects-btn').addEventListener('click', () => handlePreviewSelects(video.id));
+                    card.querySelector('.view-video-logs-btn').addEventListener('click', (e) => toggleLogsSummary(video.id, e.target));
+                    card.querySelector('.delete-video-btn').addEventListener('click', () => handleDeleteVideo(video.id, projectId));
+                    return card;
+                } catch (cardError) {
+                    console.error(`[ASSEMBLY] Error creating card for video ${video.filename}:`, cardError);
+                    const errorCard = document.createElement('div');
+                    errorCard.className = 'video-card';
+                    errorCard.innerHTML = `<h4>Error loading ${sanitizeHTML(video.filename)}</h4><p>${sanitizeHTML(cardError.message)}</p>`;
+                    return errorCard; // Return an error placeholder
+                }
             });
+            
+            const videoCardElements = await Promise.all(videoCardPromises);
+            videoCardElements.forEach(card => DOMElements.videoList.appendChild(card));
+            console.log("[ASSEMBLY] Videos rendered.");
 
         } catch (error) {
-            console.error("Error loading videos for project:", error);
-            showNotification("Failed to load videos.", "error");
+            console.error("[ASSEMBLY] Error loading videos for project:", error);
+            showNotification("Failed to load videos for this project.", "error");
+            DOMElements.videoList.innerHTML = `<p class="text-muted-color text-center" style="grid-column: 1 / -1;">Error loading videos.</p>`;
+            DOMElements.assemblyHubEmptyState.classList.add('hidden'); // Hide empty state on error, show error message instead
         }
     }
     
     async function toggleLogsSummary(videoId, button) {
         const card = button.closest('.video-card');
+        if (!card) return;
         const summaryDiv = card.querySelector('.video-card-logs-summary');
+        if (!summaryDiv) return;
+
         const isHidden = summaryDiv.classList.contains('hidden');
 
         if (isHidden) {
-            // Load and display logs
-            const logs = await dbGetByIndex(STORE_LOGS, 'videoId', videoId);
-            logs.sort((a,b) => a.inTime - b.inTime);
-            summaryDiv.innerHTML = logs.length > 0 ? '' : '<p>No logs for this video.</p>';
-            logs.forEach(log => {
-                const logEntry = document.createElement('p');
-                logEntry.textContent = `[${formatTime(log.inTime)} - ${formatTime(log.outTime)}] ${sanitizeHTML(log.notes.substring(0,50))}${log.notes.length > 50 ? '...' : ''}`;
-                summaryDiv.appendChild(logEntry);
-            });
-            summaryDiv.classList.remove('hidden');
-            button.textContent = `Hide Logs`;
+            try {
+                const logs = await dbGetByIndex(STORE_LOGS, 'videoId', videoId);
+                logs.sort((a,b) => a.inTime - b.inTime);
+                summaryDiv.innerHTML = logs.length > 0 ? '' : '<p>No logs for this video.</p>';
+                logs.forEach(log => {
+                    const logEntry = document.createElement('p');
+                    logEntry.textContent = `[${formatTime(log.inTime)} - ${formatTime(log.outTime)}] ${sanitizeHTML(log.notes.substring(0,50))}${log.notes.length > 50 ? '...' : ''}`;
+                    summaryDiv.appendChild(logEntry);
+                });
+                summaryDiv.classList.remove('hidden');
+                button.textContent = `Hide Logs`;
+            } catch (error) {
+                console.error("Error fetching logs for summary:", error);
+                summaryDiv.innerHTML = '<p>Error loading logs.</p>';
+                summaryDiv.classList.remove('hidden');
+            }
         } else {
             summaryDiv.classList.add('hidden');
-            button.textContent = `View Logs (${summaryDiv.parentElement.querySelector('.video-card-meta span').textContent.split(' ')[0]})`; // Update count if needed
+            const logCountMeta = card.querySelector('.video-card-meta span');
+            const currentLogCount = logCountMeta ? parseInt(logCountMeta.textContent.split(' ')[0]) : 0;
+            button.textContent = `View Logs (${currentLogCount})`;
         }
     }
 
-    async function handleAddVideos() {
-        DOMElements.videoFileInput.click(); // Trigger file input
+    function handleAddVideos() {
+        if (DOMElements.videoFileInput) DOMElements.videoFileInput.click();
     }
 
     async function processSelectedVideoFiles(files) {
         if (!state.currentProjectId) {
-            showNotification("No project selected.", "error");
+            showNotification("No project selected to add videos to.", "error");
             return;
         }
+        if (!files || files.length === 0) return;
+
+        console.log(`[ASSEMBLY] Processing ${files.length} selected files.`);
         let filesAddedCount = 0;
+        let errorsCount = 0;
+
+        // Process files one by one to avoid overwhelming IndexedDB or UI updates
         for (const file of files) {
             if (file.type.startsWith('video/')) {
                 try {
-                    // Store the File object directly. Most modern browsers support this.
                     const videoData = {
                         projectId: state.currentProjectId,
                         filename: file.name,
                         fileObject: file, // Store the actual File object
                         isImportant: false,
-                        createdAt: new Date()
+                        createdAt: new Date().toISOString()
                     };
-                    const newVideoId = await dbAdd(STORE_VIDEOS, videoData);
-                    // For safety, if fileObject isn't reliably stored by IDB or is too large,
-                    // keep it in a temporary cache for the session.
-                    // state.tempFileCache[newVideoId] = file; 
-
+                    await dbAdd(STORE_VIDEOS, videoData);
                     filesAddedCount++;
                 } catch (error) {
+                    errorsCount++;
                     console.error("Error adding video:", file.name, error);
-                    showNotification(`Failed to add video: ${file.name}. Storage might be full or file too large.`, "error");
+                    showNotification(`Failed to add video: ${sanitizeHTML(file.name)}. ${error.message}`, "error", 5000);
                 }
             } else {
-                showNotification(`File ${file.name} is not a valid video format.`, "error");
+                errorsCount++;
+                showNotification(`File ${sanitizeHTML(file.name)} is not a valid video format.`, "error");
             }
         }
+
         if (filesAddedCount > 0) {
             showNotification(`${filesAddedCount} video(s) added successfully.`, "success");
-            loadAndRenderVideosForProject(state.currentProjectId);
+        }
+        if (errorsCount > 0 && filesAddedCount === 0) {
+             showNotification(`No videos were added. ${errorsCount} file(s) had issues.`, "error");
+        } else if (errorsCount > 0) {
+            showNotification(`${errorsCount} file(s) could not be added.`, "error");
+        }
+        
+        if (filesAddedCount > 0) {
+            loadAndRenderVideosForProject(state.currentProjectId); // Refresh the list
         }
     }
 
-    async function toggleVideoImportant(videoId) {
+    async function toggleVideoImportant(videoId, currentProjectId) { // Added currentProjectId for reload
         try {
             const video = await dbGetById(STORE_VIDEOS, videoId);
             if (video) {
                 video.isImportant = !video.isImportant;
                 await dbUpdate(STORE_VIDEOS, video);
-                // Update UI directly for responsiveness
-                const starToggle = DOMElements.videoList.querySelector(`.star-toggle[data-video-id="${videoId}"]`);
-                if (starToggle) {
-                    starToggle.classList.toggle('important', video.isImportant);
-                }
+                // No need to reload the whole list, just update the star UI directly if possible
+                // but for simplicity and robustness, a quick reload is fine.
+                loadAndRenderVideosForProject(currentProjectId, DOMElements.assemblySearchBar.value);
+                showNotification(`Video marked as ${video.isImportant ? 'important' : 'not important'}.`, "info", 1500);
             }
         } catch (error) {
             console.error("Error toggling video importance:", error);
@@ -1098,30 +1215,33 @@
 
     async function handleDeleteVideo(videoId, projectId) {
         const video = await dbGetById(STORE_VIDEOS, videoId);
-        if (!video) return;
+        if (!video) {
+            showNotification("Video not found for deletion.", "error");
+            return;
+        }
 
-        const confirmed = await showConfirmDialog(
+        showConfirmDialog(
             "Delete Video",
             `Are you sure you want to delete video "${sanitizeHTML(video.filename)}" and all its logs? This action cannot be undone.`,
-            null
-        );
-
-        if (confirmed) {
-            try {
-                // Delete logs for this video
-                const logs = await dbGetByIndex(STORE_LOGS, 'videoId', videoId);
-                for (const log of logs) {
-                    await dbDelete(STORE_LOGS, log.id);
+            async (confirmed) => {
+                if (confirmed) {
+                    try {
+                        // Delete logs for this video
+                        const logs = await dbGetByIndex(STORE_LOGS, 'videoId', videoId);
+                        for (const log of logs) {
+                            await dbDelete(STORE_LOGS, log.id);
+                        }
+                        // Delete video
+                        await dbDelete(STORE_VIDEOS, videoId);
+                        showNotification(`Video "${sanitizeHTML(video.filename)}" deleted.`, "success");
+                        loadAndRenderVideosForProject(projectId, DOMElements.assemblySearchBar.value); // Reload videos
+                    } catch (error) {
+                        console.error("Error deleting video and its logs:", error);
+                        showNotification("Failed to delete video.", "error");
+                    }
                 }
-                // Delete video
-                await dbDelete(STORE_VIDEOS, videoId);
-                showNotification(`Video "${sanitizeHTML(video.filename)}" deleted.`, "success");
-                loadAndRenderVideosForProject(projectId); // Reload videos for the current project
-            } catch (error) {
-                console.error("Error deleting video:", error);
-                showNotification("Failed to delete video.", "error");
             }
-        }
+        );
     }
     
     function handleAssemblySearch(event) {
@@ -1131,168 +1251,190 @@
 
 
     // --- Logging Station (Screen C) ---
-    let logVideoPlayer; // Keep reference to player
-    let currentLogKeywords = []; // For the form
+    let logVideoPlayer; 
+    let currentLogKeywordsForm = []; // For the form inputs
 
     async function setupLoggingStation() {
+        console.log("[LOGGING] Setting up logging station.");
         logVideoPlayer = DOMElements.videoPlayer;
-        resetLogForm();
+        if (!logVideoPlayer) {
+            console.error("[LOGGING] Video player element not found!");
+            showNotification("Error: Video player UI missing.", "error");
+            // Attempt to navigate back if critical UI is missing
+            navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName });
+            return;
+        }
+
+        resetLogForm(); // Clears form fields, ratings, keywords, mark in/out state
         loadLogsForCurrentVideo();
 
+        // Ensure state.currentVideoFile is a File object
         if (state.currentVideoFile && state.currentVideoFile instanceof File) {
             try {
-                // Revoke previous object URL if any to prevent memory leaks
                 if (logVideoPlayer.src && logVideoPlayer.src.startsWith('blob:')) {
                     URL.revokeObjectURL(logVideoPlayer.src);
                 }
                 logVideoPlayer.src = URL.createObjectURL(state.currentVideoFile);
+                
                 logVideoPlayer.onloadedmetadata = () => {
                     state.currentVideoDuration = logVideoPlayer.duration;
+                    console.log("[LOGGING] Video metadata loaded. Duration:", state.currentVideoDuration);
                     updateMarkInOutDisplays(); // Update with 00:00:00 initially
                 };
                 logVideoPlayer.ontimeupdate = handleVideoTimeUpdate;
                 logVideoPlayer.onseeked = handleVideoTimeUpdate; // Update displays after seeking
                 
-                DOMElements.timelineMarkInOut.style.width = '0%';
-                DOMElements.timelineMarkInOut.style.left = '0%';
+                if (DOMElements.timelineMarkInOut) {
+                    DOMElements.timelineMarkInOut.style.width = '0%';
+                    DOMElements.timelineMarkInOut.style.left = '0%';
+                }
+                if (DOMElements.playbackSpeed) DOMElements.playbackSpeed.value = logVideoPlayer.playbackRate = 1; // Reset speed
 
             } catch (error) {
-                console.error("Error setting up video player:", error);
-                showNotification("Could not load video. The file might be corrupted or in an unsupported format.", "error");
-                navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName }); // Go back
+                console.error("[LOGGING] Error setting up video player src:", error);
+                showNotification("Could not load video. File might be corrupted or unsupported.", "error");
+                navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName });
             }
         } else {
-            showNotification("Video file not available. Please re-select the video.", "error");
-            // Potentially attempt to retrieve from DB if not passed directly, but fileObject should be passed.
-            // For now, assume state.currentVideoFile is populated correctly by navigateTo
-             const videoData = await dbGetById(STORE_VIDEOS, state.currentVideoId);
-             if (videoData && videoData.fileObject) {
-                 state.currentVideoFile = videoData.fileObject;
-                 setupLoggingStation(); // Retry
-             } else {
-                navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName });
-             }
+            console.error("[LOGGING] state.currentVideoFile is not a valid File object:", state.currentVideoFile);
+            showNotification("Video file data is missing or invalid. Please re-select the video.", "error", 5000);
+            
+            // Attempt to fetch from DB as a last resort if it wasn't passed, though it should be.
+            if (state.currentVideoId) {
+                const videoData = await dbGetById(STORE_VIDEOS, state.currentVideoId);
+                if (videoData && videoData.fileObject) {
+                    console.log("[LOGGING] Found video file in DB, retrying setup.");
+                    state.currentVideoFile = videoData.fileObject;
+                    setupLoggingStation(); // Retry setup
+                    return;
+                }
+            }
+            navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName });
         }
-        DOMElements.playbackSpeed.value = logVideoPlayer.playbackRate;
     }
 
     function handleVideoTimeUpdate() {
         if (!logVideoPlayer || isNaN(logVideoPlayer.currentTime) || isNaN(state.currentVideoDuration) || state.currentVideoDuration === 0) return;
         
         const currentTime = logVideoPlayer.currentTime;
-        const progressPercent = (currentTime / state.currentVideoDuration) * 100;
-        DOMElements.timelineProgress.style.width = `${progressPercent}%`;
-
+        if (DOMElements.timelineProgress) {
+            const progressPercent = (currentTime / state.currentVideoDuration) * 100;
+            DOMElements.timelineProgress.style.width = `${progressPercent}%`;
+        }
         updateMarkInOutDisplays(currentTime);
     }
     
     function updateMarkInOutDisplays(currentTime) {
         if (currentTime === undefined && logVideoPlayer) currentTime = logVideoPlayer.currentTime;
-        if (currentTime === undefined) currentTime = 0; // Default if player not ready
+        if (currentTime === undefined || isNaN(currentTime)) currentTime = 0;
 
-        DOMElements.markInTimeDisplay.textContent = state.currentMarkIn !== null ? formatTime(state.currentMarkIn, true) : formatTime(currentTime, true);
-        DOMElements.markOutTimeDisplay.textContent = state.currentMarkOut !== null ? formatTime(state.currentMarkOut, true) : formatTime(currentTime, true);
+        if (DOMElements.markInTimeDisplay) {
+            DOMElements.markInTimeDisplay.textContent = state.currentMarkIn !== null ? formatTime(state.currentMarkIn, true) : formatTime(currentTime, true);
+        }
+        if (DOMElements.markOutTimeDisplay) {
+            DOMElements.markOutTimeDisplay.textContent = state.currentMarkOut !== null ? formatTime(state.currentMarkOut, true) : formatTime(currentTime, true);
+        }
         
-        // Update visual representation of Mark In/Out on timeline
-        if (state.currentMarkIn !== null && state.currentMarkOut !== null && state.currentMarkOut > state.currentMarkIn && state.currentVideoDuration > 0) {
-            const inPercent = (state.currentMarkIn / state.currentVideoDuration) * 100;
-            const outPercent = (state.currentMarkOut / state.currentVideoDuration) * 100;
-            DOMElements.timelineMarkInOut.style.left = `${inPercent}%`;
-            DOMElements.timelineMarkInOut.style.width = `${outPercent - inPercent}%`;
-        } else if (state.currentMarkIn !== null && state.currentVideoDuration > 0) { // Only Mark In is set
-             const inPercent = (state.currentMarkIn / state.currentVideoDuration) * 100;
-             const currentPercent = (logVideoPlayer.currentTime / state.currentVideoDuration) * 100;
-             if (currentPercent > inPercent) {
+        if (DOMElements.timelineMarkInOut && state.currentVideoDuration > 0) {
+            if (state.currentMarkIn !== null && state.currentMarkOut !== null && state.currentMarkOut > state.currentMarkIn) {
+                const inPercent = (state.currentMarkIn / state.currentVideoDuration) * 100;
+                const outPercent = (state.currentMarkOut / state.currentVideoDuration) * 100;
                 DOMElements.timelineMarkInOut.style.left = `${inPercent}%`;
-                DOMElements.timelineMarkInOut.style.width = `${currentPercent - inPercent}%`;
-             } else {
-                DOMElements.timelineMarkInOut.style.width = '0%';    
-             }
-        } else {
-            DOMElements.timelineMarkInOut.style.width = '0%';
+                DOMElements.timelineMarkInOut.style.width = `${Math.max(0, outPercent - inPercent)}%`;
+            } else if (state.currentMarkIn !== null) { 
+                 const inPercent = (state.currentMarkIn / state.currentVideoDuration) * 100;
+                 const currentPercent = (logVideoPlayer.currentTime / state.currentVideoDuration) * 100;
+                 if (currentPercent > inPercent) {
+                    DOMElements.timelineMarkInOut.style.left = `${inPercent}%`;
+                    DOMElements.timelineMarkInOut.style.width = `${Math.max(0,currentPercent - inPercent)}%`;
+                 } else {
+                    DOMElements.timelineMarkInOut.style.width = '0%';    
+                 }
+            } else {
+                DOMElements.timelineMarkInOut.style.width = '0%';
+            }
+        } else if (DOMElements.timelineMarkInOut) {
+            DOMElements.timelineMarkInOut.style.width = '0%'; // Reset if no duration or no marks
         }
     }
 
     function handleMarkIn() {
+        if (!logVideoPlayer) return;
         state.currentMarkIn = logVideoPlayer.currentTime;
-        // If Mark Out is set and is before new Mark In, clear Mark Out
         if (state.currentMarkOut !== null && state.currentMarkOut < state.currentMarkIn) {
-            state.currentMarkOut = null;
+            state.currentMarkOut = null; // Clear Mark Out if it's before new Mark In
         }
         updateMarkInOutDisplays();
-        showNotification(`Mark In set at ${formatTime(state.currentMarkIn, true)}`, "info", 1500);
+        showNotification(`Mark In: ${formatTime(state.currentMarkIn, true)}`, "info", 1500);
     }
 
     function handleMarkOut() {
+        if (!logVideoPlayer) return;
         state.currentMarkOut = logVideoPlayer.currentTime;
-        // If Mark In is not set or is after new Mark Out, set Mark In to 0 or current Mark In
-        if (state.currentMarkIn === null || state.currentMarkIn > state.currentMarkOut) {
-            state.currentMarkIn = Math.min(state.currentMarkIn || 0, state.currentMarkOut); 
-            // This logic might need refinement: if MarkIn is null, should it default to 0? Or require MarkIn first?
-            // For now, if MarkIn is null, it will effectively use 0 if MarkOut is set.
-            // Or, simply disallow Mark Out if Mark In isn't set.
-            // Let's assume Mark In must be set first for a valid range.
-            if (state.currentMarkIn === null) {
-                 showNotification("Set Mark In first.", "error");
-                 state.currentMarkOut = null; // Reset Mark Out
-                 return;
-            }
-             if (state.currentMarkIn > state.currentMarkOut) {
-                showNotification("Mark Out cannot be before Mark In. Mark In reset.", "error");
-                state.currentMarkIn = state.currentMarkOut; // Or clear MarkIn
-             }
+        if (state.currentMarkIn === null) {
+             showNotification("Set Mark In first before Mark Out.", "error");
+             state.currentMarkOut = null; // Reset Mark Out
+             return;
+        }
+        if (state.currentMarkIn > state.currentMarkOut) {
+            showNotification("Mark Out cannot be before Mark In. Adjusting Mark In.", "error");
+            state.currentMarkIn = state.currentMarkOut; // Or, could choose to clear Mark In
         }
         updateMarkInOutDisplays();
-        showNotification(`Mark Out set at ${formatTime(state.currentMarkOut, true)}`, "info", 1500);
+        showNotification(`Mark Out: ${formatTime(state.currentMarkOut, true)}`, "info", 1500);
     }
 
     function handleTimelineClick(event) {
-        if (!logVideoPlayer || isNaN(state.currentVideoDuration) || state.currentVideoDuration === 0) return;
+        if (!logVideoPlayer || isNaN(state.currentVideoDuration) || state.currentVideoDuration === 0 || !DOMElements.videoTimelineContainer) return;
         const timelineRect = DOMElements.videoTimelineContainer.getBoundingClientRect();
         const clickX = event.clientX - timelineRect.left;
-        const clickPercent = clickX / timelineRect.width;
+        const clickPercent = Math.max(0, Math.min(1, clickX / timelineRect.width)); // Clamp between 0 and 1
         logVideoPlayer.currentTime = clickPercent * state.currentVideoDuration;
     }
 
     function handleStarRatingClick(event) {
-        if (event.target.classList.contains('star')) {
-            state.currentLogRating = parseInt(event.target.dataset.value);
-            renderStarRating();
+        const star = event.target.closest('.star'); // Handle click on ☆ or ★
+        if (star && star.dataset.value) {
+            state.currentLogRating = parseInt(star.dataset.value);
+            renderStarRatingForm();
         }
     }
     
-    function renderStarRating() {
+    function renderStarRatingForm() {
+        if (!DOMElements.logRating) return;
         const stars = DOMElements.logRating.querySelectorAll('.star');
         stars.forEach(star => {
-            star.textContent = parseInt(star.dataset.value) <= state.currentLogRating ? '★' : '☆';
-            star.classList.toggle('selected', parseInt(star.dataset.value) <= state.currentLogRating);
+            const starValue = parseInt(star.dataset.value);
+            star.textContent = starValue <= state.currentLogRating ? '★' : '☆';
+            star.classList.toggle('selected', starValue <= state.currentLogRating);
         });
     }
 
-    function handleKeywordInput(event) {
-        if (event.key === 'Enter' && DOMElements.logKeywordsInput.value.trim() !== "") {
+    function handleKeywordInputKeydown(event) {
+        if (event.key === 'Enter' && DOMElements.logKeywordsInput && DOMElements.logKeywordsInput.value.trim() !== "") {
             event.preventDefault();
-            const keyword = DOMElements.logKeywordsInput.value.trim();
-            if (!currentLogKeywords.includes(keyword)) {
-                currentLogKeywords.push(keyword);
-                renderKeywords();
+            const keyword = DOMElements.logKeywordsInput.value.trim().toLowerCase(); // Standardize to lowercase
+            if (!currentLogKeywordsForm.includes(keyword)) {
+                currentLogKeywordsForm.push(keyword);
+                renderKeywordsForm();
             }
             DOMElements.logKeywordsInput.value = '';
         }
     }
 
-    function renderKeywords() {
+    function renderKeywordsForm() {
+        if (!DOMElements.logKeywordsContainer) return;
         DOMElements.logKeywordsContainer.innerHTML = '';
-        currentLogKeywords.forEach(keyword => {
+        currentLogKeywordsForm.forEach(keyword => {
             const tag = document.createElement('span');
             tag.className = 'keyword-tag';
             tag.textContent = sanitizeHTML(keyword);
             const removeBtn = document.createElement('span');
             removeBtn.className = 'remove-keyword';
-            removeBtn.textContent = '×';
+            removeBtn.innerHTML = '×'; // Use HTML entity for 'x'
             removeBtn.onclick = () => {
-                currentLogKeywords = currentLogKeywords.filter(k => k !== keyword);
-                renderKeywords();
+                currentLogKeywordsForm = currentLogKeywordsForm.filter(k => k !== keyword);
+                renderKeywordsForm();
             };
             tag.appendChild(removeBtn);
             DOMElements.logKeywordsContainer.appendChild(tag);
@@ -1300,7 +1442,7 @@
     }
 
     async function handleSaveLog() {
-        const notes = DOMElements.logNotes.value.trim();
+        const notes = DOMElements.logNotes ? DOMElements.logNotes.value.trim() : "";
         if (state.currentMarkIn === null || state.currentMarkOut === null) {
             showNotification("Please set both Mark In and Mark Out points.", "error");
             return;
@@ -1309,105 +1451,113 @@
             showNotification("Mark Out must be after Mark In.", "error");
             return;
         }
+        if (!state.currentVideoId || !state.currentProjectId) {
+            showNotification("Error: Missing video or project context for saving log.", "error");
+            console.error("Missing video/project ID for log save:", state);
+            return;
+        }
 
         const logData = {
             videoId: state.currentVideoId,
-            projectId: state.currentProjectId,
+            projectId: state.currentProjectId, // Important for global search/delete
             inTime: state.currentMarkIn,
             outTime: state.currentMarkOut,
             notes: notes,
             rating: state.currentLogRating,
-            keywords: [...currentLogKeywords], // clone
-            createdAt: new Date()
+            keywords: [...currentLogKeywordsForm], // clone
+            createdAt: new Date().toISOString()
         };
 
         try {
             await dbAdd(STORE_LOGS, logData);
             showNotification("Log saved successfully.", "success");
-            resetLogForm();
+            resetLogForm(); // This will also update displays
             loadLogsForCurrentVideo();
-            // Update log count on Assembly Hub card if visible (or on next load)
-            const videoCard = document.querySelector(`.video-card[data-video-id="${state.currentVideoId}"]`);
-            if (videoCard) {
-                const logs = await dbGetByIndex(STORE_LOGS, 'videoId', state.currentVideoId);
-                videoCard.querySelector('.video-card-meta span').textContent = `${logs.length} log(s)`;
-                videoCard.querySelector('.preview-selects-btn').disabled = logs.length === 0;
-                 const viewLogsBtn = videoCard.querySelector('.view-video-logs-btn');
-                 if (viewLogsBtn) viewLogsBtn.textContent = `View Logs (${logs.length})`;
-            }
-
         } catch (error) {
             console.error("Error saving log:", error);
-            showNotification("Failed to save log.", "error");
+            showNotification(`Failed to save log. ${error.message}`, "error");
         }
     }
 
     function resetLogForm() {
-        DOMElements.logNotes.value = '';
+        if (DOMElements.logNotes) DOMElements.logNotes.value = '';
         state.currentMarkIn = null;
         state.currentMarkOut = null;
         state.currentLogRating = 0;
-        currentLogKeywords = [];
-        renderStarRating();
-        renderKeywords();
+        currentLogKeywordsForm = [];
+        
+        renderStarRatingForm(); // Updates star UI
+        renderKeywordsForm(); // Clears keyword UI
         updateMarkInOutDisplays(); // Resets time displays and timeline marker
-        DOMElements.timelineMarkInOut.style.width = '0%';
-        DOMElements.timelineMarkInOut.style.left = '0%';
+        
+        if (DOMElements.timelineMarkInOut) {
+            DOMElements.timelineMarkInOut.style.width = '0%';
+            DOMElements.timelineMarkInOut.style.left = '0%';
+        }
+        if (DOMElements.logKeywordsInput) DOMElements.logKeywordsInput.value = ''; // Ensure input is cleared
     }
 
     async function loadLogsForCurrentVideo() {
+        console.log("[LOGGING] Loading logs for video ID:", state.currentVideoId);
+        if (!DOMElements.savedLogsList || !DOMElements.loggingStationEmptyState) {
+            console.error("[LOGGING] Saved logs list or empty state DOM elements not found.");
+            return;
+        }
         try {
             const logs = await dbGetByIndex(STORE_LOGS, 'videoId', state.currentVideoId);
-            logs.sort((a, b) => a.inTime - b.inTime); // Sort by In time
+            logs.sort((a, b) => a.inTime - b.inTime); 
 
             DOMElements.savedLogsList.innerHTML = '';
-            if (logs.length === 0) {
-                DOMElements.loggingStationEmptyState.classList.remove('hidden');
-            } else {
-                DOMElements.loggingStationEmptyState.classList.add('hidden');
-                logs.forEach(log => {
-                    const item = document.createElement('div');
-                    item.className = 'log-item';
-                    item.innerHTML = `
-                        <div class="log-item-header">
-                            <span class="log-item-time">${formatTime(log.inTime)} - ${formatTime(log.outTime)}</span>
-                            <span class="log-item-rating">${'★'.repeat(log.rating)}${'☆'.repeat(5 - log.rating)}</span>
-                        </div>
-                        <p class="log-item-notes">${sanitizeHTML(log.notes) || "<em>No notes</em>"}</p>
-                        <div class="log-item-keywords">
-                            ${log.keywords.map(k => `<span class="keyword-tag">${sanitizeHTML(k)}</span>`).join('')}
-                        </div>
-                        <div class="log-item-actions">
-                            <button class="go-to-log-btn secondary" data-time="${log.inTime}">Go To</button>
-                            <button class="delete-log-btn danger" data-log-id="${log.id}">Delete</button>
-                        </div>
-                    `;
-                    item.querySelector('.go-to-log-btn').addEventListener('click', (e) => {
+            DOMElements.loggingStationEmptyState.classList.toggle('hidden', logs.length > 0);
+            
+            logs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'log-item';
+                item.innerHTML = `
+                    <div class="log-item-header">
+                        <span class="log-item-time">${formatTime(log.inTime)} - ${formatTime(log.outTime)}</span>
+                        <span class="log-item-rating">${'★'.repeat(log.rating || 0)}${'☆'.repeat(5 - (log.rating || 0))}</span>
+                    </div>
+                    <p class="log-item-notes">${sanitizeHTML(log.notes) || "<em>No notes</em>"}</p>
+                    <div class="log-item-keywords">
+                        ${log.keywords && log.keywords.map(k => `<span class="keyword-tag">${sanitizeHTML(k)}</span>`).join('') || ''}
+                    </div>
+                    <div class="log-item-actions">
+                        <button class="go-to-log-btn secondary" data-time="${log.inTime}">Go To</button>
+                        <button class="delete-log-btn danger" data-log-id="${log.id}">Delete</button>
+                    </div>
+                `;
+                item.querySelector('.go-to-log-btn').addEventListener('click', (e) => {
+                    if (logVideoPlayer) {
                         logVideoPlayer.currentTime = parseFloat(e.target.dataset.time);
-                        logVideoPlayer.play();
-                    });
-                    item.querySelector('.delete-log-btn').addEventListener('click', (e) => handleDeleteLog(parseInt(e.target.dataset.logId)));
-                    DOMElements.savedLogsList.appendChild(item);
+                        logVideoPlayer.play().catch(err => console.warn("Play interrupted or failed:", err)); // Handle play promise
+                    }
                 });
-            }
+                item.querySelector('.delete-log-btn').addEventListener('click', (e) => handleDeleteLog(parseInt(e.target.dataset.logId)));
+                DOMElements.savedLogsList.appendChild(item);
+            });
+            console.log("[LOGGING] Logs rendered.");
         } catch (error) {
             console.error("Error loading logs:", error);
             showNotification("Failed to load logs.", "error");
+            DOMElements.savedLogsList.innerHTML = '<li>Error loading logs.</li>';
+            DOMElements.loggingStationEmptyState.classList.add('hidden');
         }
     }
     
     async function handleDeleteLog(logId) {
-        const confirmed = await showConfirmDialog("Delete Log", "Are you sure you want to delete this log?", null);
-        if (confirmed) {
-            try {
-                await dbDelete(STORE_LOGS, logId);
-                showNotification("Log deleted.", "success");
-                loadLogsForCurrentVideo(); // Reload logs for the current video
-            } catch (err) {
-                showNotification("Error deleting log.", "error");
-                console.error("Error deleting log", err);
+        showConfirmDialog("Delete Log", "Are you sure you want to delete this log?", async (confirmed) => {
+            if (confirmed) {
+                try {
+                    await dbDelete(STORE_LOGS, logId);
+                    showNotification("Log deleted.", "success");
+                    loadLogsForCurrentVideo(); 
+                } catch (err) {
+                    showNotification("Error deleting log.", "error");
+                    console.error("Error deleting log", err);
+                }
             }
-        }
+        });
     }
 
 
@@ -1415,15 +1565,17 @@
     let previewSelectsPlayer;
     let previewSelectsQueue = [];
     let currentPreviewSelectIndex = 0;
+    let previewSelectTimeout = null; // To manage stopping at outTime
 
     async function handlePreviewSelects(videoId) {
         const videoData = await dbGetById(STORE_VIDEOS, videoId);
-        const logs = await dbGetByIndex(STORE_LOGS, 'videoId', videoId);
-        
         if (!videoData || !videoData.fileObject) {
-            showNotification("Video file data not found for preview.", "error");
+            showNotification("Video file not found for preview. Please re-add the video.", "error");
+            console.error("Missing fileObject for preview, video ID:", videoId);
             return;
         }
+
+        const logs = await dbGetByIndex(STORE_LOGS, 'videoId', videoId);
         if (logs.length === 0) {
             showNotification("No logs to preview for this video.", "info");
             return;
@@ -1434,70 +1586,79 @@
         currentPreviewSelectIndex = 0;
 
         previewSelectsPlayer = DOMElements.previewSelectsPlayer;
+        if (!previewSelectsPlayer || !DOMElements.previewSelectsModal || !DOMElements.previewSelectsInfo || !DOMElements.previewSelectsNotes) {
+            console.error("Preview Selects modal UI elements missing.");
+            showNotification("Cannot open preview: UI is missing.", "error");
+            return;
+        }
+
         if (previewSelectsPlayer.src && previewSelectsPlayer.src.startsWith('blob:')) {
              URL.revokeObjectURL(previewSelectsPlayer.src);
         }
         previewSelectsPlayer.src = URL.createObjectURL(videoData.fileObject);
-        previewSelectsPlayer.onended = playNextSelect;
-        previewSelectsPlayer.ontimeupdate = updatePreviewSelectsPlayerTime;
-
+        previewSelectsPlayer.onended = playNextSelectInQueue; // Use a renamed function
+        // We'll use a timeout for stopping at outTime instead of ontimeupdate for more precise control
+        previewSelectsPlayer.ontimeupdate = null; // Clear previous listener if any
 
         DOMElements.previewSelectsModal.classList.remove('hidden');
-        playNextSelect(); // Start playing the first select
+        playNextSelectInQueue(); 
     }
 
-    function playNextSelect() {
+    function playNextSelectInQueue() {
+        if (previewSelectTimeout) clearTimeout(previewSelectTimeout); // Clear any existing timeout
+
         if (currentPreviewSelectIndex >= previewSelectsQueue.length) {
             DOMElements.previewSelectsInfo.textContent = "All selects played.";
             DOMElements.previewSelectsNotes.textContent = "";
-             // Optionally close modal or offer replay
+            previewSelectsPlayer.pause();
             return;
         }
         const currentSelect = previewSelectsQueue[currentPreviewSelectIndex];
         DOMElements.previewSelectsInfo.textContent = `Playing Select ${currentPreviewSelectIndex + 1} of ${previewSelectsQueue.length}`;
-        DOMElements.previewSelectsNotes.textContent = currentSelect.notes || "No notes for this select.";
+        DOMElements.previewSelectsNotes.textContent = sanitizeHTML(currentSelect.notes) || "No notes for this select.";
         
         previewSelectsPlayer.currentTime = currentSelect.inTime;
-        previewSelectsPlayer.play();
-        // The ontimeupdate will handle stopping at outTime
-    }
+        previewSelectsPlayer.play().catch(err => console.warn("Preview play failed:", err));
 
-    function updatePreviewSelectsPlayerTime() {
-        if (!previewSelectsPlayer || previewSelectsQueue.length === 0 || currentPreviewSelectIndex >= previewSelectsQueue.length) return;
-
-        const currentSelect = previewSelectsQueue[currentPreviewSelectIndex];
-        if (previewSelectsPlayer.currentTime >= currentSelect.outTime) {
-            previewSelectsPlayer.pause();
+        const durationOfSelect = (currentSelect.outTime - currentSelect.inTime) * 1000; // in ms
+        previewSelectTimeout = setTimeout(() => {
+            if (previewSelectsPlayer && !previewSelectsPlayer.paused) { // Check if still playing this select
+                 previewSelectsPlayer.pause(); // Pause before moving to next
+            }
             currentPreviewSelectIndex++;
-            playNextSelect();
-        }
+            playNextSelectInQueue(); // This will play or end if queue is finished
+        }, durationOfSelect > 0 ? durationOfSelect : 100); // Ensure a small delay even for zero-duration
     }
 
     function closePreviewSelectsModal() {
+        if (previewSelectTimeout) clearTimeout(previewSelectTimeout);
         if (previewSelectsPlayer) {
             previewSelectsPlayer.pause();
             if (previewSelectsPlayer.src && previewSelectsPlayer.src.startsWith('blob:')) {
                  URL.revokeObjectURL(previewSelectsPlayer.src);
             }
-            previewSelectsPlayer.src = ""; // Clear src
+            previewSelectsPlayer.src = ""; 
+            previewSelectsPlayer.onended = null;
         }
         previewSelectsQueue = [];
-        DOMElements.previewSelectsModal.classList.add('hidden');
+        currentPreviewSelectIndex = 0;
+        if (DOMElements.previewSelectsModal) DOMElements.previewSelectsModal.classList.add('hidden');
     }
 
     function handleKeyboardShortcuts(event) {
         if (state.currentScreen === 'logging-station') {
-            // Prevent shortcuts if typing in an input/textarea
             const activeElement = document.activeElement;
-            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
-                return;
+            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT')) {
+                return; // Don't interfere with text input
             }
 
             switch(event.key.toLowerCase()) {
                 case ' ':
                     event.preventDefault();
-                    if (logVideoPlayer.paused) logVideoPlayer.play();
-                    else logVideoPlayer.pause();
+                    if (logVideoPlayer) {
+                        if (logVideoPlayer.paused) logVideoPlayer.play().catch(err => console.warn("Play failed:", err));
+                        else logVideoPlayer.pause();
+                    }
                     break;
                 case 'i':
                     event.preventDefault();
@@ -1507,57 +1668,62 @@
                     event.preventDefault();
                     handleMarkOut();
                     break;
+                // Add more shortcuts if needed: JKL for rewind/pause/ff, arrow keys for seek
             }
         }
     }
 
     async function exportAllData() {
-        const confirmed = await showConfirmDialog(
+        showConfirmDialog(
             "Export Data",
-            "This will export all your projects, videos (metadata only, not files), and logs as a JSON file. Do you want to proceed?",
-            null
+            "This will export all projects, video metadata (not actual video files), and logs as a JSON file. Proceed?",
+            async (confirmed) => {
+                if (confirmed) {
+                    try {
+                        const projects = await dbGetAll(STORE_PROJECTS);
+                        const videosFromDB = await dbGetAll(STORE_VIDEOS);
+                        const logs = await dbGetAll(STORE_LOGS);
+
+                        // Remove File objects before export
+                        const videosForExport = videosFromDB.map(v => {
+                            const { fileObject, ...videoMeta } = v; 
+                            return videoMeta;
+                        });
+
+                        const dataToExport = {
+                            exportFormatVersion: "1.0", // Good for future import/migration
+                            exportDate: new Date().toISOString(),
+                            projects,
+                            videos: videosForExport,
+                            logs
+                        };
+
+                        const jsonData = JSON.stringify(dataToExport, null, 2);
+                        const blob = new Blob([jsonData], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `LogReel_Export_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        showNotification("Data exported successfully.", "success");
+                    } catch (error) {
+                        console.error("Error exporting data:", error);
+                        showNotification("Failed to export data.", "error");
+                    }
+                }
+            }
         );
-        if (!confirmed) return;
-
-        try {
-            const projects = await dbGetAll(STORE_PROJECTS);
-            const videos = await dbGetAll(STORE_VIDEOS);
-            const logs = await dbGetAll(STORE_LOGS);
-
-            // Sanitize video data for export - remove actual File objects
-            const videosForExport = videos.map(v => {
-                const { fileObject, ...videoMeta } = v; // Destructure to remove fileObject
-                return videoMeta;
-            });
-
-            const dataToExport = {
-                exportDate: new Date().toISOString(),
-                projects,
-                videos: videosForExport,
-                logs
-            };
-
-            const jsonData = JSON.stringify(dataToExport, null, 2);
-            const blob = new Blob([jsonData], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `LogReel_Export_${new Date().toISOString().slice(0,10)}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            showNotification("Data exported successfully.", "success");
-        } catch (error) {
-            console.error("Error exporting data:", error);
-            showNotification("Failed to export data.", "error");
-        }
     }
 
 
     // --- Initialization ---
     async function initApp() {
-        // Cache DOM Elements
+        console.log("[INITAPP] Initializing application...");
+        // Cache DOM Elements - Crucial to do this early and correctly
+        DOMElements.app = document.getElementById('app');
         DOMElements.projectDashboardScreen = document.getElementById('project-dashboard-screen');
         DOMElements.assemblyHubScreen = document.getElementById('assembly-hub-screen');
         DOMElements.loggingStationScreen = document.getElementById('logging-station-screen');
@@ -1607,92 +1773,109 @@
         
         DOMElements.notificationsContainer = document.getElementById('notifications-container');
 
+        // Verify all critical screen elements are cached
+        if (!DOMElements.projectDashboardScreen || !DOMElements.assemblyHubScreen || !DOMElements.loggingStationScreen) {
+            console.error("[INITAPP] CRITICAL ERROR: One or more main screen elements could not be found in the DOM. Halting initialization.");
+            document.body.innerHTML = "<h1 style='color:red; text-align:center; padding-top: 20vh;'>Application UI Error: Core screen elements missing. Check console.</h1>";
+            return;
+        }
+        console.log("[INITAPP] All DOMElements cached successfully.");
+
 
         // Init DB
         try {
             await initDB();
-            showNotification("Application ready.", "success", 1500);
+            // Moved "Application ready" to after initial navigation
         } catch (error) {
-            showNotification("Failed to initialize database. Application may not work correctly.", "error");
-            console.error("DB Init failed:", error);
-            // Optionally, disable app features that rely on DB
+            showNotification("Failed to initialize database. App may not work correctly.", "error", 10000);
+            console.error("[INITAPP] DB Init failed:", error);
+            // Consider disabling features or showing a more permanent error message
         }
 
-        // Setup Event Listeners
-        // Project Dashboard
-        DOMElements.createNewProjectBtn.addEventListener('click', handleCreateNewProject);
-        DOMElements.exportAllDataBtn.addEventListener('click', exportAllData);
-        DOMElements.projectList.addEventListener('click', (event) => {
-            if (event.target.classList.contains('delete-project-btn')) {
-                const projectId = parseInt(event.target.dataset.projectId);
-                handleDeleteProject(projectId);
-            }
-        });
+        // Setup Event Listeners (ensure elements exist before adding listeners)
+        if (DOMElements.createNewProjectBtn) DOMElements.createNewProjectBtn.addEventListener('click', handleCreateNewProject);
+        if (DOMElements.exportAllDataBtn) DOMElements.exportAllDataBtn.addEventListener('click', exportAllData);
+        if (DOMElements.projectList) {
+            DOMElements.projectList.addEventListener('click', (event) => {
+                const deleteButton = event.target.closest('.delete-project-btn');
+                if (deleteButton && deleteButton.dataset.projectId) {
+                    handleDeleteProject(parseInt(deleteButton.dataset.projectId));
+                }
+                // Navigation to project handled in loadAndRenderProjects' item creation
+            });
+        }
 
-        // Assembly Hub
-        DOMElements.assemblyBackToDashboardBtn.addEventListener('click', () => navigateTo('project-dashboard'));
-        DOMElements.addVideosBtn.addEventListener('click', handleAddVideos);
-        DOMElements.videoFileInput.addEventListener('change', (event) => {
-            processSelectedVideoFiles(event.target.files);
-            event.target.value = null; // Reset file input
-        });
-        DOMElements.assemblySearchBar.addEventListener('input', handleAssemblySearch);
+        if (DOMElements.assemblyBackToDashboardBtn) DOMElements.assemblyBackToDashboardBtn.addEventListener('click', () => navigateTo('project-dashboard'));
+        if (DOMElements.addVideosBtn) DOMElements.addVideosBtn.addEventListener('click', handleAddVideos);
+        if (DOMElements.videoFileInput) {
+            DOMElements.videoFileInput.addEventListener('change', (event) => {
+                processSelectedVideoFiles(event.target.files);
+                event.target.value = null; 
+            });
+        }
+        if (DOMElements.assemblySearchBar) DOMElements.assemblySearchBar.addEventListener('input', handleAssemblySearch);
 
 
-        // Logging Station
-        DOMElements.loggingBackToAssemblyBtn.addEventListener('click', () => {
-            // Clean up player before navigating away
-            if (logVideoPlayer && logVideoPlayer.src && logVideoPlayer.src.startsWith('blob:')) {
-                URL.revokeObjectURL(logVideoPlayer.src);
-                logVideoPlayer.src = ""; // prevent video from playing in background
-            }
-            logVideoPlayer.onloadedmetadata = null;
-            logVideoPlayer.ontimeupdate = null;
-            logVideoPlayer.onseeked = null;
+        if (DOMElements.loggingBackToAssemblyBtn) {
+            DOMElements.loggingBackToAssemblyBtn.addEventListener('click', () => {
+                if (logVideoPlayer) {
+                    logVideoPlayer.pause();
+                    if (logVideoPlayer.src && logVideoPlayer.src.startsWith('blob:')) {
+                        URL.revokeObjectURL(logVideoPlayer.src);
+                    }
+                    logVideoPlayer.src = ""; 
+                    logVideoPlayer.onloadedmetadata = null;
+                    logVideoPlayer.ontimeupdate = null;
+                    logVideoPlayer.onseeked = null;
+                }
+                navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName });
+            });
+        }
+        if (DOMElements.markInBtn) DOMElements.markInBtn.addEventListener('click', handleMarkIn);
+        if (DOMElements.markOutBtn) DOMElements.markOutBtn.addEventListener('click', handleMarkOut);
+        if (DOMElements.videoTimelineContainer) DOMElements.videoTimelineContainer.addEventListener('click', handleTimelineClick);
+        if (DOMElements.logRating) DOMElements.logRating.addEventListener('click', handleStarRatingClick);
+        if (DOMElements.logKeywordsInput) DOMElements.logKeywordsInput.addEventListener('keydown', handleKeywordInputKeydown);
+        if (DOMElements.saveLogBtn) DOMElements.saveLogBtn.addEventListener('click', handleSaveLog);
+        if (DOMElements.playbackSpeed) {
+            DOMElements.playbackSpeed.addEventListener('change', (e) => {
+                if(logVideoPlayer) logVideoPlayer.playbackRate = parseFloat(e.target.value);
+            });
+        }
 
-            navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName });
-        });
-        DOMElements.markInBtn.addEventListener('click', handleMarkIn);
-        DOMElements.markOutBtn.addEventListener('click', handleMarkOut);
-        DOMElements.videoTimelineContainer.addEventListener('click', handleTimelineClick);
-        DOMElements.logRating.addEventListener('click', handleStarRatingClick);
-        DOMElements.logKeywordsInput.addEventListener('keydown', handleKeywordInput);
-        DOMElements.saveLogBtn.addEventListener('click', handleSaveLog);
-        DOMElements.playbackSpeed.addEventListener('change', (e) => {
-            if(logVideoPlayer) logVideoPlayer.playbackRate = parseFloat(e.target.value);
-        });
-
-        // Modals
         document.querySelectorAll('.close-modal-btn').forEach(btn => {
             btn.addEventListener('click', (event) => {
                 const modalId = event.target.dataset.targetModal;
                 if (modalId === 'preview-selects-modal') {
                     closePreviewSelectsModal();
-                } else {
+                } else if (modalId && document.getElementById(modalId)) { // Check if modalId is valid
                     document.getElementById(modalId).classList.add('hidden');
+                } else if (event.target.closest('.modal')) { // Fallback for any close btn inside a modal
+                     event.target.closest('.modal').classList.add('hidden');
                 }
             });
         });
-        DOMElements.confirmDialogCancelBtn.addEventListener('click', () => DOMElements.confirmDialog.classList.add('hidden'));
-
-
-        // Global Listeners
-        document.addEventListener('keydown', handleKeyboardShortcuts);
-        window.addEventListener('beforeunload', (event) => {
-            // Optional: Warn user if there's unsaved data or work in progress.
-            // For a client-side app saving to IndexedDB, this is less critical than server-side.
-            // if (state.unsavedChanges) {
-            //     event.preventDefault();
-            //     event.returnValue = ''; // Standard for most browsers
-            // }
+        if (DOMElements.confirmDialogCancelBtn) DOMElements.confirmDialogCancelBtn.addEventListener('click', () => {
+            if (DOMElements.confirmDialog) DOMElements.confirmDialog.classList.add('hidden');
         });
 
-        // Initial Render (Project Dashboard)
+
+        document.addEventListener('keydown', handleKeyboardShortcuts);
+        
+        // Initial Render
+        console.log("[INITAPP] Navigating to initial screen: project-dashboard");
         navigateTo('project-dashboard');
+        showNotification("Application ready.", "success", 2000); // Show after initial screen is supposed to be visible
+        console.log("[INITAPP] Application initialization complete.");
     }
 
     // Start the application
-    document.addEventListener('DOMContentLoaded', initApp);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+        // DOMContentLoaded has already fired
+        initApp();
+    }
 
 })();
 </script>
