@@ -169,32 +169,36 @@
             const db = new Dexie('LogReelDB');
             db.version(1).stores({
                 projects: '++id, name, createdAt',
-                videos: '++id, projectId, fileName, important, createdAt, fileHandle',
-                logs: '++id, videoId, projectId, markIn, &keywords, createdAt'
+                videos: '++id, projectId, fileName, important, createdAt, fileHandle', // Storing fileHandle
+                logs: '++id, videoId, projectId, markIn, &keywords, createdAt' // Added projectId for easier filtering, compound index example for keywords
             });
 
             const App = {
                 setup() {
                     let createFocusTrap;
+                    // Check if focus-trap is loaded
                     if (window.focusTrap && typeof window.focusTrap.createFocusTrap === 'function') {
                         createFocusTrap = window.focusTrap.createFocusTrap;
                     } else {
                         console.error("FocusTrap library not found or createFocusTrap is not a function on window.focusTrap! Modals will not trap focus.");
+                        // Provide a dummy implementation if focus-trap is not available
                         createFocusTrap = () => ({ activate: () => {}, deactivate: () => {} });
                     }
 
-                    const currentScreen = ref('projectDashboard');
+                    // --- App State ---
+                    const currentScreen = ref('projectDashboard'); // projectDashboard, assemblyHub, loggingStation
                     const currentProjectId = ref(null);
                     const currentVideoId = ref(null);
 
                     const projects = ref([]);
                     const videosInCurrentProject = ref([]);
-                    const logsInCurrentProject = ref([]);
-                    const logsForCurrentVideo = ref([]);
+                    const logsInCurrentProject = ref([]); // All logs for the current project (Assembly Hub)
+                    const logsForCurrentVideo = ref([]);  // Logs for the specific video in Logging Station
 
                     const isLoading = ref(false);
                     const toastMessages = ref([]);
 
+                    // --- Toast Notifications ---
                     function showToast(text, type = 'success', duration = 3000) {
                         const id = Date.now() + Math.random();
                         toastMessages.value.push({ id, text, type });
@@ -203,6 +207,7 @@
                         }, duration);
                     }
 
+                    // --- Utility Functions ---
                     function formatTime(totalSeconds, showMillis = false) {
                         if (isNaN(totalSeconds) || totalSeconds < 0) return showMillis ? '00:00:00.000' : '00:00:00';
                         const hours = Math.floor(totalSeconds / 3600);
@@ -220,8 +225,16 @@
                         }
                         const opts = withWrite ? { mode: 'readwrite' } : { mode: 'read' };
                         try {
-                            if (await fileHandle.queryPermission(opts) === 'granted') return true;
-                            return await fileHandle.requestPermission(opts) === 'granted';
+                            // Check if permission was already granted.
+                            if (await fileHandle.queryPermission(opts) === 'granted') {
+                                return true;
+                            }
+                            // Request permission.
+                            if (await fileHandle.requestPermission(opts) === 'granted') {
+                                return true;
+                            }
+                            // Permission was not granted.
+                            return false;
                         } catch (err) {
                             console.error("Error verifying/requesting file permission:", err);
                             showToast("Error accessing file. Permission might have been revoked.", "error", 5000);
@@ -229,13 +242,17 @@
                         }
                     }
 
+
+                    // --- Navigation ---
                     function navigateTo(screen, projectId = null, videoId = null) {
                         currentProjectId.value = projectId;
                         currentVideoId.value = videoId;
+
+                        // Reset states for screens not being navigated to
                         if (screen !== 'assemblyHub') {
                             videosInCurrentProject.value = [];
                             logsInCurrentProject.value = [];
-                            assemblySearchQuery.value = '';
+                            assemblySearchQuery.value = ''; // Reset search
                         }
                         if (screen !== 'loggingStation') {
                             logsForCurrentVideo.value = [];
@@ -248,28 +265,31 @@
                         currentScreen.value = screen;
                     }
 
+                    // --- Project Dashboard ---
                     const newProjectName = ref('');
                     const showNewProjectModal = ref(false);
                     let newProjectModalFocusTrap = null;
-                    const newProjectModalElement = ref(null);
+                    const newProjectModalElement = ref(null); // Ref for the modal DOM element
 
                     watch(showNewProjectModal, (isShown) => {
-                        nextTick(() => {
+                        nextTick(() => { // Ensure DOM is updated before trying to access the element
                             if (isShown && newProjectModalElement.value) {
                                 if (!newProjectModalFocusTrap) {
-                                    if (typeof createFocusTrap !== 'function') {
+                                     if (typeof createFocusTrap !== 'function') {
                                         console.error("createFocusTrap is not a function. Modal focus trap will not work.");
                                         return;
                                     }
                                     newProjectModalFocusTrap = createFocusTrap(newProjectModalElement.value, {
                                         onDeactivate: () => {
+                                            // Ensure the modal is hidden if focus trap is deactivated externally (e.g., Escape key)
                                             showNewProjectModal.value = false;
                                         },
                                         initialFocus: () => newProjectModalElement.value.querySelector('input[type="text"]') || undefined,
-                                        escapeDeactivates: true,
+                                        escapeDeactivates: true, // Allow Escape key to close modal
                                     });
                                 }
                                 newProjectModalFocusTrap.activate();
+                                // Optional: explicitly focus the input after activation
                                 const inputEl = newProjectModalElement.value?.querySelector('input[type="text"]');
                                 inputEl?.focus();
                             } else if (!isShown && newProjectModalFocusTrap) {
@@ -278,10 +298,12 @@
                         });
                     });
 
+
                     async function loadProjects() {
                         isLoading.value = true;
                         try {
                             const projectList = await db.projects.orderBy('createdAt').reverse().toArray();
+                            // Get video counts for each project
                             for (const proj of projectList) {
                                 proj.videoCount = await db.videos.where('projectId').equals(proj.id).count();
                             }
@@ -307,7 +329,7 @@
                             });
                             showToast("Project created successfully!", "success");
                             newProjectName.value = '';
-                            showNewProjectModal.value = false;
+                            showNewProjectModal.value = false; // This will trigger the watch to deactivate focus trap
                             await loadProjects();
                         } catch (error) {
                             console.error("Error creating project:", error);
@@ -321,10 +343,10 @@
                         navigateTo('assemblyHub', projectId);
                     }
 
+                    // --- Assembly Hub ---
                     const currentProject = computed(() => projects.value.find(p => p.id === currentProjectId.value));
                     const assemblySearchQuery = ref('');
 
-                    // MODIFIED loadAssemblyHubData for more logging
                     async function loadAssemblyHubData() {
                         if (!currentProjectId.value) return;
                         isLoading.value = true;
@@ -333,22 +355,22 @@
                             console.log("Fetching videos from DB...");
                             const projectVideos = await db.videos
                                 .where('projectId').equals(currentProjectId.value)
-                                .orderBy('createdAt').toArray();
+                                .orderBy('createdAt').toArray(); // Sort by creation or name
                             console.log("Videos fetched:", projectVideos);
                             videosInCurrentProject.value = projectVideos;
 
-                            console.log("Fetching logs from DB...");
+                            console.log("Fetching logs from DB for the entire project...");
                             const projectLogs = await db.logs
                                 .where('projectId').equals(currentProjectId.value)
                                 .toArray();
                             console.log("Logs fetched:", projectLogs);
-                            logsInCurrentProject.value = projectLogs;
+                            logsInCurrentProject.value = projectLogs; // Store all logs for current project
                             console.log("Assembly Hub data loaded successfully.");
 
                         } catch (error) {
-                            console.error("Error loading assembly hub data:", error.name, error.message, error.stack, error); // Log full error object
-                            showToast("Failed to load project data.", "error");
-                            navigateTo('projectDashboard');
+                            console.error("Error loading assembly hub data:", error.name, error.message, error.stack, error);
+                            showToast("Failed to load project data. Please try again or check console.", "error", 7000);
+                            navigateTo('projectDashboard'); // Fallback to dashboard
                         } finally {
                             isLoading.value = false;
                         }
@@ -367,7 +389,9 @@
                         }
                         const query = assemblySearchQuery.value.toLowerCase().trim();
                         return videosInCurrentProject.value.filter(video => {
+                            // Check video name
                             if (video.fileName.toLowerCase().includes(query)) return true;
+                            // Check logs associated with this video
                             const videoLogs = logsInCurrentProject.value.filter(log => log.videoId === video.id);
                             for (const log of videoLogs) {
                                 if (log.notes && log.notes.toLowerCase().includes(query)) return true;
@@ -379,7 +403,7 @@
 
                     async function addVideosToProject() {
                         if (!window.showOpenFilePicker) {
-                            showToast("File System Access API is not supported in your browser/context.", "error", 6000);
+                            showToast("File System Access API is not supported in your browser/context. Try a modern browser like Chrome or Edge.", "error", 6000);
                             return;
                         }
                         isLoading.value = true;
@@ -391,35 +415,36 @@
 
                             let addedCount = 0;
                             for (const handle of handles) {
+                                 // Verify permission for each handle before proceeding
                                  if (!(await verifyFilePermission(handle))) {
                                     showToast(`Permission denied for ${handle.name}. Skipping.`, "info");
                                     continue;
                                 }
-                                const file = await handle.getFile();
+                                const file = await handle.getFile(); // Get file to check details like name
                                 const existingVideo = await db.videos.where({ projectId: currentProjectId.value, fileName: file.name }).first();
                                 if (existingVideo) {
-                                    showToast(`Video "${file.name}" already exists. Skipping.`, "info");
+                                    showToast(`Video "${file.name}" already exists in this project. Skipping.`, "info");
                                     continue;
                                 }
 
                                 await db.videos.add({
                                     projectId: currentProjectId.value,
                                     fileName: file.name,
-                                    fileType: file.type,
-                                    fileSize: file.size,
-                                    fileHandle: handle,
+                                    fileType: file.type, // Store file type
+                                    fileSize: file.size, // Store file size
+                                    fileHandle: handle, // Store the handle itself
                                     important: false,
                                     createdAt: new Date()
                                 });
                                 addedCount++;
                             }
-                            if (addedCount > 0) showToast(`${addedCount} video(s) added.`, "success");
-                            if (addedCount !== handles.length && handles.length > 0) showToast(`${handles.length - addedCount} video(s) skipped.`, "info");
+                            if (addedCount > 0) showToast(`${addedCount} video(s) added successfully.`, "success");
+                            if (addedCount !== handles.length && handles.length > 0) showToast(`${handles.length - addedCount} video(s) were skipped (e.g., duplicates or permission issues).`, "info");
 
-                            await loadAssemblyHubData();
+                            await loadAssemblyHubData(); // Refresh video list
                         } catch (error) {
                             if (error.name === 'AbortError') {
-                                console.log("File picker aborted.");
+                                console.log("File picker aborted by user."); // Not an error to show toast for
                             } else {
                                 console.error("Error adding videos:", error);
                                 showToast(`Error adding videos: ${error.message}`, "error");
@@ -434,6 +459,7 @@
                         try {
                             const newImportance = !video.important;
                             await db.videos.update(video.id, { important: newImportance });
+                            // Update local array for immediate UI reflection
                             const videoInArray = videosInCurrentProject.value.find(v => v.id === video.id);
                             if (videoInArray) videoInArray.important = newImportance;
                             showToast(`Video marked ${newImportance ? 'important' : 'not important'}.`, "success");
@@ -449,21 +475,24 @@
                         navigateTo('loggingStation', video.projectId, video.id);
                     }
 
-                    const expandedVideoLogs = ref({});
+                    // For expanding logs list in Assembly Hub
+                    const expandedVideoLogs = ref({}); // Stores videoId: true/false
                     function toggleViewLogs(videoId) {
                         expandedVideoLogs.value[videoId] = !expandedVideoLogs.value[videoId];
                     }
-                    function getLogsForVideoCard(videoId) {
-                        return logsInCurrentProject.value.filter(log => log.videoId === video.id)
+                    function getLogsForVideoCard(videoId) { // Used in template
+                        return logsInCurrentProject.value.filter(log => log.videoId === videoId)
                                                    .sort((a,b) => a.markIn - b.markIn);
                     }
-                    function hasLogs(videoId) {
+                    function hasLogs(videoId){ // Used in template
                         return logsInCurrentProject.value.some(log => log.videoId === videoId);
                     }
 
-                    const currentVideoDetails = ref(null);
-                    const videoPlayerRef = ref(null);
-                    const videoSrc = ref('');
+
+                    // --- Logging Station ---
+                    const currentVideoDetails = ref(null); // Full video object from DB
+                    const videoPlayerRef = ref(null); // Ref for the <video> element
+                    const videoSrc = ref(''); // Object URL for the video
                     const currentTime = ref(0);
                     const duration = ref(0);
                     const isPlaying = ref(false);
@@ -484,43 +513,46 @@
                         try {
                             const videoData = await db.videos.get(currentVideoId.value);
                             if (!videoData) {
-                                showToast("Video not found.", "error");
+                                showToast("Video not found. It might have been deleted.", "error");
                                 navigateTo('assemblyHub', currentProjectId.value || undefined);
                                 return;
                             }
                             currentVideoDetails.value = videoData;
 
+                            // Crucial: Get file from stored handle and set src
                             if (videoData.fileHandle) {
                                if (await verifyFilePermission(videoData.fileHandle)) {
                                     const file = await videoData.fileHandle.getFile();
-                                    if (videoSrc.value) URL.revokeObjectURL(videoSrc.value);
+                                    if (videoSrc.value) URL.revokeObjectURL(videoSrc.value); // Clean up old object URL
                                     videoSrc.value = URL.createObjectURL(file);
                                } else {
                                    showToast("Permission denied for video file. Re-add or re-select if prompted.", "error", 5000);
                                    navigateTo('assemblyHub', currentProjectId.value); return;
                                }
                             } else {
-                                showToast("Video file handle missing. Re-add video.", "error", 5000);
+                                showToast("Video file handle missing. This video may be corrupted or was not added correctly. Please re-add it.", "error", 5000);
                                 navigateTo('assemblyHub', currentProjectId.value); return;
                             }
 
+                            // Load logs specific to this video
                             const videoLogs = await db.logs.where('videoId').equals(currentVideoId.value)
-                                                      .orderBy('markIn').toArray();
+                                                      .orderBy('markIn').toArray(); // Sort by markIn time
                             logsForCurrentVideo.value = videoLogs;
 
                         } catch (error) {
                             console.error("Error loading logging station data:", error);
-                            showToast("Failed to load video or logs.", "error");
-                            navigateTo('assemblyHub', currentProjectId.value);
+                            showToast("Failed to load video or its logs. Check console for details.", "error");
+                            navigateTo('assemblyHub', currentProjectId.value); // Go back if error
                         } finally {
                             isLoading.value = false;
                         }
                     }
 
+                    // Video player event handlers
                     function handleTimeUpdate(event) { currentTime.value = event.target.currentTime; }
                     function handleLoadedMetadata(event) {
                         duration.value = event.target.duration;
-                        markInTime.value = null; markOutTime.value = null;
+                        markInTime.value = null; markOutTime.value = null; // Reset marks when new video loads
                     }
                     function handlePlay() { isPlaying.value = true; }
                     function handlePause() { isPlaying.value = false; }
@@ -531,7 +563,7 @@
                         const timeline = event.currentTarget;
                         const rect = timeline.getBoundingClientRect();
                         const clickX = event.clientX - rect.left;
-                        const percentage = Math.max(0, Math.min(1, clickX / rect.width));
+                        const percentage = Math.max(0, Math.min(1, clickX / rect.width)); // Clamp between 0 and 1
                         seekVideo(duration.value * percentage);
                     }
 
@@ -551,40 +583,47 @@
                         if (newKeyword && !logForm.keywords.includes(newKeyword)) {
                             logForm.keywords.push(newKeyword);
                         }
-                        logForm.newKeyword = '';
+                        logForm.newKeyword = ''; // Clear input
                     }
                     function removeKeyword(keywordToRemove) {
                         logForm.keywords = logForm.keywords.filter(k => k !== keywordToRemove);
                     }
                     function resetLogForm() {
                         logForm.notes = ''; logForm.rating = 0; logForm.keywords = []; logForm.newKeyword = '';
+                        // Optionally reset markIn/markOut too, or leave them for quick re-logging of same segment
+                        // markInTime.value = null; markOutTime.value = null;
                     }
 
                     async function saveLog() {
                         if (markInTime.value === null || markOutTime.value === null) {
-                            showToast("Set Mark In and Mark Out points.", "error"); return;
+                            showToast("Please set both Mark In and Mark Out points.", "error"); return;
                         }
                         if (markInTime.value >= markOutTime.value) {
-                            showToast("Mark Out must be after Mark In.", "error"); return;
+                            showToast("Mark Out time must be after Mark In time.", "error"); return;
                         }
                         if (!logForm.notes.trim() && logForm.keywords.length === 0 && logForm.rating === 0) {
-                             showToast("Add notes, keywords, or a rating.", "error"); return;
+                             showToast("Please add notes, keywords, or a rating to save a log.", "error"); return;
                         }
                         isLoading.value = true;
                         try {
                             const newLogData = {
-                                videoId: currentVideoId.value, projectId: currentProjectId.value,
+                                videoId: currentVideoId.value, projectId: currentProjectId.value, // Store projectId for easier project-wide log ops
                                 markIn: markInTime.value, markOut: markOutTime.value,
                                 notes: logForm.notes.trim(), rating: logForm.rating,
-                                keywords: [...logForm.keywords], createdAt: new Date()
+                                keywords: [...logForm.keywords], // Clone array
+                                createdAt: new Date()
                             };
                             const newLogId = await db.logs.add(newLogData);
-                            showToast("Log saved!", "success");
+                            showToast("Log saved successfully!", "success");
 
+                            // Optimistically update local logs array
                             const newLogWithId = {...newLogData, id: newLogId };
                             logsForCurrentVideo.value.push(newLogWithId);
-                            logsForCurrentVideo.value.sort((a,b) => a.markIn - b.markIn);
+                            logsForCurrentVideo.value.sort((a,b) => a.markIn - b.markIn); // Re-sort
+
+                            // Also update the project-wide logs in Assembly Hub's cache
                             logsInCurrentProject.value.push(newLogWithId);
+
 
                             resetLogForm();
                         } catch (error) {
@@ -595,6 +634,7 @@
                         }
                     }
 
+                    // Keyboard shortcuts for Logging Station
                     function handleKeydown(event) {
                         if (currentScreen.value !== 'loggingStation') return;
                         const activeElement = document.activeElement;
@@ -605,17 +645,19 @@
                         else if (event.key.toLowerCase() === 'o' && !isTyping) { event.preventDefault(); setMarkOut(); }
                     }
 
+                    // --- Play Selects Modal ---
                     const showPlaySelectsModal = ref(false);
                     const playSelectsVideoSrc = ref('');
-                    const playSelectsLogs = ref([]);
+                    const playSelectsLogs = ref([]); // Logs specifically for the selects player
                     const currentSelectIndex = ref(0);
-                    const playSelectsPlayerRef = ref(null);
+                    const playSelectsPlayerRef = ref(null); // Ref for the selects <video> element
                     let playSelectsFocusTrapInstance = null;
-                    const playSelectsModalElement = ref(null);
+                    const playSelectsModalElement = ref(null); // Ref for the modal DOM element
 
-                    async function openPlaySelectsModal(video) {
+                    async function openPlaySelectsModal(video) { // Pass the whole video object
                         isLoading.value = true;
                         try {
+                            // Filter logs for *this specific video* from the project-wide cache
                             const logs = logsInCurrentProject.value.filter(log => log.videoId === video.id)
                                                      .sort((a, b) => a.markIn - b.markIn);
                             if (logs.length === 0) {
@@ -623,9 +665,11 @@
                             }
                             playSelectsLogs.value = logs;
 
-                            const videoData = await db.videos.get(video.id);
+                            // Video data might already be in `video` object if called from Assembly Hub
+                            // Or fetch if needed (though `video.fileHandle` should be there)
+                            const videoData = await db.videos.get(video.id); // Re-fetch to ensure fresh handle
                             if (!videoData || !videoData.fileHandle) {
-                                showToast("Video data or file handle not found.", "error"); return;
+                                showToast("Video data or file handle not found for Play Selects.", "error"); return;
                             }
 
                             if (await verifyFilePermission(videoData.fileHandle)) {
@@ -633,9 +677,9 @@
                                 if (playSelectsVideoSrc.value) URL.revokeObjectURL(playSelectsVideoSrc.value);
                                 playSelectsVideoSrc.value = URL.createObjectURL(file);
                                 currentSelectIndex.value = 0;
-                                showPlaySelectsModal.value = true;
+                                showPlaySelectsModal.value = true; // This will trigger the watch
 
-                                nextTick(() => {
+                                nextTick(() => { // Ensure modal element is in DOM
                                     if (playSelectsModalElement.value) {
                                         if (!playSelectsFocusTrapInstance) {
                                             if (typeof createFocusTrap !== 'function') {
@@ -644,17 +688,19 @@
                                             }
                                             playSelectsFocusTrapInstance = createFocusTrap(playSelectsModalElement.value, {
                                                 onDeactivate: () => {
+                                                    // This ensures that if the trap is deactivated (e.g. by Escape), the modal closes
                                                     if (showPlaySelectsModal.value) closePlaySelectsModal();
                                                 },
-                                                initialFocus: () => playSelectsPlayerRef.value || undefined,
+                                                initialFocus: () => playSelectsPlayerRef.value || undefined, // Focus video player
                                                 escapeDeactivates: true,
                                             });
                                         }
                                         playSelectsFocusTrapInstance.activate();
                                     }
+                                    // playCurrentSelectSegment() will be called by @loadeddata on video
                                 });
                             } else {
-                                showToast("Could not get permission to load video.", "error", 5000);
+                                showToast("Could not get permission to load video for Play Selects.", "error", 5000);
                             }
                         } catch (error) {
                             console.error("Error opening Play Selects:", error);
@@ -665,17 +711,19 @@
                     }
 
                     function closePlaySelectsModal() {
-                        if (!showPlaySelectsModal.value) return;
+                        if (!showPlaySelectsModal.value) return; // Prevent multiple calls if already closing
 
                         if (playSelectsPlayerRef.value) playSelectsPlayerRef.value.pause();
                         if (playSelectsVideoSrc.value) URL.revokeObjectURL(playSelectsVideoSrc.value);
                         playSelectsVideoSrc.value = '';
-                        playSelectsLogs.value = [];
-                        showPlaySelectsModal.value = false;
+                        playSelectsLogs.value = []; // Clear logs
+                        showPlaySelectsModal.value = false; // Triggers watch to deactivate trap
 
+                        // Deactivation is now handled by the watch on showPlaySelectsModal
+                        // and by the onDeactivate callback in createFocusTrap
                         if (playSelectsFocusTrapInstance) {
-                            playSelectsFocusTrapInstance.deactivate();
-                            playSelectsFocusTrapInstance = null;
+                            playSelectsFocusTrapInstance.deactivate(); // Explicitly call if needed
+                            playSelectsFocusTrapInstance = null; // Clean up instance
                         }
                     }
 
@@ -686,7 +734,8 @@
 
                         if (currentSelectIndex.value >= playSelectsLogs.value.length) {
                             showToast("All selects played.", "info");
-                            player.pause(); return;
+                            player.pause(); // Ensure paused
+                            return;
                         }
 
                         const currentLog = playSelectsLogs.value[currentSelectIndex.value];
@@ -702,48 +751,64 @@
                         if (player.currentTime >= currentLog.markOut) {
                             player.pause();
                             currentSelectIndex.value++;
+                            // Small delay before playing next to allow UI to update and avoid race conditions
                             setTimeout(playCurrentSelectSegment, 100);
                         }
                     }
+                    // This will be called once the video data is loaded for the Play Selects player
                     function handlePlaySelectsLoadedData(){
                         playCurrentSelectSegment();
                     }
 
-                    onMounted(() => {
-                        (async () => {
-                            try {
-                                await loadProjects();
-                                if (navigator.storage && navigator.storage.persist) {
-                                    if (!await navigator.storage.persisted()) {
-                                        const result = await navigator.storage.persist();
-                                        if(!result) showToast("Offline storage may not be persistent.", "info", 7000);
+
+                    // --- Lifecycle Hooks ---
+                    onMounted(async () => {
+                        try {
+                            await loadProjects();
+                            // Attempt to make storage persistent
+                            if (navigator.storage && navigator.storage.persist) {
+                                if (!await navigator.storage.persisted()) { // Check if already persisted
+                                    const result = await navigator.storage.persist();
+                                    if(result) {
+                                        console.log("Storage successfully persisted.");
+                                    } else {
+                                        showToast("Offline storage may not be persistent. Your browser might clear data.", "info", 7000);
                                     }
                                 } else {
-                                    showToast("Persistent storage API not available from this context.", "warning", 7000);
+                                     console.log("Storage was already persistent.");
                                 }
-                            } catch (e) {
-                                console.error("LogReel: CRITICAL ERROR IN ONMOUNTED", e);
-                                showToast(`CRITICAL Mount Error: ${e.message}. Check console.`, "error", 15000);
+                            } else {
+                                showToast("Persistent storage API not available from this context (e.g., private browsing, or older browser).", "warning", 7000);
                             }
-                        })();
+                        } catch (e) {
+                            console.error("LogReel: CRITICAL ERROR IN ONMOUNTED", e);
+                            showToast(`CRITICAL Mount Error: ${e.message}. Application might not work correctly. Check console.`, "error", 15000);
+                        }
                         window.addEventListener('keydown', handleKeydown);
                     });
 
                     onUnmounted(() => {
                         window.removeEventListener('keydown', handleKeydown);
+                        // Clean up any object URLs to prevent memory leaks
                         if (videoSrc.value) URL.revokeObjectURL(videoSrc.value);
                         if (playSelectsVideoSrc.value) URL.revokeObjectURL(playSelectsVideoSrc.value);
                     });
 
-                    return { /* ... */
+                    return {
+                        // State
                         currentScreen, currentProjectId, currentVideoId, isLoading, toastMessages,
                         projects, videosInCurrentProject, logsInCurrentProject, logsForCurrentVideo,
+                        // Project Dashboard
                         newProjectName, showNewProjectModal, newProjectModalElement,
+                        // Assembly Hub
                         currentProject, assemblySearchQuery, filteredVideos, expandedVideoLogs,
+                        // Logging Station
                         currentVideoDetails, videoPlayerRef, videoSrc, currentTime, duration, isPlaying,
                         markInTime, markOutTime, progressPercent, markInRangeStyle,
                         logForm,
+                        // Play Selects Modal
                         showPlaySelectsModal, playSelectsVideoSrc, playSelectsLogs, currentSelectIndex, playSelectsPlayerRef, playSelectsModalElement,
+                        // Methods
                         showToast, formatTime, navigateTo,
                         loadProjects, createProject, openProject,
                         loadAssemblyHubData, addVideosToProject, toggleVideoImportant, openLoggingStation, toggleViewLogs, getLogsForVideoCard, hasLogs,
@@ -752,7 +817,6 @@
                         openPlaySelectsModal, closePlaySelectsModal, handlePlaySelectsTimeUpdate, handlePlaySelectsLoadedData,
                     };
                 },
-                // IMPORTANT: Manually remove the "{/* Ensure this loads */}" comment from the start of your template string below if it's there.
                 template: `
                     <!-- Toast Notifications Container -->
                     <div aria-live="assertive" class="fixed inset-0 flex flex-col items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-end z-[100]">
@@ -767,6 +831,7 @@
                         </TransitionGroup>
                     </div>
 
+                    <!-- Global Loading Indicator -->
                     <div v-if="isLoading" class="fixed inset-0 bg-stone-950/80 flex items-center justify-center z-[99]">
                         <svg class="animate-spin h-10 w-10 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -801,15 +866,15 @@
 
                         <!-- New Project Modal -->
                         <Transition name="fade">
-                            <div v-if="showNewProjectModal" class="modal-overlay" @click.self="showNewProjectModal = false">
+                            <div v-if="showNewProjectModal" class="modal-overlay" @click.self="showNewProjectModal = false" role="dialog" aria-modal="true" aria-labelledby="newProjectModalTitle">
                                 <div ref="newProjectModalElement" class="modal-content w-full max-w-md">
-                                    <h3 class="text-xl font-semibold mb-4 text-stone-100">Create New Project</h3>
+                                    <h3 id="newProjectModalTitle" class="text-xl font-semibold mb-4 text-stone-100">Create New Project</h3>
                                     <form @submit.prevent="createProject">
                                         <label for="newProjectNameInput" class="sr-only">Project Name</label>
                                         <input id="newProjectNameInput" type="text" v-model="newProjectName" placeholder="Project Name" class="input-field mb-4" required>
                                         <div class="flex justify-end gap-3">
                                             <button type="button" @click="showNewProjectModal = false" class="btn btn-secondary">Cancel</button>
-                                            <button type="submit" class="btn btn-primary">Create</button>
+                                            <button type="submit" class="btn btn-primary" :disabled="!newProjectName.trim()">Create</button>
                                         </div>
                                     </form>
                                 </div>
@@ -833,7 +898,7 @@
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                         <i class="ph ph-magnifying-glass text-stone-400"></i>
                                     </div>
-                                    <label for="assemblySearchInput" class="sr-only">Search videos</label>
+                                    <label for="assemblySearchInput" class="sr-only">Search videos, notes, or keywords within this project</label>
                                     <input id="assemblySearchInput" type="search" v-model="assemblySearchQuery" placeholder="Search videos, notes, keywords..." class="input-field pl-10 w-full">
                                 </div>
                                 <button @click="addVideosToProject" class="btn btn-primary w-full sm:w-auto shrink-0">
@@ -855,6 +920,7 @@
                                     <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                                         <div class="shrink-0 text-xl font-semibold text-stone-400 w-8 text-center hidden sm:block">{{ index + 1 }}.</div>
                                         <div class="shrink-0 w-32 h-20 bg-stone-800 rounded flex items-center justify-center aspect-video">
+                                            <!-- Basic thumbnail placeholder -->
                                             <i class="ph ph-film-strip text-4xl text-stone-500"></i>
                                         </div>
                                         <div class="flex-grow min-w-0">
@@ -878,7 +944,7 @@
                                         </div>
                                     </div>
                                     <div v-if="hasLogs(video.id)" class="border-t border-stone-800 px-4 sm:px-5 py-2">
-                                        <button @click="toggleViewLogs(video.id)" class="text-sm text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1">
+                                        <button @click="toggleViewLogs(video.id)" class="text-sm text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 w-full justify-between">
                                             <span>{{ expandedVideoLogs[video.id] ? 'Hide Logs' : 'View Logs' }} ({{ getLogsForVideoCard(video.id).length }})</span>
                                             <i class="ph transition-transform" :class="expandedVideoLogs[video.id] ? 'ph-caret-up' : 'ph-caret-down'"></i>
                                         </button>
@@ -983,7 +1049,7 @@
                                         </div>
                                     </div>
                                     <div class="flex gap-3 pt-2">
-                                         <button type="submit" class="btn btn-primary w-full py-3 text-base">
+                                         <button type="submit" class="btn btn-primary w-full py-3 text-base" :disabled="markInTime === null || markOutTime === null || markInTime >= markOutTime || (!logForm.notes.trim() && logForm.keywords.length === 0 && logForm.rating === 0)">
                                             <i class="ph ph-floppy-disk text-xl"></i>
                                             <span>Save Log</span>
                                         </button>
@@ -1026,22 +1092,32 @@
 
                     <!-- Play Selects Modal -->
                     <Transition name="fade">
-                    <div v-if="showPlaySelectsModal" ref="playSelectsModalElement" class="fixed inset-0 bg-black/90 flex flex-col items-center justify-center p-4 z-50" @click.self="closePlaySelectsModal">
-                        <div class="relative w-full max-w-4xl">
-                            <video ref="playSelectsPlayerRef" :src="playSelectsVideoSrc"
-                                   @timeupdate="handlePlaySelectsTimeUpdate"
-                                   @loadeddata="handlePlaySelectsLoadedData"
-                                   @ended="handlePlaySelectsTimeUpdate"
-                                   class="w-full max-h-[80vh] rounded-lg bg-black aspect-video mb-4" controls></video>
-                            <p v-if="playSelectsLogs.length > 0 && currentSelectIndex < playSelectsLogs.length" class="text-stone-200 text-lg mb-4 text-center">
-                                Playing Select {{ currentSelectIndex + 1 }} of {{ playSelectsLogs.length }}
-                            </p>
-                            <p v-else-if="playSelectsLogs.length > 0 && currentSelectIndex >= playSelectsLogs.length" class="text-stone-200 text-lg mb-4 text-center">
-                                Finished playing all selects.
-                            </p>
-                            <button @click="closePlaySelectsModal" class="btn btn-secondary absolute top-2 right-2 sm:top-4 sm:right-4 z-10" aria-label="Close player">
-                                <i class="ph ph-x text-xl"></i> <span class="hidden sm:inline">Close</span>
-                            </button>
+                    <div v-if="showPlaySelectsModal" ref="playSelectsModalElement" class="fixed inset-0 bg-black/90 flex flex-col items-center justify-center p-4 z-50" @click.self="closePlaySelectsModal" role="dialog" aria-modal="true" aria-labelledby="playSelectsModalTitle">
+                        <div class="relative w-full max-w-4xl flex flex-col bg-stone-900 rounded-lg shadow-xl overflow-hidden max-h-[90vh]">
+                            <header class="p-4 border-b border-stone-800 flex items-center justify-between shrink-0">
+                                <h3 id="playSelectsModalTitle" class="text-lg font-semibold text-stone-100">Play Selects</h3>
+                                <button @click="closePlaySelectsModal" class="btn btn-secondary btn-sm p-1" aria-label="Close player">
+                                    <i class="ph ph-x text-xl"></i>
+                                </button>
+                            </header>
+                            <div class="flex-grow flex items-center justify-center p-4">
+                                <video ref="playSelectsPlayerRef" :src="playSelectsVideoSrc"
+                                       @timeupdate="handlePlaySelectsTimeUpdate"
+                                       @loadeddata="handlePlaySelectsLoadedData"
+                                       @ended="handlePlaySelectsTimeUpdate" <!-- Call timeupdate on ended to potentially advance -->
+                                       class="w-full max-h-[70vh] rounded-md bg-black aspect-video" controls></video>
+                            </div>
+                            <footer class="p-4 border-t border-stone-800 shrink-0 text-center">
+                                <p v-if="playSelectsLogs.length > 0 && currentSelectIndex < playSelectsLogs.length" class="text-stone-200 text-sm mb-2">
+                                    Playing Select {{ currentSelectIndex + 1 }} of {{ playSelectsLogs.length }}: {{ formatTime(playSelectsLogs[currentSelectIndex].markIn) }} - {{ formatTime(playSelectsLogs[currentSelectIndex].markOut) }}
+                                </p>
+                                <p v-else-if="playSelectsLogs.length > 0 && currentSelectIndex >= playSelectsLogs.length" class="text-stone-200 text-sm mb-2">
+                                    Finished playing all selects.
+                                </p>
+                                <div v-if="playSelectsLogs.length > 0 && currentSelectIndex < playSelectsLogs.length" class="text-xs text-stone-400 truncate">
+                                    {{ playSelectsLogs[currentSelectIndex].notes || 'No notes for this select.'}}
+                                </div>
+                            </footer>
                         </div>
                     </div>
                     </Transition>
@@ -1053,17 +1129,20 @@
         } catch (e) {
             console.error('TOP LEVEL CRITICAL ERROR (before Vue mount):', e);
             const appDiv = document.getElementById('app');
-            if (appDiv && !document.querySelector('.critical-error-display')) {
+            if (appDiv && !document.querySelector('.critical-error-display')) { // Avoid multiple error messages
                  const errorDiv = document.createElement('div');
-                 errorDiv.className = 'critical-error-display';
+                 errorDiv.className = 'critical-error-display'; // Class for potential future styling/selection
                  errorDiv.style.cssText = 'color: red; background-color: black; padding: 20px; border: 2px solid red; position: fixed; top: 10px; left: 10px; right: 10px; z-index: 9999; font-size: 12px; white-space: pre-wrap; word-break: break-all;';
                 errorDiv.innerHTML = `<h2>FATAL ERROR: Application could not start.</h2>
-                    <p>Please check the browser console for details.</p>
+                    <p>This is usually due to a JavaScript error during initialization.</p>
+                    <p>Please check the browser console (usually F12 or Right-click -> Inspect -> Console) for specific error messages.</p>
                     <p><strong>Error:</strong> ${e.message}</p>
-                    <pre>${e.stack}</pre>
+                    <pre><strong>Stack:</strong><br>${e.stack}</pre>
                 </div>`;
-                 if (document.body) {
-                    document.body.prepend(errorDiv);
+                 if (document.body) { // Ensure body exists
+                    document.body.prepend(errorDiv); // Prepend to show on top
+                } else { // Fallback if body isn't ready
+                    appDiv.innerHTML = errorDiv.outerHTML;
                 }
             }
         }
