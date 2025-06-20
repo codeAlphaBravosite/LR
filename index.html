@@ -1,1883 +1,1381 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>LogReel - Client-Side Video Logging</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogReel - Professional Video Logging</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Dexie.js -->
+    <script src="https://unpkg.com/dexie@3/dist/dexie.js"></script> <!-- Dexie 3.x -->
+    <!-- focus-trap -->
+    <script src="https://unpkg.com/focus-trap@7.5.4/dist/focus-trap.umd.js"></script>
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Vue Router -->
+    <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
+
     <style>
-        /* CSS Reset (Minimal) */
-        *, *::before, *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        html, body {
-            height: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            color: #e0e0e0;
-            background-color: #1a1a1a; /* Dark background */
-            overscroll-behavior-y: contain; /* Prevent pull-to-refresh on mobile */
-        }
-
         body {
-            display: flex;
-            flex-direction: column;
+            font-family: 'Inter', sans-serif;
+            background-color: #0c0a09; /* stone-950 */
+            color: #e7e5e4; /* stone-200 (approx for stone-100/200) */
+            overscroll-behavior: none; /* Prevents pull-to-refresh on mobile */
         }
-
-        #app {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
+        /* Custom scrollbar for webkit browsers */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
         }
-
-        /* Theme Variables */
-        :root {
-            --primary-color: #007bff; /* A nice blue */
-            --primary-hover: #0056b3;
-            --secondary-color: #6c757d;
-            --background-color: #1a1a1a;
-            --surface-color: #2c2c2c; /* Cards, inputs */
-            --text-color: #e0e0e0;
-            --text-muted-color: #a0a0a0;
-            --border-color: #444;
-            --error-color: #dc3545;
-            --success-color: #28a745;
-            --star-color: #ffc107;
-            --timeline-played-color: var(--primary-color);
-            --timeline-buffered-color: #555;
-            --timeline-mark-color: var(--star-color);
+        ::-webkit-scrollbar-track {
+            background: #1c1917; /* stone-900 */
         }
-
-        /* General Styles */
-        h1, h2, h3 {
-            margin-bottom: 0.75em;
-            color: var(--text-color);
-        }
-
-        button, input[type="text"], textarea, select {
-            font-family: inherit;
-            font-size: 1rem;
-            padding: 0.6em 1em;
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-            background-color: var(--surface-color);
-            color: var(--text-color);
-        }
-
-        button {
-            cursor: pointer;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            transition: background-color 0.2s ease;
-        }
-        button:hover:not(:disabled) {
-            background-color: var(--primary-hover);
-        }
-        button:disabled {
-            background-color: var(--secondary-color);
-            cursor: not-allowed;
-            opacity: 0.7;
-        }
-        button.secondary {
-            background-color: var(--secondary-color);
-        }
-        button.secondary:hover:not(:disabled) {
-            background-color: #5a6268;
-        }
-        button.danger {
-            background-color: var(--error-color);
-        }
-        button.danger:hover:not(:disabled) {
-            background-color: #c82333;
-        }
-        .icon-button {
-            background: none;
-            border: none;
-            color: var(--text-muted-color);
-            padding: 0.5em;
-            font-size: 1.2rem;
-        }
-        .icon-button:hover {
-            color: var(--primary-color);
-        }
-
-
-        input[type="text"], textarea {
-            width: 100%;
-            margin-bottom: 0.5em;
-        }
-        textarea {
-            min-height: 80px;
-            resize: vertical;
-        }
-
-        .screen {
-            padding: 1.5em;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto; /* Allow content to scroll */
-        }
-        .screen-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5em;
-            padding-bottom: 0.5em;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .screen-header h1, .screen-header h2 {
-            margin-bottom: 0;
-            font-size: 1.5rem;
-        }
-        .back-button {
-            font-size: 1rem;
-            padding: 0.5em 0.8em;
-        }
-
-        .empty-state {
-            text-align: center;
-            color: var(--text-muted-color);
-            padding: 2em;
-            border: 2px dashed var(--border-color);
-            border-radius: 8px;
-            margin-top: 2em;
-        }
-        .empty-state p { margin-bottom: 1em; }
-
-        /* Project Dashboard (Screen A) */
-        #project-list {
-            list-style: none;
-            padding: 0;
-        }
-        .project-item {
-            background-color: var(--surface-color);
-            padding: 1em 1.5em;
-            margin-bottom: 1em;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-        .project-item:hover {
-            background-color: #3a3a3a;
-        }
-        .project-item-info h3 {
-            margin-bottom: 0.25em;
-            font-size: 1.2rem;
-        }
-        .project-item-info span {
-            font-size: 0.9rem;
-            color: var(--text-muted-color);
-        }
-        .project-item-actions button {
-            margin-left: 0.5em;
-            padding: 0.4em 0.6em; /* Smaller delete button */
-            font-size: 0.9rem;
-        }
-
-        /* Assembly Hub (Screen B) */
-        #assembly-hub-screen .search-bar {
-            width: 100%;
-            margin-bottom: 1.5em;
-        }
-        #video-list {
-            display: grid;
-            gap: 1.5em;
-            grid-template-columns: 1fr; /* Mobile first */
-        }
-        @media (min-width: 768px) { /* Tablet and up */
-            #video-list {
-                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            }
-        }
-
-        .video-card {
-            background-color: var(--surface-color);
-            border-radius: 8px;
-            padding: 1em;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        .video-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start; /* Align star to top */
-            margin-bottom: 0.75em;
-        }
-        .video-card-header h4 {
-            font-size: 1.1rem;
-            word-break: break-all; /* Prevent long filenames from breaking layout */
-            margin-right: 0.5em; /* Space for star */
-            flex-grow: 1;
-        }
-        .video-card-header .video-number {
-            color: var(--text-muted-color);
-            font-weight: bold;
-            margin-right: 0.5em;
-        }
-        .star-toggle {
-            font-size: 1.5rem; /* Larger star */
-            color: var(--text-muted-color);
-            cursor: pointer;
-        }
-        .star-toggle.important {
-            color: var(--star-color);
-        }
-        .video-thumbnail-placeholder {
-            width: 100%;
-            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
-            background-color: #444;
+        ::-webkit-scrollbar-thumb {
+            background: #44403c; /* stone-700 */
             border-radius: 4px;
-            margin-bottom: 0.75em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-muted-color);
         }
-        .video-card-meta {
-            font-size: 0.9rem;
-            color: var(--text-muted-color);
-            margin-bottom: 1em;
+        ::-webkit-scrollbar-thumb:hover {
+            background: #57534e; /* stone-600 */
         }
-        .video-card-actions {
-            display: flex;
-            gap: 0.5em; /* Space between buttons */
-            margin-top: auto; /* Push actions to bottom */
+        /* Base styles using @apply (Tailwind JIT CDN will process this) */
+        .btn {
+            @apply px-4 py-2 rounded-md font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-stone-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
         }
-        .video-card-actions button {
-            flex-grow: 1;
+        .btn-primary {
+            @apply bg-indigo-600 hover:bg-indigo-700 text-white focus:ring-indigo-500;
         }
-        .video-card-logs-summary {
-            font-size: 0.9rem;
-            color: var(--text-muted-color);
-            margin-top: 0.5em;
-            max-height: 100px; /* Limit height */
-            overflow-y: auto;
-            border-top: 1px solid var(--border-color);
-            padding-top: 0.5em;
+        .btn-secondary {
+            @apply bg-stone-700 hover:bg-stone-600 text-stone-200 focus:ring-stone-500;
         }
-        .video-card-logs-summary p { margin-bottom: 0.3em; }
-
-        /* Logging Station (Screen C) */
-        #logging-station-screen {
-            display: flex;
-            flex-direction: column;
+        .btn-danger {
+            @apply bg-red-600 hover:bg-red-700 text-white focus:ring-red-500;
         }
-        .video-player-area {
-            background-color: #000;
-            margin-bottom: 1em;
-            position: sticky; /* Sticky player on scroll for larger screens */
-            top: 0;
-            z-index: 10;
+        .card {
+            @apply bg-stone-900 rounded-lg shadow-md p-4 sm:p-6;
         }
-        #video-player {
-            width: 100%;
-            max-height: 60vh; /* Limit player height */
-            display: block; /* Remove extra space below video */
+        .input-field {
+            @apply bg-stone-800 border border-stone-700 text-stone-200 placeholder-stone-500 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5;
         }
-        .video-timeline-container {
-            position: relative;
-            height: 10px;
-            background-color: #333;
-            cursor: pointer;
-            margin: 0.5em 0;
+        .label {
+            @apply block mb-2 text-sm font-medium text-stone-300;
         }
-        .timeline-progress, .timeline-mark-in-out {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
+        /* Vue transitions */
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease;
         }
-        .timeline-progress {
-            background-color: var(--timeline-played-color);
-            z-index: 2;
-        }
-        .timeline-mark-in-out {
-            background-color: var(--timeline-mark-color);
-            opacity: 0.5;
-            z-index: 1;
-        }
-
-        .logging-controls {
-            display: flex;
-            flex-wrap: wrap; /* Allow wrapping on small screens */
-            gap: 1em;
-            margin-bottom: 1.5em;
-            align-items: center;
-        }
-        .logging-controls button { padding: 0.8em 1.2em; }
-        .mark-time { font-size: 0.8em; color: var(--text-muted-color); display: block; }
-
-        .log-form {
-            background-color: var(--surface-color);
-            padding: 1.5em;
-            border-radius: 8px;
-            margin-bottom: 1.5em;
-        }
-        .star-rating {
-            display: flex;
-            margin-bottom: 1em;
-        }
-        .star-rating .star {
-            font-size: 1.8rem;
-            color: var(--text-muted-color);
-            cursor: pointer;
-            margin-right: 0.25em;
-        }
-        .star-rating .star.selected, .star-rating .star:hover {
-            color: var(--star-color);
-        }
-        .keywords-input-area { margin-bottom: 1em; }
-        .keywords-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5em;
-            margin-top: 0.5em;
-            padding: 0.5em;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            min-height: 30px;
-        }
-        .keyword-tag {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 0.3em 0.6em;
-            border-radius: 4px;
-            font-size: 0.9em;
-            display: flex;
-            align-items: center;
-        }
-        .keyword-tag .remove-keyword {
-            margin-left: 0.5em;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .saved-logs-list {
-            flex-grow: 1; /* Take remaining space */
-            overflow-y: auto; /* Scroll for logs */
-        }
-        .log-item {
-            background-color: var(--surface-color);
-            padding: 1em;
-            margin-bottom: 1em;
-            border-radius: 8px;
-            border-left: 4px solid var(--primary-color);
-        }
-        .log-item-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5em;
-        }
-        .log-item-time { font-weight: bold; color: var(--text-color); }
-        .log-item-rating { color: var(--star-color); }
-        .log-item-notes { margin-bottom: 0.5em; white-space: pre-wrap; word-wrap: break-word; }
-        .log-item-keywords .keyword-tag {
-            background-color: var(--secondary-color); /* Different color for display */
-            margin-right: 0.3em;
-            margin-bottom: 0.3em;
-            display: inline-flex; /* Fit tags in line */
-        }
-        .log-item-actions { margin-top: 0.75em; display: flex; gap: 0.5em; justify-content: flex-end; }
-
-
-        /* Modal Styles */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            padding: 1em;
-        }
-        .modal-content {
-            background-color: var(--surface-color);
-            padding: 2em;
-            border-radius: 8px;
-            max-width: 90vw;
-            width: 500px; /* Default width */
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1em;
-        }
-        .modal-header h3 { margin-bottom: 0; }
-        .close-modal-btn {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            color: var(--text-muted-color);
-            cursor: pointer;
-        }
-        .modal-actions { margin-top: 1.5em; display: flex; justify-content: flex-end; gap: 0.5em; }
-
-        #preview-selects-player { width: 100%; margin-bottom: 1em; }
-        #preview-selects-info { text-align: center; margin-bottom: 1em; color: var(--text-muted-color); }
-        #preview-selects-notes-label {
-            color: var(--text-color);
-            font-weight: bold;
-            display: block;
-            margin-bottom: 0.3em;
-        }
-        #preview-selects-notes {
-            background-color: #333;
-            padding: 0.5em;
-            border-radius: 4px;
-            min-height: 50px;
-            margin-bottom: 1em;
-            font-size: 0.9em;
-            white-space: pre-wrap;
-            color: var(--text-color);
-        }
-
-        /* Notifications */
-        #notifications-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 2000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .notification {
-            padding: 1em 1.5em;
-            border-radius: 6px;
-            color: white;
-            min-width: 250px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        .fade-enter-from, .fade-leave-to {
             opacity: 0;
-            transform: translateX(100%);
-            transition: opacity 0.3s ease, transform 0.3s ease;
         }
-        .notification.show {
-            opacity: 1;
-            transform: translateX(0);
+        .slide-fade-enter-active {
+            transition: all 0.3s ease-out;
         }
-        .notification.info { background-color: var(--primary-color); }
-        .notification.success { background-color: var(--success-color); }
-        .notification.error { background-color: var(--error-color); }
-
-        /* Utility classes */
-        .hidden { display: none !important; }
-        .text-center { text-align: center; }
-        .mt-1 { margin-top: 1em; }
-        .mb-1 { margin-bottom: 1em; }
-        .button-group { display: flex; gap: 0.5em; }
-
+        .slide-fade-leave-active {
+            transition: all 0.3s cubic-bezier(1, 0.5, 0.8, 1);
+        }
+        .slide-fade-enter-from,
+        .slide-fade-leave-to {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        /* Ensure touch targets are large enough */
+        button, [role="button"], input[type="checkbox"], input[type="radio"] {
+            min-height: 44px;
+            min-width: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* Adjust for buttons that are meant to be smaller (like icon buttons) */
+        .btn-sm, .p-1 { /* specific classes for small buttons */
+            min-height: auto;
+            min-width: auto;
+        }
+        .btn { /* Padded buttons should be fine, but explicit flex align */
+             display: inline-flex; align-items: center; justify-content: center;
+        }
+        /* Phosphor icons size */
+        i.ph, i.ph-bold, i.ph-fill, i.ph-light {
+             line-height: 1; /* Helps with alignment */
+        }
     </style>
 </head>
 <body>
-    <div id="app">
-        <!-- Screen A: Project Dashboard -->
-        <section id="project-dashboard-screen" class="screen hidden">
-            <div class="screen-header">
-                <h1>LogReel</h1>
-                <button id="export-all-data-btn" class="secondary">Export All Data</button>
-            </div>
-            <button id="create-new-project-btn" class="mb-1">Create New Project</button>
-            <ul id="project-list">
-                <!-- Project items will be dynamically inserted here -->
-            </ul>
-            <div id="project-dashboard-empty-state" class="empty-state hidden">
-                <p>No projects yet.</p>
-                <p>Click "Create New Project" to get started!</p>
-            </div>
-        </section>
-
-        <!-- Screen B: Assembly Hub (Project View) -->
-        <section id="assembly-hub-screen" class="screen hidden">
-            <div class="screen-header">
-                <button id="assembly-back-to-dashboard-btn" class="back-button">< Projects</button>
-                <h2 id="assembly-project-title">Project Name</h2>
-            </div>
-            <input type="text" id="assembly-search-bar" class="search-bar" placeholder="Search videos or logs (filename, notes, keywords)...">
-            <div class="button-group mb-1">
-                <button id="add-videos-btn">Add Video(s)</button>
-                <input type="file" id="video-file-input" multiple accept="video/*" class="hidden">
-            </div>
-            <div id="video-list">
-                <!-- Video cards will be dynamically inserted here -->
-            </div>
-            <div id="assembly-hub-empty-state" class="empty-state hidden">
-                <p>No videos in this project yet.</p>
-                <p>Click "Add Video(s)" to import your footage.</p>
-            </div>
-        </section>
-
-        <!-- Screen C: Logging Station (Individual Video View) -->
-        <section id="logging-station-screen" class="screen hidden">
-            <div class="screen-header">
-                <button id="logging-back-to-assembly-btn" class="back-button">< Project Videos</button>
-                <h2 id="logging-video-filename">Video Filename.mp4</h2>
-            </div>
-
-            <div class="video-player-area">
-                <video id="video-player" controls></video>
-                <div class="video-timeline-container" id="video-timeline-container">
-                    <div class="timeline-mark-in-out" id="timeline-mark-in-out"></div>
-                    <div class="timeline-progress" id="timeline-progress"></div>
-                </div>
-                <div class="button-group" style="justify-content: space-around; padding: 0.5em 0;">
-                    <label for="playback-speed">Speed:</label>
-                    <select id="playback-speed">
-                        <option value="0.25">0.25x</option>
-                        <option value="0.5">0.5x</option>
-                        <option value="0.75">0.75x</option>
-                        <option value="1" selected>1x</option>
-                        <option value="1.25">1.25x</option>
-                        <option value="1.5">1.5x</option>
-                        <option value="2">2x</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="logging-controls">
-                <button id="mark-in-btn">Mark In <span class="mark-time" id="mark-in-time-display">00:00:00.000</span></button>
-                <button id="mark-out-btn">Mark Out <span class="mark-time" id="mark-out-time-display">00:00:00.000</span></button>
-            </div>
-
-            <div class="log-form">
-                <h3>Create New Log</h3>
-                <label for="log-notes">Notes:</label>
-                <textarea id="log-notes" placeholder="Enter notes for this segment..."></textarea>
-                
-                <label>Rating:</label>
-                <div class="star-rating" id="log-rating">
-                    <span class="star" data-value="1">☆</span>
-                    <span class="star" data-value="2">☆</span>
-                    <span class="star" data-value="3">☆</span>
-                    <span class="star" data-value="4">☆</span>
-                    <span class="star" data-value="5">☆</span>
-                </div>
-                
-                <label for="log-keywords-input">Keywords (press Enter to add):</label>
-                <div class="keywords-input-area">
-                    <input type="text" id="log-keywords-input" placeholder="e.g., b-roll, interview, good take">
-                    <div class="keywords-container" id="log-keywords-container">
-                        <!-- Keyword tags will appear here -->
-                    </div>
-                </div>
-                <button id="save-log-btn">Save Log</button>
-            </div>
-
-            <h3>Saved Logs</h3>
-            <div id="saved-logs-list" class="saved-logs-list">
-                <!-- Log items will be dynamically inserted here -->
-            </div>
-            <div id="logging-station-empty-state" class="empty-state hidden">
-                <p>No logs created for this video yet.</p>
-                <p>Use the controls above to mark segments and save your logs.</p>
-            </div>
-        </section>
-
-        <!-- Modals -->
-        <div id="preview-selects-modal" class="modal hidden">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Preview Selects</h3>
-                    <button class="close-modal-btn" data-target-modal="preview-selects-modal">×</button>
-                </div>
-                <video id="preview-selects-player" controls></video>
-                <div id="preview-selects-info">Playing Select X of Y</div>
-                <div id="preview-selects-notes-label">Current Select Notes:</div>
-                <div id="preview-selects-notes"></div>
-                <div class="modal-actions">
-                    <button class="secondary close-modal-btn" data-target-modal="preview-selects-modal">Close</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="confirm-dialog" class="modal hidden">
-            <div class="modal-content">
-                <h3 id="confirm-dialog-title">Confirm Action</h3>
-                <p id="confirm-dialog-message">Are you sure?</p>
-                <div class="modal-actions">
-                    <button id="confirm-dialog-cancel-btn" class="secondary">Cancel</button>
-                    <button id="confirm-dialog-confirm-btn" class="danger">Confirm</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="notifications-container"></div>
+    <div id="app" class="antialiased">
+        <router-view v-slot="{ Component }">
+            <transition name="fade" mode="out-in">
+                <component :is="Component" />
+            </transition>
+        </router-view>
+        <toast-notifications></toast-notifications>
     </div>
 
-<script>
-(function() {
-    'use strict';
+    <script type="module">
+        const { createApp, ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
+        const { createRouter, createWebHashHistory, useRoute, useRouter } = VueRouter;
+        const Dexie = window.Dexie; // Dexie is global from CDN
+        const focusTrap = window.focusTrap; // focus-trap is global
 
-    // --- App State ---
-    const state = {
-        currentScreen: null, // Will be set by navigateTo
-        currentProjectId: null,
-        currentProjectName: '',
-        currentVideoId: null,
-        currentVideoFile: null,
-        currentVideoFilename: '',
-        currentVideoDuration: 0,
-        currentMarkIn: null,
-        currentMarkOut: null,
-        currentLogRating: 0,
-        // currentLogKeywords: [], // This will be managed locally in the log form section
-    };
-
-    // --- DOM Elements Cache ---
-    const DOMElements = {};
-
-    // --- Database (IndexedDB) ---
-    const DB_NAME = 'LogReelDB';
-    const DB_VERSION = 1; // Increment if schema changes
-    const STORE_PROJECTS = 'projects';
-    const STORE_VIDEOS = 'videos'; // Stores video metadata AND File objects
-    const STORE_LOGS = 'logs';
-    let db;
-
-    async function initDB() {
-        console.log("[DB] Initializing Database...");
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-            request.onerror = (event) => {
-                console.error("[DB] Database error:", event.target.error);
-                reject("Database error: " + event.target.error);
-            };
-
-            request.onupgradeneeded = (event) => {
-                console.log("[DB] Upgrade needed or DB creation.");
-                db = event.target.result;
-                if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
-                    console.log("[DB] Creating object store:", STORE_PROJECTS);
-                    db.createObjectStore(STORE_PROJECTS, { keyPath: 'id', autoIncrement: true });
-                }
-                if (!db.objectStoreNames.contains(STORE_VIDEOS)) {
-                    console.log("[DB] Creating object store:", STORE_VIDEOS);
-                    const videoStore = db.createObjectStore(STORE_VIDEOS, { keyPath: 'id', autoIncrement: true });
-                    videoStore.createIndex('projectId', 'projectId', { unique: false });
-                     // It's good practice to also index filename if you search by it often, though full text search is complex in IDB
-                    videoStore.createIndex('filename', 'filename', { unique: false });
-                }
-                if (!db.objectStoreNames.contains(STORE_LOGS)) {
-                    console.log("[DB] Creating object store:", STORE_LOGS);
-                    const logStore = db.createObjectStore(STORE_LOGS, { keyPath: 'id', autoIncrement: true });
-                    logStore.createIndex('videoId', 'videoId', { unique: false });
-                    logStore.createIndex('projectId', 'projectId', { unique: false }); // For easier cleanup/export
-                }
-                 console.log("[DB] Upgrade complete.");
-            };
-
-            request.onsuccess = (event) => {
-                db = event.target.result;
-                console.log("[DB] Database initialized successfully.");
-                db.onerror = (event) => { // Generic error handler for the DB connection
-                    console.error("[DB] Generic Database Error:", event.target.error);
-                    showNotification("A database error occurred. Some operations might fail.", "error");
-                };
-                resolve(db);
-            };
-        });
-    }
-
-    // --- DB Helper Functions with more logging ---
-    async function dbOperation(storeName, mode, operation, ...args) {
-        return new Promise((resolve, reject) => {
-            if (!db) {
-                console.error(`[DB OP] DB not initialized for ${storeName} ${operation.name}`);
-                return reject("DB not initialized");
-            }
-            try {
-                const transaction = db.transaction([storeName], mode);
-                const store = transaction.objectStore(storeName);
-                const request = operation(store, ...args);
-
-                request.onsuccess = (event) => resolve(event.target.result);
-                request.onerror = (event) => {
-                    console.error(`[DB OP ERROR] ${storeName} ${mode} ${operation.name}:`, event.target.error, "Args:", args);
-                    reject(`Error in ${operation.name}: ${event.target.error}`);
-                };
-            } catch (error) {
-                 console.error(`[DB OP EXCEPTION] ${storeName} ${mode} ${operation.name}:`, error, "Args:", args);
-                 reject(`Exception in ${operation.name}: ${error.message}`);
-            }
-        });
-    }
-
-    async function dbAdd(storeName, item) {
-        return dbOperation(storeName, 'readwrite', (store, item) => store.add(item), item);
-    }
-    async function dbGetAll(storeName) {
-        return dbOperation(storeName, 'readonly', (store) => store.getAll());
-    }
-    async function dbGetById(storeName, id) {
-        return dbOperation(storeName, 'readonly', (store, id) => store.get(id), id);
-    }
-    async function dbGetByIndex(storeName, indexName, query) {
-        return dbOperation(storeName, 'readonly', (store, indexName, query) => store.index(indexName).getAll(query), indexName, query);
-    }
-    async function dbUpdate(storeName, item) {
-        return dbOperation(storeName, 'readwrite', (store, item) => store.put(item), item);
-    }
-    async function dbDelete(storeName, key) {
-        return dbOperation(storeName, 'readwrite', (store, key) => store.delete(key), key);
-    }
-
-
-    // --- Router ---
-    function navigateTo(screenId, params = {}) {
-        console.log(`[NAVIGATE] Attempting to navigate to: ${screenId} with params:`, params);
-
-        document.querySelectorAll('.screen').forEach(s => {
-            // console.log(`[NAVIGATE] Hiding screen: ${s.id}`);
-            if (s) s.classList.add('hidden');
+        // --- Database Setup (Dexie) ---
+        const db = new Dexie('LogReelDB');
+        db.version(1).stores({
+            projects: '++id, name, createdAt',
+            videos: '++id, projectId, filename, createdAt, isImportant, &[projectId+filename]',
+            logs: '++id, videoId, markIn, createdAt, &[videoId+markIn]'
         });
 
-        const targetScreenElement = DOMElements[screenId + 'Screen'];
-
-        if (targetScreenElement) {
-            console.log(`[NAVIGATE] Showing screen: ${targetScreenElement.id}`);
-            targetScreenElement.classList.remove('hidden');
-        } else {
-            console.error(`[NAVIGATE] Target screen element NOT FOUND in DOMElements for screenId: "${screenId}". DOMElements object:`, DOMElements);
-            showNotification(`Error: Could not find screen UI for "${screenId}".`, "error");
-            // Fallback to dashboard if intended screen isn't found, to prevent blank page.
-            if (screenId !== 'project-dashboard' && DOMElements.projectDashboardScreen) {
-                console.warn(`[NAVIGATE] Fallback: Navigating to project-dashboard as ${screenId} was not found.`);
-                DOMElements.projectDashboardScreen.classList.remove('hidden');
-                state.currentScreen = 'project-dashboard';
-                loadAndRenderProjects(); // Load its content
+        // --- Global State / Services ---
+        const toastStore = reactive({
+            toasts: [],
+            addToast(message, type = 'success', duration = 3000) {
+                const id = Date.now() + Math.random();
+                this.toasts.push({ id, message, type });
+                setTimeout(() => {
+                    this.toasts = this.toasts.filter(t => t.id !== id);
+                }, duration);
             }
-            return;
-        }
+        });
 
-        state.currentScreen = screenId;
-        window.scrollTo(0, 0);
-        console.log(`[NAVIGATE] Current screen state set to: ${state.currentScreen}`);
-
-        // Handle specific screen initializations
-        if (screenId === 'project-dashboard') {
-            console.log("[NAVIGATE] Loading projects for dashboard...");
-            loadAndRenderProjects();
-        } else if (screenId === 'assembly-hub') {
-            state.currentProjectId = params.projectId;
-            // Ensure project name is also fetched/passed if needed for title, or fetch it here.
-            // For now, assume params.projectName is provided.
-            state.currentProjectName = params.projectName || "Project"; // Fallback name
-            if (DOMElements.assemblyProjectTitle) {
-                DOMElements.assemblyProjectTitle.textContent = sanitizeHTML(state.currentProjectName);
-            } else {
-                 console.warn("[NAVIGATE] assemblyProjectTitle DOM element not found for Assembly Hub.");
+        // Helper function for File System Access API permissions
+        async function verifyPermission(fileHandle, readWrite = false) {
+            if (!fileHandle || typeof fileHandle.queryPermission !== 'function') {
+                console.warn('Invalid fileHandle or queryPermission not available.');
+                return false; // Or throw an error, depending on how you want to handle this
             }
-            console.log(`[NAVIGATE] Loading videos for project: ${state.currentProjectName} (ID: ${state.currentProjectId})`);
-            loadAndRenderVideosForProject(state.currentProjectId);
-            if (DOMElements.assemblySearchBar) DOMElements.assemblySearchBar.value = ''; // Clear search bar
-        } else if (screenId === 'logging-station') {
-            state.currentProjectId = params.projectId; // Keep track of project context
-            state.currentProjectName = params.projectName;
-            state.currentVideoId = params.videoId;
-            state.currentVideoFilename = params.videoFilename;
-            state.currentVideoFile = params.videoFile;
-            if (DOMElements.loggingVideoFilename) {
-                 DOMElements.loggingVideoFilename.textContent = sanitizeHTML(state.currentVideoFilename);
-            } else {
-                console.warn("[NAVIGATE] loggingVideoFilename DOM element not found for Logging Station.");
+            const options = {};
+            if (readWrite) {
+                options.mode = 'readwrite';
             }
-            console.log(`[NAVIGATE] Setting up logging station for video: ${state.currentVideoFilename}`);
-            setupLoggingStation();
+            // Check current permission status
+            if ((await fileHandle.queryPermission(options)) === 'granted') {
+                return true;
+            }
+            // If not granted, request permission
+            if ((await fileHandle.requestPermission(options)) === 'granted') {
+                return true;
+            }
+            // Permission not granted
+            return false;
         }
-        console.log(`[NAVIGATE] Navigation to ${screenId} complete.`);
-    }
-
-    // --- Utility Functions ---
-    function formatTime(totalSeconds, showMilliseconds = false) {
-        if (isNaN(totalSeconds) || totalSeconds < 0) totalSeconds = 0;
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = Math.floor(totalSeconds % 60);
-        const milliseconds = Math.floor((totalSeconds - Math.floor(totalSeconds)) * 1000);
-
-        let timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        if (showMilliseconds) {
-            timeStr += `.${String(milliseconds).padStart(3, '0')}`;
-        }
-        return timeStr;
-    }
-
-    function showNotification(message, type = 'info', duration = 3000) {
-        if (!DOMElements.notificationsContainer) {
-            console.warn("Notifications container not found. Message:", message);
-            return;
-        }
-        const container = DOMElements.notificationsContainer;
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.textContent = message;
         
-        container.appendChild(notification);
-        void notification.offsetWidth; 
-        notification.classList.add('show');
+        // Helper to format timecodes
+        const formatTimecode = (seconds, showHours = false, showMilliseconds = true) => {
+            if (isNaN(seconds) || seconds === null || seconds < 0) return showMilliseconds ? '00:00.000' : '00:00';
+            const hh = Math.floor(seconds / 3600);
+            const mm = Math.floor((seconds % 3600) / 60);
+            const ss = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds - Math.floor(seconds)) * 1000);
 
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => {
-                if (container.contains(notification)) {
-                     container.removeChild(notification);
-                }
-            }, 300);
-        }, duration);
-    }
-
-    function showConfirmDialog(title, message, onConfirmCallback) { // Modified to use callback directly
-        if (!DOMElements.confirmDialog || !DOMElements.confirmDialogTitle || !DOMElements.confirmDialogMessage || !DOMElements.confirmDialogConfirmBtn || !DOMElements.confirmDialogCancelBtn) {
-            console.error("Confirm dialog elements not found.");
-            // Fallback to browser confirm if UI is broken
-            if (window.confirm(`${title}\n${message}`)) {
-                if (onConfirmCallback) onConfirmCallback(true);
-            } else {
-                if (onConfirmCallback) onConfirmCallback(false);
+            let parts = [
+                mm.toString().padStart(2, '0'),
+                ss.toString().padStart(2, '0')
+            ];
+            if (showHours || hh > 0) {
+                parts.unshift(hh.toString().padStart(2, '0'));
             }
-            return;
-        }
-        DOMElements.confirmDialogTitle.textContent = title;
-        DOMElements.confirmDialogMessage.textContent = message;
-        DOMElements.confirmDialog.classList.remove('hidden');
-
-        // Remove previous listeners to avoid multiple fires
-        const newConfirmBtn = DOMElements.confirmDialogConfirmBtn.cloneNode(true);
-        DOMElements.confirmDialogConfirmBtn.parentNode.replaceChild(newConfirmBtn, DOMElements.confirmDialogConfirmBtn);
-        DOMElements.confirmDialogConfirmBtn = newConfirmBtn;
-        
-        const newCancelBtn = DOMElements.confirmDialogCancelBtn.cloneNode(true);
-        DOMElements.confirmDialogCancelBtn.parentNode.replaceChild(newCancelBtn, DOMElements.confirmDialogCancelBtn);
-        DOMElements.confirmDialogCancelBtn = newCancelBtn;
-
-
-        DOMElements.confirmDialogConfirmBtn.onclick = () => {
-            DOMElements.confirmDialog.classList.add('hidden');
-            if (onConfirmCallback) onConfirmCallback(true);
+            let timeString = parts.join(':');
+            if (showMilliseconds) {
+                timeString += `.${ms.toString().padStart(3, '0')}`;
+            }
+            return timeString;
         };
-        DOMElements.confirmDialogCancelBtn.onclick = () => {
-            DOMElements.confirmDialog.classList.add('hidden');
-            if (onConfirmCallback) onConfirmCallback(false);
+
+
+        // --- Vue Components ---
+
+        const ToastNotifications = {
+            setup() {
+                return { toasts: computed(() => toastStore.toasts) };
+            },
+            template: `
+                <div class="fixed bottom-0 right-0 p-4 space-y-2 z-[100] max-w-xs w-full">
+                    <transition-group name="slide-fade" tag="div">
+                        <div v-for="toast in toasts" :key="toast.id" 
+                             :class="['p-3 rounded-md shadow-lg text-sm font-medium break-words', toast.type === 'success' ? 'bg-green-600 text-white' : toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white']">
+                            {{ toast.message }}
+                        </div>
+                    </transition-group>
+                </div>
+            `
         };
-    }
-    
-    function sanitizeHTML(str) {
-        if (typeof str !== 'string') return '';
-        const temp = document.createElement('div');
-        temp.textContent = str;
-        return temp.innerHTML;
-    }
 
+        const Modal = {
+            props: {
+                isOpen: Boolean,
+                title: String,
+            },
+            emits: ['close'],
+            setup(props, { emit }) {
+                const modalRef = ref(null);
+                let trap = null;
 
-    // --- Project Dashboard (Screen A) ---
-    async function loadAndRenderProjects() {
-        console.log("[PROJECTS] Loading and rendering projects...");
-        if (!DOMElements.projectList || !DOMElements.projectDashboardEmptyState) {
-            console.error("[PROJECTS] Project list or empty state DOM elements not found.");
-            return;
-        }
-        try {
-            const projects = await dbGetAll(STORE_PROJECTS);
-            DOMElements.projectList.innerHTML = ''; 
-            if (projects.length === 0) {
-                DOMElements.projectDashboardEmptyState.classList.remove('hidden');
-            } else {
-                DOMElements.projectDashboardEmptyState.classList.add('hidden');
-                // Use Promise.all to handle async video counts correctly
-                const projectItemsPromises = projects.map(async (project) => {
-                    let videoCount = 0;
-                    try {
-                        const videosInProject = await dbGetByIndex(STORE_VIDEOS, 'projectId', project.id);
-                        videoCount = videosInProject.length;
-                    } catch (countError) {
-                        console.error(`[PROJECTS] Error counting videos for project ${project.id}:`, countError);
-                    }
+                const close = () => emit('close');
 
-                    const li = document.createElement('li');
-                    li.className = 'project-item';
-                    li.dataset.projectId = project.id;
-                    li.dataset.projectName = project.name; // Store name for navigation
-                    li.innerHTML = `
-                        <div class="project-item-info">
-                            <h3>${sanitizeHTML(project.name)}</h3>
-                            <span>${videoCount} video(s)</span>
-                        </div>
-                        <div class="project-item-actions">
-                            <button class="danger delete-project-btn" data-project-id="${project.id}">Delete</button>
-                        </div>
-                    `;
-                    // Add event listener to the info part for navigation
-                    const infoDiv = li.querySelector('.project-item-info');
-                    if (infoDiv) {
-                        infoDiv.addEventListener('click', () => {
-                            navigateTo('assembly-hub', { projectId: project.id, projectName: project.name });
-                        });
-                    }
-                    return li;
-                });
-                const projectListItems = await Promise.all(projectItemsPromises);
-                projectListItems.forEach(item => DOMElements.projectList.appendChild(item));
-            }
-            console.log("[PROJECTS] Projects rendered.");
-        } catch (error) {
-            console.error("[PROJECTS] Error loading projects:", error);
-            showNotification("Failed to load projects.", "error");
-            DOMElements.projectDashboardEmptyState.classList.remove('hidden'); // Show empty state on error
-            DOMElements.projectList.innerHTML = '<li>Error loading projects.</li>';
-        }
-    }
-
-    async function handleCreateNewProject() {
-        const projectName = prompt("Enter project name:");
-        if (projectName && projectName.trim() !== "") {
-            try {
-                const newProject = { name: projectName.trim(), createdAt: new Date().toISOString() };
-                await dbAdd(STORE_PROJECTS, newProject);
-                showNotification(`Project "${sanitizeHTML(newProject.name)}" created.`, "success");
-                loadAndRenderProjects();
-            } catch (error) {
-                console.error("Error creating project:", error);
-                showNotification("Failed to create project.", "error");
-            }
-        }
-    }
-
-    async function handleDeleteProject(projectId) {
-        const project = await dbGetById(STORE_PROJECTS, projectId);
-        if (!project) {
-            showNotification("Project not found for deletion.", "error");
-            return;
-        }
-        
-        showConfirmDialog(
-            "Delete Project",
-            `Are you sure you want to delete project "${sanitizeHTML(project.name)}" and all its ${project.videoCount || ''} videos and logs? This action cannot be undone.`,
-            async (confirmed) => {
-                if (confirmed) {
-                    try {
-                        console.log(`[PROJECTS] Deleting project ID: ${projectId}`);
-                        // Delete logs associated with this project
-                        const logs = await dbGetByIndex(STORE_LOGS, 'projectId', projectId);
-                        for (const log of logs) {
-                            await dbDelete(STORE_LOGS, log.id);
+                watch(() => props.isOpen, (open) => {
+                    nextTick(() => {
+                        if (open && modalRef.value) {
+                            if (!trap) {
+                                trap = focusTrap.createFocusTrap(modalRef.value, {
+                                    onDeactivate: close, // Automatically call close when trap deactivates
+                                    clickOutsideDeactivates: true,
+                                    escapeDeactivates: true,
+                                    allowOutsideClick: true, // Allow clicks outside to propagate if clickOutsideDeactivates is false or handled
+                                });
+                            }
+                            trap.activate();
+                        } else if (trap && trap.active) {
+                             // trap.deactivate() will be called by focus-trap itself if escapeDeactivates or clickOutsideDeactivates is true
+                             // if close is called programmatically, the watch will trigger this else block.
+                             // Explicitly deactivate if close was called by other means than escape/outside click.
+                            trap.deactivate();
                         }
-                        console.log(`[PROJECTS] Deleted ${logs.length} logs for project ${projectId}.`);
-
-                        // Delete videos associated with this project
-                        const videos = await dbGetByIndex(STORE_VIDEOS, 'projectId', projectId);
-                        for (const video of videos) {
-                            await dbDelete(STORE_VIDEOS, video.id);
-                        }
-                        console.log(`[PROJECTS] Deleted ${videos.length} videos for project ${projectId}.`);
-
-                        // Delete the project itself
-                        await dbDelete(STORE_PROJECTS, projectId);
-                        showNotification(`Project "${sanitizeHTML(project.name)}" deleted.`, "success");
-                        loadAndRenderProjects(); // Refresh the list
-                    } catch (error) {
-                        console.error("Error deleting project assets:", error);
-                        showNotification("Failed to delete project and its assets.", "error");
-                    }
-                }
-            }
-        );
-    }
-
-    // --- Assembly Hub (Screen B) ---
-    async function loadAndRenderVideosForProject(projectId, searchTerm = '') {
-        console.log(`[ASSEMBLY] Loading videos for project ID: ${projectId}, search: "${searchTerm}"`);
-        if (!DOMElements.videoList || !DOMElements.assemblyHubEmptyState) {
-             console.error("[ASSEMBLY] Video list or empty state DOM elements not found.");
-             return;
-        }
-        try {
-            let videos = await dbGetByIndex(STORE_VIDEOS, 'projectId', projectId);
-            DOMElements.videoList.innerHTML = '';
-
-            if (searchTerm) {
-                searchTerm = searchTerm.toLowerCase().trim();
-                const videoIdsWithMatchingLogs = new Set();
-                if (searchTerm) { // Only search logs if there's a search term
-                    const allLogsForProject = await dbGetByIndex(STORE_LOGS, 'projectId', projectId);
-                    for (const log of allLogsForProject) {
-                        if ( (log.notes && log.notes.toLowerCase().includes(searchTerm)) ||
-                             (log.keywords && log.keywords.some(k => k.toLowerCase().includes(searchTerm))) ) {
-                            videoIdsWithMatchingLogs.add(log.videoId);
-                        }
-                    }
-                }
-                videos = videos.filter(video => 
-                    video.filename.toLowerCase().includes(searchTerm) || videoIdsWithMatchingLogs.has(video.id)
-                );
-            }
-            
-            videos.sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt)); // Sort by creation time
-
-            DOMElements.assemblyHubEmptyState.classList.toggle('hidden', videos.length > 0 || searchTerm);
-            if (videos.length === 0 && searchTerm) {
-                 DOMElements.videoList.innerHTML = `<p class="text-muted-color text-center" style="grid-column: 1 / -1;">No videos match your search: "${sanitizeHTML(searchTerm)}".</p>`;
-            } else if (videos.length === 0 && !searchTerm) {
-                DOMElements.assemblyHubEmptyState.classList.remove('hidden');
-            }
-
-
-            const videoCardPromises = videos.map(async (video, index) => {
-                try {
-                    const logs = await dbGetByIndex(STORE_LOGS, 'videoId', video.id);
-                    const logCount = logs.length;
-
-                    const card = document.createElement('div');
-                    card.className = 'video-card';
-                    card.dataset.videoId = video.id;
-                    card.innerHTML = `
-                        <div class="video-card-header">
-                            <span class="video-number">${index + 1}.</span>
-                            <h4>${sanitizeHTML(video.filename)}</h4>
-                            <span class="star-toggle ${video.isImportant ? 'important' : ''}" data-video-id="${video.id}">★</span>
-                        </div>
-                        <div class="video-thumbnail-placeholder">
-                            <span>Video Preview</span>
-                        </div>
-                        <div class="video-card-meta">
-                            <span>${logCount} log(s)</span>
-                        </div>
-                        <div class="video-card-actions">
-                            <button class="log-video-btn">Log Video</button>
-                            <button class="preview-selects-btn" ${logCount === 0 ? 'disabled' : ''}>Preview Selects</button>
-                        </div>
-                        <button class="secondary view-video-logs-btn mt-1">View Logs (${logCount})</button>
-                        <div class="video-card-logs-summary hidden"></div>
-                        <button class="danger delete-video-btn mt-1">Delete Video</button>
-                    `;
-                    
-                    card.querySelector('.log-video-btn').addEventListener('click', async () => {
-                        // Re-fetch video to ensure fileObject is current, as it might not be passed if list is re-rendered
-                        const currentVideoData = await dbGetById(STORE_VIDEOS, video.id);
-                        if (!currentVideoData || !currentVideoData.fileObject) {
-                            showNotification("Video file data not found. Please try re-adding the video.", "error");
-                            console.error("Missing fileObject for video ID:", video.id, "Data:", currentVideoData);
-                            return;
-                        }
-                        navigateTo('logging-station', { 
-                            projectId: projectId, // Pass current project context
-                            projectName: state.currentProjectName,
-                            videoId: video.id, 
-                            videoFilename: video.filename,
-                            videoFile: currentVideoData.fileObject 
-                        });
                     });
-                    
-                    card.querySelector('.star-toggle').addEventListener('click', () => toggleVideoImportant(video.id, projectId));
-                    card.querySelector('.preview-selects-btn').addEventListener('click', () => handlePreviewSelects(video.id));
-                    card.querySelector('.view-video-logs-btn').addEventListener('click', (e) => toggleLogsSummary(video.id, e.target));
-                    card.querySelector('.delete-video-btn').addEventListener('click', () => handleDeleteVideo(video.id, projectId));
-                    return card;
-                } catch (cardError) {
-                    console.error(`[ASSEMBLY] Error creating card for video ${video.filename}:`, cardError);
-                    const errorCard = document.createElement('div');
-                    errorCard.className = 'video-card';
-                    errorCard.innerHTML = `<h4>Error loading ${sanitizeHTML(video.filename)}</h4><p>${sanitizeHTML(cardError.message)}</p>`;
-                    return errorCard; // Return an error placeholder
-                }
-            });
-            
-            const videoCardElements = await Promise.all(videoCardPromises);
-            videoCardElements.forEach(card => DOMElements.videoList.appendChild(card));
-            console.log("[ASSEMBLY] Videos rendered.");
-
-        } catch (error) {
-            console.error("[ASSEMBLY] Error loading videos for project:", error);
-            showNotification("Failed to load videos for this project.", "error");
-            DOMElements.videoList.innerHTML = `<p class="text-muted-color text-center" style="grid-column: 1 / -1;">Error loading videos.</p>`;
-            DOMElements.assemblyHubEmptyState.classList.add('hidden'); // Hide empty state on error, show error message instead
-        }
-    }
-    
-    async function toggleLogsSummary(videoId, button) {
-        const card = button.closest('.video-card');
-        if (!card) return;
-        const summaryDiv = card.querySelector('.video-card-logs-summary');
-        if (!summaryDiv) return;
-
-        const isHidden = summaryDiv.classList.contains('hidden');
-
-        if (isHidden) {
-            try {
-                const logs = await dbGetByIndex(STORE_LOGS, 'videoId', videoId);
-                logs.sort((a,b) => a.inTime - b.inTime);
-                summaryDiv.innerHTML = logs.length > 0 ? '' : '<p>No logs for this video.</p>';
-                logs.forEach(log => {
-                    const logEntry = document.createElement('p');
-                    logEntry.textContent = `[${formatTime(log.inTime)} - ${formatTime(log.outTime)}] ${sanitizeHTML(log.notes.substring(0,50))}${log.notes.length > 50 ? '...' : ''}`;
-                    summaryDiv.appendChild(logEntry);
                 });
-                summaryDiv.classList.remove('hidden');
-                button.textContent = `Hide Logs`;
-            } catch (error) {
-                console.error("Error fetching logs for summary:", error);
-                summaryDiv.innerHTML = '<p>Error loading logs.</p>';
-                summaryDiv.classList.remove('hidden');
-            }
-        } else {
-            summaryDiv.classList.add('hidden');
-            const logCountMeta = card.querySelector('.video-card-meta span');
-            const currentLogCount = logCountMeta ? parseInt(logCountMeta.textContent.split(' ')[0]) : 0;
-            button.textContent = `View Logs (${currentLogCount})`;
-        }
-    }
-
-    function handleAddVideos() {
-        if (DOMElements.videoFileInput) DOMElements.videoFileInput.click();
-    }
-
-    async function processSelectedVideoFiles(files) {
-        if (!state.currentProjectId) {
-            showNotification("No project selected to add videos to.", "error");
-            return;
-        }
-        if (!files || files.length === 0) return;
-
-        console.log(`[ASSEMBLY] Processing ${files.length} selected files.`);
-        let filesAddedCount = 0;
-        let errorsCount = 0;
-
-        // Process files one by one to avoid overwhelming IndexedDB or UI updates
-        for (const file of files) {
-            if (file.type.startsWith('video/')) {
-                try {
-                    const videoData = {
-                        projectId: state.currentProjectId,
-                        filename: file.name,
-                        fileObject: file, // Store the actual File object
-                        isImportant: false,
-                        createdAt: new Date().toISOString()
-                    };
-                    await dbAdd(STORE_VIDEOS, videoData);
-                    filesAddedCount++;
-                } catch (error) {
-                    errorsCount++;
-                    console.error("Error adding video:", file.name, error);
-                    showNotification(`Failed to add video: ${sanitizeHTML(file.name)}. ${error.message}`, "error", 5000);
-                }
-            } else {
-                errorsCount++;
-                showNotification(`File ${sanitizeHTML(file.name)} is not a valid video format.`, "error");
-            }
-        }
-
-        if (filesAddedCount > 0) {
-            showNotification(`${filesAddedCount} video(s) added successfully.`, "success");
-        }
-        if (errorsCount > 0 && filesAddedCount === 0) {
-             showNotification(`No videos were added. ${errorsCount} file(s) had issues.`, "error");
-        } else if (errorsCount > 0) {
-            showNotification(`${errorsCount} file(s) could not be added.`, "error");
-        }
-        
-        if (filesAddedCount > 0) {
-            loadAndRenderVideosForProject(state.currentProjectId); // Refresh the list
-        }
-    }
-
-    async function toggleVideoImportant(videoId, currentProjectId) { // Added currentProjectId for reload
-        try {
-            const video = await dbGetById(STORE_VIDEOS, videoId);
-            if (video) {
-                video.isImportant = !video.isImportant;
-                await dbUpdate(STORE_VIDEOS, video);
-                // No need to reload the whole list, just update the star UI directly if possible
-                // but for simplicity and robustness, a quick reload is fine.
-                loadAndRenderVideosForProject(currentProjectId, DOMElements.assemblySearchBar.value);
-                showNotification(`Video marked as ${video.isImportant ? 'important' : 'not important'}.`, "info", 1500);
-            }
-        } catch (error) {
-            console.error("Error toggling video importance:", error);
-            showNotification("Failed to update video importance.", "error");
-        }
-    }
-
-    async function handleDeleteVideo(videoId, projectId) {
-        const video = await dbGetById(STORE_VIDEOS, videoId);
-        if (!video) {
-            showNotification("Video not found for deletion.", "error");
-            return;
-        }
-
-        showConfirmDialog(
-            "Delete Video",
-            `Are you sure you want to delete video "${sanitizeHTML(video.filename)}" and all its logs? This action cannot be undone.`,
-            async (confirmed) => {
-                if (confirmed) {
-                    try {
-                        // Delete logs for this video
-                        const logs = await dbGetByIndex(STORE_LOGS, 'videoId', videoId);
-                        for (const log of logs) {
-                            await dbDelete(STORE_LOGS, log.id);
-                        }
-                        // Delete video
-                        await dbDelete(STORE_VIDEOS, videoId);
-                        showNotification(`Video "${sanitizeHTML(video.filename)}" deleted.`, "success");
-                        loadAndRenderVideosForProject(projectId, DOMElements.assemblySearchBar.value); // Reload videos
-                    } catch (error) {
-                        console.error("Error deleting video and its logs:", error);
-                        showNotification("Failed to delete video.", "error");
+                
+                onUnmounted(() => {
+                    if (trap && trap.active) {
+                        trap.deactivate();
                     }
-                }
-            }
-        );
-    }
-    
-    function handleAssemblySearch(event) {
-        const searchTerm = event.target.value;
-        loadAndRenderVideosForProject(state.currentProjectId, searchTerm);
-    }
+                    trap = null; 
+                });
 
-
-    // --- Logging Station (Screen C) ---
-    let logVideoPlayer; 
-    let currentLogKeywordsForm = []; // For the form inputs
-
-    async function setupLoggingStation() {
-        console.log("[LOGGING] Setting up logging station.");
-        logVideoPlayer = DOMElements.videoPlayer;
-        if (!logVideoPlayer) {
-            console.error("[LOGGING] Video player element not found!");
-            showNotification("Error: Video player UI missing.", "error");
-            // Attempt to navigate back if critical UI is missing
-            navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName });
-            return;
-        }
-
-        resetLogForm(); // Clears form fields, ratings, keywords, mark in/out state
-        loadLogsForCurrentVideo();
-
-        // Ensure state.currentVideoFile is a File object
-        if (state.currentVideoFile && state.currentVideoFile instanceof File) {
-            try {
-                if (logVideoPlayer.src && logVideoPlayer.src.startsWith('blob:')) {
-                    URL.revokeObjectURL(logVideoPlayer.src);
-                }
-                logVideoPlayer.src = URL.createObjectURL(state.currentVideoFile);
-                
-                logVideoPlayer.onloadedmetadata = () => {
-                    state.currentVideoDuration = logVideoPlayer.duration;
-                    console.log("[LOGGING] Video metadata loaded. Duration:", state.currentVideoDuration);
-                    updateMarkInOutDisplays(); // Update with 00:00:00 initially
-                };
-                logVideoPlayer.ontimeupdate = handleVideoTimeUpdate;
-                logVideoPlayer.onseeked = handleVideoTimeUpdate; // Update displays after seeking
-                
-                if (DOMElements.timelineMarkInOut) {
-                    DOMElements.timelineMarkInOut.style.width = '0%';
-                    DOMElements.timelineMarkInOut.style.left = '0%';
-                }
-                if (DOMElements.playbackSpeed) DOMElements.playbackSpeed.value = logVideoPlayer.playbackRate = 1; // Reset speed
-
-            } catch (error) {
-                console.error("[LOGGING] Error setting up video player src:", error);
-                showNotification("Could not load video. File might be corrupted or unsupported.", "error");
-                navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName });
-            }
-        } else {
-            console.error("[LOGGING] state.currentVideoFile is not a valid File object:", state.currentVideoFile);
-            showNotification("Video file data is missing or invalid. Please re-select the video.", "error", 5000);
-            
-            // Attempt to fetch from DB as a last resort if it wasn't passed, though it should be.
-            if (state.currentVideoId) {
-                const videoData = await dbGetById(STORE_VIDEOS, state.currentVideoId);
-                if (videoData && videoData.fileObject) {
-                    console.log("[LOGGING] Found video file in DB, retrying setup.");
-                    state.currentVideoFile = videoData.fileObject;
-                    setupLoggingStation(); // Retry setup
-                    return;
-                }
-            }
-            navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName });
-        }
-    }
-
-    function handleVideoTimeUpdate() {
-        if (!logVideoPlayer || isNaN(logVideoPlayer.currentTime) || isNaN(state.currentVideoDuration) || state.currentVideoDuration === 0) return;
-        
-        const currentTime = logVideoPlayer.currentTime;
-        if (DOMElements.timelineProgress) {
-            const progressPercent = (currentTime / state.currentVideoDuration) * 100;
-            DOMElements.timelineProgress.style.width = `${progressPercent}%`;
-        }
-        updateMarkInOutDisplays(currentTime);
-    }
-    
-    function updateMarkInOutDisplays(currentTime) {
-        if (currentTime === undefined && logVideoPlayer) currentTime = logVideoPlayer.currentTime;
-        if (currentTime === undefined || isNaN(currentTime)) currentTime = 0;
-
-        if (DOMElements.markInTimeDisplay) {
-            DOMElements.markInTimeDisplay.textContent = state.currentMarkIn !== null ? formatTime(state.currentMarkIn, true) : formatTime(currentTime, true);
-        }
-        if (DOMElements.markOutTimeDisplay) {
-            DOMElements.markOutTimeDisplay.textContent = state.currentMarkOut !== null ? formatTime(state.currentMarkOut, true) : formatTime(currentTime, true);
-        }
-        
-        if (DOMElements.timelineMarkInOut && state.currentVideoDuration > 0) {
-            if (state.currentMarkIn !== null && state.currentMarkOut !== null && state.currentMarkOut > state.currentMarkIn) {
-                const inPercent = (state.currentMarkIn / state.currentVideoDuration) * 100;
-                const outPercent = (state.currentMarkOut / state.currentVideoDuration) * 100;
-                DOMElements.timelineMarkInOut.style.left = `${inPercent}%`;
-                DOMElements.timelineMarkInOut.style.width = `${Math.max(0, outPercent - inPercent)}%`;
-            } else if (state.currentMarkIn !== null) { 
-                 const inPercent = (state.currentMarkIn / state.currentVideoDuration) * 100;
-                 const currentPercent = (logVideoPlayer.currentTime / state.currentVideoDuration) * 100;
-                 if (currentPercent > inPercent) {
-                    DOMElements.timelineMarkInOut.style.left = `${inPercent}%`;
-                    DOMElements.timelineMarkInOut.style.width = `${Math.max(0,currentPercent - inPercent)}%`;
-                 } else {
-                    DOMElements.timelineMarkInOut.style.width = '0%';    
-                 }
-            } else {
-                DOMElements.timelineMarkInOut.style.width = '0%';
-            }
-        } else if (DOMElements.timelineMarkInOut) {
-            DOMElements.timelineMarkInOut.style.width = '0%'; // Reset if no duration or no marks
-        }
-    }
-
-    function handleMarkIn() {
-        if (!logVideoPlayer) return;
-        state.currentMarkIn = logVideoPlayer.currentTime;
-        if (state.currentMarkOut !== null && state.currentMarkOut < state.currentMarkIn) {
-            state.currentMarkOut = null; // Clear Mark Out if it's before new Mark In
-        }
-        updateMarkInOutDisplays();
-        showNotification(`Mark In: ${formatTime(state.currentMarkIn, true)}`, "info", 1500);
-    }
-
-    function handleMarkOut() {
-        if (!logVideoPlayer) return;
-        state.currentMarkOut = logVideoPlayer.currentTime;
-        if (state.currentMarkIn === null) {
-             showNotification("Set Mark In first before Mark Out.", "error");
-             state.currentMarkOut = null; // Reset Mark Out
-             return;
-        }
-        if (state.currentMarkIn > state.currentMarkOut) {
-            showNotification("Mark Out cannot be before Mark In. Adjusting Mark In.", "error");
-            state.currentMarkIn = state.currentMarkOut; // Or, could choose to clear Mark In
-        }
-        updateMarkInOutDisplays();
-        showNotification(`Mark Out: ${formatTime(state.currentMarkOut, true)}`, "info", 1500);
-    }
-
-    function handleTimelineClick(event) {
-        if (!logVideoPlayer || isNaN(state.currentVideoDuration) || state.currentVideoDuration === 0 || !DOMElements.videoTimelineContainer) return;
-        const timelineRect = DOMElements.videoTimelineContainer.getBoundingClientRect();
-        const clickX = event.clientX - timelineRect.left;
-        const clickPercent = Math.max(0, Math.min(1, clickX / timelineRect.width)); // Clamp between 0 and 1
-        logVideoPlayer.currentTime = clickPercent * state.currentVideoDuration;
-    }
-
-    function handleStarRatingClick(event) {
-        const star = event.target.closest('.star'); // Handle click on ☆ or ★
-        if (star && star.dataset.value) {
-            state.currentLogRating = parseInt(star.dataset.value);
-            renderStarRatingForm();
-        }
-    }
-    
-    function renderStarRatingForm() {
-        if (!DOMElements.logRating) return;
-        const stars = DOMElements.logRating.querySelectorAll('.star');
-        stars.forEach(star => {
-            const starValue = parseInt(star.dataset.value);
-            star.textContent = starValue <= state.currentLogRating ? '★' : '☆';
-            star.classList.toggle('selected', starValue <= state.currentLogRating);
-        });
-    }
-
-    function handleKeywordInputKeydown(event) {
-        if (event.key === 'Enter' && DOMElements.logKeywordsInput && DOMElements.logKeywordsInput.value.trim() !== "") {
-            event.preventDefault();
-            const keyword = DOMElements.logKeywordsInput.value.trim().toLowerCase(); // Standardize to lowercase
-            if (!currentLogKeywordsForm.includes(keyword)) {
-                currentLogKeywordsForm.push(keyword);
-                renderKeywordsForm();
-            }
-            DOMElements.logKeywordsInput.value = '';
-        }
-    }
-
-    function renderKeywordsForm() {
-        if (!DOMElements.logKeywordsContainer) return;
-        DOMElements.logKeywordsContainer.innerHTML = '';
-        currentLogKeywordsForm.forEach(keyword => {
-            const tag = document.createElement('span');
-            tag.className = 'keyword-tag';
-            tag.textContent = sanitizeHTML(keyword);
-            const removeBtn = document.createElement('span');
-            removeBtn.className = 'remove-keyword';
-            removeBtn.innerHTML = '×'; // Use HTML entity for 'x'
-            removeBtn.onclick = () => {
-                currentLogKeywordsForm = currentLogKeywordsForm.filter(k => k !== keyword);
-                renderKeywordsForm();
-            };
-            tag.appendChild(removeBtn);
-            DOMElements.logKeywordsContainer.appendChild(tag);
-        });
-    }
-
-    async function handleSaveLog() {
-        const notes = DOMElements.logNotes ? DOMElements.logNotes.value.trim() : "";
-        if (state.currentMarkIn === null || state.currentMarkOut === null) {
-            showNotification("Please set both Mark In and Mark Out points.", "error");
-            return;
-        }
-        if (state.currentMarkIn >= state.currentMarkOut) {
-            showNotification("Mark Out must be after Mark In.", "error");
-            return;
-        }
-        if (!state.currentVideoId || !state.currentProjectId) {
-            showNotification("Error: Missing video or project context for saving log.", "error");
-            console.error("Missing video/project ID for log save:", state);
-            return;
-        }
-
-        const logData = {
-            videoId: state.currentVideoId,
-            projectId: state.currentProjectId, // Important for global search/delete
-            inTime: state.currentMarkIn,
-            outTime: state.currentMarkOut,
-            notes: notes,
-            rating: state.currentLogRating,
-            keywords: [...currentLogKeywordsForm], // clone
-            createdAt: new Date().toISOString()
+                return { modalRef, close };
+            },
+            template: `
+                <transition name="fade">
+                    <div v-if="isOpen" class="fixed inset-0 bg-stone-950 bg-opacity-80 flex items-center justify-center z-40 p-4" @mousedown.self="close">
+                        <div ref="modalRef" class="card w-full max-w-md" role="dialog" aria-modal="true" :aria-labelledby="title ? 'modal-title' : null">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 v-if="title" id="modal-title" class="text-xl font-semibold text-stone-100">{{ title }}</h2>
+                                <button @click="close" class="text-stone-400 hover:text-stone-200 p-1 -m-1 btn-sm" aria-label="Close modal">
+                                    <i class="ph-bold ph-x text-2xl"></i>
+                                </button>
+                            </div>
+                            <slot></slot>
+                        </div>
+                    </div>
+                </transition>
+            `
         };
 
-        try {
-            await dbAdd(STORE_LOGS, logData);
-            showNotification("Log saved successfully.", "success");
-            resetLogForm(); // This will also update displays
-            loadLogsForCurrentVideo();
-        } catch (error) {
-            console.error("Error saving log:", error);
-            showNotification(`Failed to save log. ${error.message}`, "error");
-        }
-    }
-
-    function resetLogForm() {
-        if (DOMElements.logNotes) DOMElements.logNotes.value = '';
-        state.currentMarkIn = null;
-        state.currentMarkOut = null;
-        state.currentLogRating = 0;
-        currentLogKeywordsForm = [];
+        const ConfirmationModal = {
+            components: { Modal },
+            props: {
+                isOpen: Boolean,
+                title: String,
+                message: String,
+            },
+            emits: ['confirm', 'cancel'],
+            setup(props, { emit }) {
+                const confirm = () => emit('confirm');
+                const cancel = () => emit('cancel');
+                return { confirm, cancel };
+            },
+            template: `
+                <Modal :is-open="isOpen" :title="title" @close="cancel">
+                    <p class="text-stone-300 mb-6">{{ message }}</p>
+                    <div class="flex justify-end space-x-3">
+                        <button @click="cancel" class="btn btn-secondary">Cancel</button>
+                        <button @click="confirm" class="btn btn-danger">Confirm</button>
+                    </div>
+                </Modal>
+            `
+        };
         
-        renderStarRatingForm(); // Updates star UI
-        renderKeywordsForm(); // Clears keyword UI
-        updateMarkInOutDisplays(); // Resets time displays and timeline marker
-        
-        if (DOMElements.timelineMarkInOut) {
-            DOMElements.timelineMarkInOut.style.width = '0%';
-            DOMElements.timelineMarkInOut.style.left = '0%';
-        }
-        if (DOMElements.logKeywordsInput) DOMElements.logKeywordsInput.value = ''; // Ensure input is cleared
-    }
+        const ProjectCard = {
+            components: { ConfirmationModal },
+            props: ['project'],
+            emits: ['delete-project', 'project-deleted'], // Added project-deleted
+            setup(props, { emit }) {
+                const router = useRouter();
+                const videoCount = ref(0);
 
-    async function loadLogsForCurrentVideo() {
-        console.log("[LOGGING] Loading logs for video ID:", state.currentVideoId);
-        if (!DOMElements.savedLogsList || !DOMElements.loggingStationEmptyState) {
-            console.error("[LOGGING] Saved logs list or empty state DOM elements not found.");
-            return;
-        }
-        try {
-            const logs = await dbGetByIndex(STORE_LOGS, 'videoId', state.currentVideoId);
-            logs.sort((a, b) => a.inTime - b.inTime); 
-
-            DOMElements.savedLogsList.innerHTML = '';
-            DOMElements.loggingStationEmptyState.classList.toggle('hidden', logs.length > 0);
-            
-            logs.forEach(log => {
-                const item = document.createElement('div');
-                item.className = 'log-item';
-                item.innerHTML = `
-                    <div class="log-item-header">
-                        <span class="log-item-time">${formatTime(log.inTime)} - ${formatTime(log.outTime)}</span>
-                        <span class="log-item-rating">${'★'.repeat(log.rating || 0)}${'☆'.repeat(5 - (log.rating || 0))}</span>
-                    </div>
-                    <p class="log-item-notes">${sanitizeHTML(log.notes) || "<em>No notes</em>"}</p>
-                    <div class="log-item-keywords">
-                        ${log.keywords && log.keywords.map(k => `<span class="keyword-tag">${sanitizeHTML(k)}</span>`).join('') || ''}
-                    </div>
-                    <div class="log-item-actions">
-                        <button class="go-to-log-btn secondary" data-time="${log.inTime}">Go To</button>
-                        <button class="delete-log-btn danger" data-log-id="${log.id}">Delete</button>
-                    </div>
-                `;
-                item.querySelector('.go-to-log-btn').addEventListener('click', (e) => {
-                    if (logVideoPlayer) {
-                        logVideoPlayer.currentTime = parseFloat(e.target.dataset.time);
-                        logVideoPlayer.play().catch(err => console.warn("Play interrupted or failed:", err)); // Handle play promise
+                const fetchVideoCount = async () => {
+                    if(props.project && props.project.id) {
+                       videoCount.value = await db.videos.where('projectId').equals(props.project.id).count();
                     }
-                });
-                item.querySelector('.delete-log-btn').addEventListener('click', (e) => handleDeleteLog(parseInt(e.target.dataset.logId)));
-                DOMElements.savedLogsList.appendChild(item);
-            });
-            console.log("[LOGGING] Logs rendered.");
-        } catch (error) {
-            console.error("Error loading logs:", error);
-            showNotification("Failed to load logs.", "error");
-            DOMElements.savedLogsList.innerHTML = '<li>Error loading logs.</li>';
-            DOMElements.loggingStationEmptyState.classList.add('hidden');
-        }
-    }
-    
-    async function handleDeleteLog(logId) {
-        showConfirmDialog("Delete Log", "Are you sure you want to delete this log?", async (confirmed) => {
-            if (confirmed) {
-                try {
-                    await dbDelete(STORE_LOGS, logId);
-                    showNotification("Log deleted.", "success");
-                    loadLogsForCurrentVideo(); 
-                } catch (err) {
-                    showNotification("Error deleting log.", "error");
-                    console.error("Error deleting log", err);
-                }
-            }
-        });
-    }
+                };
 
+                onMounted(fetchVideoCount);
+                watch(() => props.project.id, fetchVideoCount);
 
-    // --- Advanced Features ---
-    let previewSelectsPlayer;
-    let previewSelectsQueue = [];
-    let currentPreviewSelectIndex = 0;
-    let previewSelectTimeout = null; // To manage stopping at outTime
+                const navigateToProject = () => {
+                    router.push(`/project/${props.project.id}`);
+                };
+                
+                const showConfirmDelete = ref(false);
 
-    async function handlePreviewSelects(videoId) {
-        const videoData = await dbGetById(STORE_VIDEOS, videoId);
-        if (!videoData || !videoData.fileObject) {
-            showNotification("Video file not found for preview. Please re-add the video.", "error");
-            console.error("Missing fileObject for preview, video ID:", videoId);
-            return;
-        }
+                const deleteProjectConfirmed = async () => {
+                    emit('delete-project', props.project.id);
+                    showConfirmDelete.value = false;
+                };
 
-        const logs = await dbGetByIndex(STORE_LOGS, 'videoId', videoId);
-        if (logs.length === 0) {
-            showNotification("No logs to preview for this video.", "info");
-            return;
-        }
+                return {
+                    navigateToProject,
+                    videoCount,
+                    formattedDate: computed(() => props.project && props.project.createdAt ? new Date(props.project.createdAt).toLocaleDateString() : 'N/A'),
+                    showConfirmDelete,
+                    deleteProjectConfirmed,
+                };
+            },
+            template: `
+                <div class="card cursor-pointer hover:shadow-indigo-500/30 transition-shadow group" @click="navigateToProject">
+                    <div class="flex justify-between items-start">
+                        <h3 class="text-xl font-semibold text-stone-100 mb-2 group-hover:text-indigo-400 transition-colors">{{ project.name }}</h3>
+                        <button @click.stop="showConfirmDelete = true" class="text-stone-500 hover:text-red-500 p-1 -m-1 btn-sm" aria-label="Delete project">
+                            <i class="ph ph-trash text-lg"></i>
+                        </button>
+                    </div>
+                    <p class="text-sm text-stone-400">Videos: {{ videoCount }}</p>
+                    <p class="text-xs text-stone-500 mt-2">Created: {{ formattedDate }}</p>
+                </div>
+                <ConfirmationModal
+                    :is-open="showConfirmDelete"
+                    title="Delete Project?"
+                    :message="'Are you sure you want to delete \'' + project.name + '\'? This will also delete all associated videos and logs.'"
+                    @confirm="deleteProjectConfirmed"
+                    @cancel="showConfirmDelete = false"
+                />
+            `
+        };
 
-        logs.sort((a,b) => a.inTime - b.inTime);
-        previewSelectsQueue = logs;
-        currentPreviewSelectIndex = 0;
+        const ProjectDashboard = {
+            components: { ProjectCard, Modal }, // ConfirmationModal is used by ProjectCard
+            setup() {
+                const projects = ref([]);
+                const showNewProjectModal = ref(false);
+                const newProjectName = ref('');
+                const router = useRouter();
 
-        previewSelectsPlayer = DOMElements.previewSelectsPlayer;
-        if (!previewSelectsPlayer || !DOMElements.previewSelectsModal || !DOMElements.previewSelectsInfo || !DOMElements.previewSelectsNotes) {
-            console.error("Preview Selects modal UI elements missing.");
-            showNotification("Cannot open preview: UI is missing.", "error");
-            return;
-        }
+                const loadProjects = async () => {
+                    projects.value = await db.projects.orderBy('createdAt').reverse().toArray();
+                };
 
-        if (previewSelectsPlayer.src && previewSelectsPlayer.src.startsWith('blob:')) {
-             URL.revokeObjectURL(previewSelectsPlayer.src);
-        }
-        previewSelectsPlayer.src = URL.createObjectURL(videoData.fileObject);
-        previewSelectsPlayer.onended = playNextSelectInQueue; // Use a renamed function
-        // We'll use a timeout for stopping at outTime instead of ontimeupdate for more precise control
-        previewSelectsPlayer.ontimeupdate = null; // Clear previous listener if any
+                onMounted(loadProjects);
 
-        DOMElements.previewSelectsModal.classList.remove('hidden');
-        playNextSelectInQueue(); 
-    }
-
-    function playNextSelectInQueue() {
-        if (previewSelectTimeout) clearTimeout(previewSelectTimeout); // Clear any existing timeout
-
-        if (currentPreviewSelectIndex >= previewSelectsQueue.length) {
-            DOMElements.previewSelectsInfo.textContent = "All selects played.";
-            DOMElements.previewSelectsNotes.textContent = "";
-            previewSelectsPlayer.pause();
-            return;
-        }
-        const currentSelect = previewSelectsQueue[currentPreviewSelectIndex];
-        DOMElements.previewSelectsInfo.textContent = `Playing Select ${currentPreviewSelectIndex + 1} of ${previewSelectsQueue.length}`;
-        DOMElements.previewSelectsNotes.textContent = sanitizeHTML(currentSelect.notes) || "No notes for this select.";
-        
-        previewSelectsPlayer.currentTime = currentSelect.inTime;
-        previewSelectsPlayer.play().catch(err => console.warn("Preview play failed:", err));
-
-        const durationOfSelect = (currentSelect.outTime - currentSelect.inTime) * 1000; // in ms
-        previewSelectTimeout = setTimeout(() => {
-            if (previewSelectsPlayer && !previewSelectsPlayer.paused) { // Check if still playing this select
-                 previewSelectsPlayer.pause(); // Pause before moving to next
-            }
-            currentPreviewSelectIndex++;
-            playNextSelectInQueue(); // This will play or end if queue is finished
-        }, durationOfSelect > 0 ? durationOfSelect : 100); // Ensure a small delay even for zero-duration
-    }
-
-    function closePreviewSelectsModal() {
-        if (previewSelectTimeout) clearTimeout(previewSelectTimeout);
-        if (previewSelectsPlayer) {
-            previewSelectsPlayer.pause();
-            if (previewSelectsPlayer.src && previewSelectsPlayer.src.startsWith('blob:')) {
-                 URL.revokeObjectURL(previewSelectsPlayer.src);
-            }
-            previewSelectsPlayer.src = ""; 
-            previewSelectsPlayer.onended = null;
-        }
-        previewSelectsQueue = [];
-        currentPreviewSelectIndex = 0;
-        if (DOMElements.previewSelectsModal) DOMElements.previewSelectsModal.classList.add('hidden');
-    }
-
-    function handleKeyboardShortcuts(event) {
-        if (state.currentScreen === 'logging-station') {
-            const activeElement = document.activeElement;
-            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT')) {
-                return; // Don't interfere with text input
-            }
-
-            switch(event.key.toLowerCase()) {
-                case ' ':
-                    event.preventDefault();
-                    if (logVideoPlayer) {
-                        if (logVideoPlayer.paused) logVideoPlayer.play().catch(err => console.warn("Play failed:", err));
-                        else logVideoPlayer.pause();
+                const createNewProject = async () => {
+                    if (!newProjectName.value.trim()) {
+                        toastStore.addToast('Project name cannot be empty.', 'error');
+                        return;
                     }
-                    break;
-                case 'i':
-                    event.preventDefault();
-                    handleMarkIn();
-                    break;
-                case 'o':
-                    event.preventDefault();
-                    handleMarkOut();
-                    break;
-                // Add more shortcuts if needed: JKL for rewind/pause/ff, arrow keys for seek
-            }
-        }
-    }
-
-    async function exportAllData() {
-        showConfirmDialog(
-            "Export Data",
-            "This will export all projects, video metadata (not actual video files), and logs as a JSON file. Proceed?",
-            async (confirmed) => {
-                if (confirmed) {
                     try {
-                        const projects = await dbGetAll(STORE_PROJECTS);
-                        const videosFromDB = await dbGetAll(STORE_VIDEOS);
-                        const logs = await dbGetAll(STORE_LOGS);
-
-                        // Remove File objects before export
-                        const videosForExport = videosFromDB.map(v => {
-                            const { fileObject, ...videoMeta } = v; 
-                            return videoMeta;
+                        const projectId = await db.projects.add({
+                            name: newProjectName.value.trim(),
+                            createdAt: new Date()
                         });
+                        newProjectName.value = '';
+                        showNewProjectModal.value = false;
+                        await loadProjects(); // Refresh list
+                        toastStore.addToast('Project created!', 'success');
+                        router.push(`/project/${projectId}`);
+                    } catch (error) {
+                        console.error("Failed to create project:", error);
+                        if (error.name === 'ConstraintError') {
+                             toastStore.addToast('A project with this name might already exist.', 'error');
+                        } else {
+                             toastStore.addToast('Failed to create project.', 'error');
+                        }
+                    }
+                };
 
+                const handleDeleteProject = async (projectId) => {
+                    try {
+                        await db.transaction('rw', db.projects, db.videos, db.logs, async () => {
+                            const videosToDelete = await db.videos.where('projectId').equals(projectId).toArray();
+                            const videoIdsToDelete = videosToDelete.map(v => v.id);
+                            
+                            if (videoIdsToDelete.length > 0) {
+                                await db.logs.where('videoId').anyOf(videoIdsToDelete).delete();
+                            }
+                            await db.videos.where('projectId').equals(projectId).delete();
+                            await db.projects.delete(projectId);
+                        });
+                        toastStore.addToast('Project deleted.', 'success');
+                        loadProjects(); // Refresh list
+                    } catch (error) {
+                        console.error("Failed to delete project:", error);
+                        toastStore.addToast('Error deleting project.', 'error');
+                    }
+                };
+                
+                const exportData = async () => {
+                    try {
+                        const allProjects = await db.projects.toArray();
+                        const allVideos = await db.videos.toArray();
+                        const allLogs = await db.logs.toArray();
+
+                        const serializableVideos = allVideos.map(v => {
+                            const { fileHandle, ...rest } = v; // Exclude fileHandle
+                            return { ...rest, filename: v.filename }; 
+                        });
+                        
                         const dataToExport = {
-                            exportFormatVersion: "1.0", // Good for future import/migration
-                            exportDate: new Date().toISOString(),
-                            projects,
-                            videos: videosForExport,
-                            logs
+                            appName: 'LogReel',
+                            version: '1.0.0',
+                            exportedAt: new Date().toISOString(),
+                            data: {
+                                projects: allProjects,
+                                videos: serializableVideos,
+                                logs: allLogs,
+                            }
                         };
 
-                        const jsonData = JSON.stringify(dataToExport, null, 2);
-                        const blob = new Blob([jsonData], { type: 'application/json' });
+                        const jsonString = JSON.stringify(dataToExport, null, 2);
+                        const blob = new Blob([jsonString], { type: 'application/json' });
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `LogReel_Export_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`;
+                        a.download = `logreel_export_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
                         URL.revokeObjectURL(url);
-                        showNotification("Data exported successfully.", "success");
+                        toastStore.addToast('Data exported successfully.', 'success');
                     } catch (error) {
-                        console.error("Error exporting data:", error);
-                        showNotification("Failed to export data.", "error");
+                        console.error('Error exporting data:', error);
+                        toastStore.addToast('Failed to export data.', 'error');
                     }
-                }
+                };
+
+                return {
+                    projects,
+                    showNewProjectModal,
+                    newProjectName,
+                    createNewProject,
+                    handleDeleteProject,
+                    exportData
+                };
+            },
+            template: `
+                <div class="min-h-screen flex flex-col">
+                    <header class="bg-stone-900 shadow-md p-4 sticky top-0 z-20">
+                        <div class="container mx-auto flex flex-wrap justify-between items-center gap-2">
+                            <h1 class="text-2xl font-bold text-indigo-500">LogReel</h1>
+                            <div class="flex items-center space-x-2">
+                                <button @click="exportData" class="btn btn-secondary btn-sm md:btn-md py-1 px-2 md:py-2 md:px-4 text-xs md:text-sm">
+                                    <i class="ph ph-export mr-1"></i> Export Data
+                                </button>
+                                <button @click="showNewProjectModal = true" class="btn btn-primary btn-sm md:btn-md py-1 px-2 md:py-2 md:px-4 text-xs md:text-sm">
+                                    <i class="ph ph-plus-circle mr-1"></i> New Project
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main class="flex-grow container mx-auto p-4 sm:p-6">
+                        <div v-if="projects.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                            <ProjectCard v-for="project in projects" :key="project.id" :project="project" @delete-project="handleDeleteProject" />
+                        </div>
+                        <div v-else class="text-center py-12">
+                            <i class="ph-light ph-folder-notch-open text-6xl text-stone-600 mb-4"></i>
+                            <p class="text-xl text-stone-400">No projects yet.</p>
+                            <p class="text-stone-500">Click "New Project" to get started.</p>
+                        </div>
+                    </main>
+
+                    <Modal :is-open="showNewProjectModal" title="Create New Project" @close="showNewProjectModal = false; newProjectName = '';">
+                        <form @submit.prevent="createNewProject">
+                            <div class="mb-4">
+                                <label for="projectName" class="label">Project Name</label>
+                                <input type="text" id="projectName" v-model="newProjectName" class="input-field" required autofocus>
+                            </div>
+                            <div class="flex justify-end">
+                                <button type="submit" class="btn btn-primary">Create Project</button>
+                            </div>
+                        </form>
+                    </Modal>
+                </div>
+            `
+        };
+
+        const VideoCard = {
+            components: { ConfirmationModal },
+            props: {
+                video: Object,
+                index: Number
+            },
+            emits: ['toggle-importance', 'delete-video', 'play-selects', 'log-video', 'view-logs-toggled'],
+            setup(props, { emit }) {
+                const logCount = ref(0);
+                const logs = ref([]);
+                const showLogs = ref(false);
+
+                const fetchLogData = async () => {
+                    if (!props.video || !props.video.id) return;
+                    logCount.value = await db.logs.where('videoId').equals(props.video.id).count();
+                    if (showLogs.value) {
+                         logs.value = await db.logs.where('videoId').equals(props.video.id).orderBy('markIn').toArray();
+                    }
+                };
+
+                onMounted(fetchLogData);
+                watch(() => [props.video.id, showLogs.value], fetchLogData, { deep: true });
+
+                const toggleImportance = () => {
+                    emit('toggle-importance', props.video.id, !props.video.isImportant);
+                };
+                
+                const showConfirmDelete = ref(false);
+                const deleteVideoConfirmed = () => {
+                     emit('delete-video', props.video.id);
+                     showConfirmDelete.value = false;
+                };
+
+                const logVideo = () => emit('log-video', props.video.id);
+                const playSelects = () => emit('play-selects', props.video.id);
+                
+                const toggleViewLogs = () => {
+                    showLogs.value = !showLogs.value;
+                    emit('view-logs-toggled', props.video.id, showLogs.value);
+                };
+                
+                return {
+                    logCount, logs, showLogs,
+                    toggleImportance, deleteVideoConfirmed, showConfirmDelete,
+                    logVideo, playSelects, toggleViewLogs,
+                    formatTimecode, // make it globally available or pass as prop if needed in template
+                };
+            },
+            template: `
+                <div class="card flex flex-col">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center space-x-2 min-w-0"> <!-- min-w-0 for truncate -->
+                            <span class="text-sm text-stone-500 shrink-0">{{ index + 1 }}.</span>
+                            <h4 class="text-lg font-medium text-stone-200 truncate" :title="video.filename">{{ video.filename }}</h4>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0">
+                            <button @click.stop="toggleImportance" class="p-1 btn-sm" :aria-pressed="video.isImportant" aria-label="Toggle importance">
+                                <i :class="['ph-star text-xl', video.isImportant ? 'ph-fill text-yellow-400' : 'ph text-stone-500 hover:text-yellow-400']"></i>
+                            </button>
+                            <button @click.stop="showConfirmDelete = true" class="text-stone-500 hover:text-red-500 p-1 btn-sm" aria-label="Delete video">
+                                <i class="ph ph-trash text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-stone-800 aspect-video rounded flex items-center justify-center mb-3">
+                        <i class="ph ph-video text-5xl text-stone-600"></i>
+                    </div>
+
+                    <div class="flex justify-between items-center mb-3 text-xs">
+                        <span class="bg-indigo-500 text-indigo-50 font-semibold px-2 py-0.5 rounded-full">{{ logCount }} Log{{ logCount !== 1 ? 's' : '' }}</span>
+                        <div class="space-x-2">
+                             <button @click="toggleViewLogs" class="text-indigo-400 hover:text-indigo-300">
+                                <i :class="['ph text-sm mr-0.5', showLogs ? 'ph-caret-up' : 'ph-caret-down']"></i> View Logs
+                            </button>
+                            <button @click="playSelects" :disabled="logCount === 0" 
+                                    class="btn btn-secondary py-1 px-2 !text-xs"> <!-- !text-xs to override .btn potentially -->
+                                <i class="ph ph-play-circle mr-1"></i> Play Selects
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button @click="logVideo" class="btn btn-primary w-full mt-auto">
+                        <i class="ph ph-list-plus mr-1"></i> Log Video
+                    </button>
+
+                    <transition name="slide-fade">
+                        <div v-if="showLogs" class="mt-4 pt-4 border-t border-stone-700">
+                            <h5 class="text-sm font-semibold text-stone-300 mb-2">Logs:</h5>
+                            <ul v-if="logs.length > 0" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                <li v-for="log_item in logs" :key="log_item.id" class="text-xs p-2 bg-stone-800 rounded">
+                                    <div class="font-medium text-stone-300">{{ formatTimecode(log_item.markIn, false, false) }} - {{ formatTimecode(log_item.markOut, false, false) }}</div>
+                                    <p class="text-stone-400 truncate my-0.5" :title="log_item.notes">{{ log_item.notes || 'No notes' }}</p>
+                                    <div class="flex items-center">
+                                        <i v-for="n in 5" :key="n" :class="['ph-star text-sm', n <= log_item.rating ? 'ph-fill text-yellow-400' : 'ph text-stone-600']"></i>
+                                    </div>
+                                    <div v-if="log_item.keywords && log_item.keywords.length" class="mt-1 flex flex-wrap gap-1">
+                                        <span v-for="kw in log_item.keywords" :key="kw" class="text-indigo-300 bg-indigo-800/60 px-1.5 py-0.5 rounded text-[0.7rem] leading-none">{{ kw }}</span>
+                                    </div>
+                                </li>
+                            </ul>
+                            <p v-else class="text-xs text-stone-500">No logs for this video yet.</p>
+                        </div>
+                    </transition>
+                    <ConfirmationModal
+                        :is-open="showConfirmDelete"
+                        title="Delete Video?"
+                        message="Are you sure you want to delete this video and all its logs? This action cannot be undone."
+                        @confirm="deleteVideoConfirmed"
+                        @cancel="showConfirmDelete = false"
+                    />
+                </div>
+            `
+        };
+
+        const AssemblyHub = {
+            components: { VideoCard, ConfirmationModal },
+            setup() {
+                const route = useRoute();
+                const router = useRouter();
+                const projectId = computed(() => route.params.id ? parseInt(route.params.id) : null);
+                const project = ref(null);
+                const videos = ref([]);
+                const searchTerm = ref('');
+                
+                const showPlaySelectsModal = ref(false);
+                const playSelectsModalContentRef = ref(null);
+                const videoForPlaySelects = ref(null);
+                const logsForPlaySelects = ref([]);
+                const currentPlayingSelectIndex = ref(0);
+                const playSelectsVideoPlayerRef = ref(null);
+                let playSelectsTrap = null;
+
+
+                const loadProjectData = async () => {
+                    if (!projectId.value) {
+                         router.push('/'); return;
+                    }
+                    project.value = await db.projects.get(projectId.value);
+                    if (!project.value) {
+                        toastStore.addToast('Project not found.', 'error');
+                        router.push('/');
+                        return;
+                    }
+                    await loadVideos();
+                };
+
+                const loadVideos = async () => {
+                    if (!projectId.value) return;
+                    const allProjectVideos = await db.videos.where('projectId').equals(projectId.value).sortBy('createdAt');
+                    
+                    if (!searchTerm.value.trim()) {
+                        videos.value = allProjectVideos;
+                        return;
+                    }
+
+                    const lowerSearchTerm = searchTerm.value.toLowerCase();
+                    const videoIdsWithMatchingLogs = new Set();
+                    
+                    if (allProjectVideos.length > 0) {
+                        const projectVideoIds = allProjectVideos.map(v => v.id);
+                        const allLogsForProject = await db.logs.where('videoId').anyOf(projectVideoIds).toArray();
+                        
+                        allLogsForProject.forEach(log => {
+                            const notesMatch = log.notes && log.notes.toLowerCase().includes(lowerSearchTerm);
+                            const keywordsMatch = log.keywords && log.keywords.some(kw => kw.toLowerCase().includes(lowerSearchTerm));
+                            if (notesMatch || keywordsMatch) {
+                                videoIdsWithMatchingLogs.add(log.videoId);
+                            }
+                        });
+                    }
+
+                    videos.value = allProjectVideos.filter(video => 
+                        video.filename.toLowerCase().includes(lowerSearchTerm) ||
+                        videoIdsWithMatchingLogs.has(video.id)
+                    );
+                };
+                
+                let debounceTimer;
+                watch(searchTerm, () => {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(loadVideos, 300);
+                });
+
+                onMounted(loadProjectData);
+                watch(projectId, (newId, oldId) => {
+                    if (newId !== oldId) loadProjectData();
+                }, { immediate: true });
+
+                const addVideos = async () => {
+                    if (!('showOpenFilePicker' in window)) {
+                        toastStore.addToast('File System Access API is not supported.', 'error', 5000);
+                        return;
+                    }
+                    try {
+                        const fileHandles = await window.showOpenFilePicker({
+                            multiple: true,
+                            types: [{
+                                description: 'Video files',
+                                accept: { 'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm'] }
+                            }]
+                        });
+
+                        let addedCount = 0;
+                        for (const handle of fileHandles) {
+                            const existingVideo = await db.videos.get({ projectId: projectId.value, filename: handle.name });
+                            if (existingVideo) {
+                                toastStore.addToast(`Video "${handle.name}" already exists.`, 'info');
+                                continue;
+                            }
+                            await db.videos.add({
+                                projectId: projectId.value,
+                                filename: handle.name,
+                                fileHandle: handle,
+                                isImportant: false,
+                                createdAt: new Date()
+                            });
+                            addedCount++;
+                        }
+                        if (addedCount > 0) {
+                           await loadVideos();
+                           toastStore.addToast(`${addedCount} video(s) added.`, 'success');
+                        }
+                    } catch (err) {
+                        if (err.name === 'AbortError') {
+                            // User cancelled, do nothing or show info toast
+                        } else {
+                            console.error("Error adding videos:", err);
+                            toastStore.addToast('Error adding videos. Check permissions or console.', 'error');
+                        }
+                    }
+                };
+
+                const handleToggleImportance = async (videoId, newImportance) => {
+                    await db.videos.update(videoId, { isImportant: newImportance });
+                    const videoToUpdate = videos.value.find(v => v.id === videoId);
+                    if (videoToUpdate) videoToUpdate.isImportant = newImportance;
+                };
+
+                const handleDeleteVideo = async (videoId) => {
+                    try {
+                        await db.transaction('rw', db.videos, db.logs, async () => {
+                            await db.logs.where('videoId').equals(videoId).delete();
+                            await db.videos.delete(videoId);
+                        });
+                        toastStore.addToast('Video deleted.', 'success');
+                        await loadVideos(); // Refresh list
+                    } catch (error) {
+                        console.error("Failed to delete video:", error);
+                        toastStore.addToast('Error deleting video.', 'error');
+                    }
+                };
+                
+                const handleLogVideo = (videoId) => {
+                    router.push(`/video/${videoId}`);
+                };
+
+                const openPlaySelectsModal = async (videoId) => {
+                    const selectedVideo = await db.videos.get(videoId);
+                    if (!selectedVideo) {
+                        toastStore.addToast('Video not found for Play Selects.', 'error');
+                        return;
+                    }
+                    videoForPlaySelects.value = selectedVideo;
+                    
+                    logsForPlaySelects.value = await db.logs.where('videoId').equals(videoId).orderBy('markIn').toArray();
+                    if (logsForPlaySelects.value.length === 0) {
+                        toastStore.addToast('No logs to play for this video.', 'info');
+                        return;
+                    }
+                    currentPlayingSelectIndex.value = 0;
+                    showPlaySelectsModal.value = true; // This will trigger the watcher for focus trap
+                    nextTick(playCurrentSelect); // Start playing after modal is rendered
+                };
+
+                const closePlaySelectsModal = () => {
+                    showPlaySelectsModal.value = false; // Triggers watcher to deactivate trap
+                    if (playSelectsVideoPlayerRef.value) {
+                        playSelectsVideoPlayerRef.value.pause();
+                        if (playSelectsVideoPlayerRef.value.src) {
+                            URL.revokeObjectURL(playSelectsVideoPlayerRef.value.src); // Important: Release object URL
+                        }
+                        playSelectsVideoPlayerRef.value.src = ''; 
+                    }
+                    videoForPlaySelects.value = null;
+                    logsForPlaySelects.value = [];
+                };
+                
+                watch(showPlaySelectsModal, (isOpen) => {
+                    nextTick(() => { // Ensure DOM is updated
+                        if (isOpen && playSelectsModalContentRef.value) {
+                            if (!playSelectsTrap) {
+                                playSelectsTrap = focusTrap.createFocusTrap(playSelectsModalContentRef.value, {
+                                    onDeactivate: closePlaySelectsModal,
+                                    clickOutsideDeactivates: false, // Fullscreen modal
+                                    escapeDeactivates: true,
+                                    initialFocus: playSelectsVideoPlayerRef.value || playSelectsModalContentRef.value.querySelector('button[aria-label="Close Play Selects"]')
+                                });
+                            }
+                            playSelectsTrap.activate();
+                        } else if (playSelectsTrap && playSelectsTrap.active) {
+                            playSelectsTrap.deactivate();
+                        }
+                    });
+                });
+                
+                onUnmounted(() => {
+                    if (playSelectsTrap && playSelectsTrap.active) {
+                        playSelectsTrap.deactivate();
+                    }
+                    playSelectsTrap = null;
+                    // Also ensure video object URL is revoked if modal was open
+                    if (playSelectsVideoPlayerRef.value && playSelectsVideoPlayerRef.value.src) {
+                        URL.revokeObjectURL(playSelectsVideoPlayerRef.value.src);
+                    }
+                });
+
+                const playCurrentSelect = async () => {
+                    if (!videoForPlaySelects.value || !playSelectsVideoPlayerRef.value || currentPlayingSelectIndex.value >= logsForPlaySelects.value.length) {
+                        if (logsForPlaySelects.value.length > 0 && currentPlayingSelectIndex.value >= logsForPlaySelects.value.length) {
+                             toastStore.addToast('Finished playing all selects.', 'success');
+                        }
+                        return;
+                    }
+
+                    const logEntry = logsForPlaySelects.value[currentPlayingSelectIndex.value];
+                    const videoPlayer = playSelectsVideoPlayerRef.value;
+
+                    try {
+                        const hasPermission = await verifyPermission(videoForPlaySelects.value.fileHandle);
+                        if (!hasPermission) {
+                            toastStore.addToast('Permission denied for video file.', 'error');
+                            closePlaySelectsModal();
+                            return;
+                        }
+                        const file = await videoForPlaySelects.value.fileHandle.getFile();
+                        
+                        // Revoke previous object URL if any, before setting new one
+                        if (videoPlayer.src) {
+                            URL.revokeObjectURL(videoPlayer.src);
+                        }
+                        videoPlayer.src = URL.createObjectURL(file);
+                        
+                        videoPlayer.onloadedmetadata = () => {
+                            videoPlayer.currentTime = logEntry.markIn;
+                            videoPlayer.play().catch(e => console.error("Play interrupted or failed:", e));
+                        };
+                        
+                        const timeUpdateHandler = () => {
+                            if (videoPlayer.currentTime >= logEntry.markOut) {
+                                videoPlayer.pause();
+                                videoPlayer.removeEventListener('timeupdate', timeUpdateHandler); // Clean up listener
+                                currentPlayingSelectIndex.value++;
+                                if (currentPlayingSelectIndex.value < logsForPlaySelects.value.length) {
+                                    playCurrentSelect();
+                                } else {
+                                    toastStore.addToast('Finished playing all selects.', 'success');
+                                }
+                            }
+                        };
+                        videoPlayer.addEventListener('timeupdate', timeUpdateHandler);
+
+                        videoPlayer.onerror = (e) => {
+                             console.error("Error playing video in selects modal:", e, videoPlayer.error);
+                             toastStore.addToast('Error playing video for selects.', 'error');
+                             closePlaySelectsModal();
+                        }
+                    } catch (error) {
+                        console.error("Error setting up video for play selects:", error);
+                        toastStore.addToast('Failed to load video for Play Selects.', 'error');
+                        closePlaySelectsModal();
+                    }
+                };
+                
+                const currentSelectLog = computed(() => {
+                    if (showPlaySelectsModal.value && logsForPlaySelects.value.length > 0 && currentPlayingSelectIndex.value < logsForPlaySelects.value.length) {
+                        return logsForPlaySelects.value[currentPlayingSelectIndex.value];
+                    }
+                    return null;
+                });
+
+                return {
+                    project, videos, searchTerm,
+                    addVideos, handleToggleImportance, handleDeleteVideo, handleLogVideo,
+                    router,
+                    openPlaySelectsModal, closePlaySelectsModal, showPlaySelectsModal,
+                    playSelectsModalContentRef, playSelectsVideoPlayerRef,
+                    currentPlayingSelectIndex, logsForPlaySelects, currentSelectLog, videoForPlaySelects,
+                };
+            },
+            template: `
+                <div class="min-h-screen flex flex-col">
+                    <header class="bg-stone-900 shadow-md p-4 sticky top-0 z-20">
+                        <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+                            <div class="flex items-center">
+                                <button @click="router.push('/')" class="text-indigo-400 hover:text-indigo-300 mr-2 p-1 btn-sm" aria-label="Back to projects">
+                                    <i class="ph-bold ph-arrow-left text-2xl"></i>
+                                </button>
+                                <h2 class="text-xl font-semibold text-stone-100 truncate" :title="project?.name">
+                                    {{ project?.name || 'Loading...' }}
+                                </h2>
+                            </div>
+                            <div class="flex items-center space-x-2 w-full sm:w-auto">
+                                <input type="search" v-model="searchTerm" placeholder="Search videos & logs..." class="input-field flex-grow sm:w-64 !py-2">
+                                <button @click="addVideos" class="btn btn-primary whitespace-nowrap !py-2">
+                                    <i class="ph ph-plus-circle mr-1"></i> Add Videos
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main class="flex-grow container mx-auto p-4 sm:p-6">
+                        <div v-if="videos.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                            <VideoCard v-for="(video, index) in videos" 
+                                       :key="video.id" 
+                                       :video="video" 
+                                       :index="index"
+                                       @toggle-importance="handleToggleImportance"
+                                       @delete-video="handleDeleteVideo"
+                                       @log-video="handleLogVideo"
+                                       @play-selects="openPlaySelectsModal"
+                            />
+                        </div>
+                        <div v-else-if="project" class="text-center py-12">
+                            <i class="ph-light ph-video text-6xl text-stone-600 mb-4"></i>
+                            <p class="text-xl text-stone-400" v-if="!searchTerm">No videos in this project yet.</p>
+                            <p class="text-xl text-stone-400" v-else>No videos match your search.</p>
+                            <p class="text-stone-500" v-if="!searchTerm">Click "Add Videos" to import some.</p>
+                        </div>
+                         <div v-else class="text-center py-12">
+                            <i class="ph-light ph-spinner-gap text-6xl text-stone-600 mb-4 animate-spin"></i>
+                            <p class="text-xl text-stone-400">Loading project data...</p>
+                        </div>
+                    </main>
+
+                    <!-- Play Selects Modal -->
+                    <transition name="fade">
+                        <div v-if="showPlaySelectsModal" class="fixed inset-0 bg-stone-950 bg-opacity-95 flex flex-col items-center justify-center z-50 p-4">
+                            <div ref="playSelectsModalContentRef" class="w-full h-full flex flex-col items-center justify-center relative outline-none" tabindex="-1">
+                                <button @click="closePlaySelectsModal" class="absolute top-4 right-4 text-stone-300 hover:text-white z-[51] p-2 btn-sm bg-black/30 rounded-full" aria-label="Close Play Selects">
+                                    <i class="ph-bold ph-x text-3xl"></i>
+                                </button>
+                                
+                                <div v-if="videoForPlaySelects" class="text-center mb-4 text-stone-200">
+                                    <p>Playing Select {{ currentPlayingSelectIndex + 1 }} of {{ logsForPlaySelects.length }}</p>
+                                    <p class="text-sm text-stone-400">Video: {{ videoForPlaySelects.filename }}</p>
+                                </div>
+
+                                <video ref="playSelectsVideoPlayerRef" class="max-w-[90vw] max-h-[70vh] bg-black rounded outline-none" controlslist="nodownload nofullscreen noremoteplayback"></video>
+                                
+                                <div v-if="currentSelectLog" class="mt-4 p-4 bg-stone-900 rounded-lg max-w-2xl w-full text-left max-h-32 overflow-y-auto">
+                                    <h4 class="text-md font-semibold text-indigo-400">Notes:</h4>
+                                    <p class="text-stone-300 text-sm whitespace-pre-wrap">{{ currentSelectLog.notes || 'No notes for this select.' }}</p>
+                                </div>
+                                <div v-else-if="!currentSelectLog && videoForPlaySelects" class="mt-4 p-4 bg-stone-900 rounded-lg max-w-2xl w-full text-left">
+                                     <p class="text-stone-400 text-sm">Loading select info...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </transition>
+                </div>
+            `
+        };
+        
+        const LoggingStation = {
+            components: { ConfirmationModal },
+            setup() {
+                const route = useRoute();
+                const router = useRouter();
+                const videoId = computed(() => route.params.id ? parseInt(route.params.id) : null);
+                
+                const videoData = ref(null);
+                const videoPlayerRef = ref(null);
+                const timelineRef = ref(null);
+                const videoSrc = ref(null);
+
+                const currentTime = ref(0);
+                const duration = ref(0);
+                const isPlaying = ref(false);
+                const showControls = ref(false); // HTML5 video controls
+
+                const markIn = ref(null);
+                const markOut = ref(null);
+
+                const logForm = reactive({
+                    notes: '',
+                    rating: 0,
+                    keywordsText: '',
+                    keywords: [],
+                });
+
+                const logs = ref([]);
+                const logToDelete = ref(null);
+
+                const loadVideoAndLogs = async () => {
+                    if (!videoId.value) { router.push('/'); return; }
+                    
+                    videoData.value = await db.videos.get(videoId.value);
+                    if (!videoData.value) {
+                        toastStore.addToast('Video not found.', 'error');
+                        router.push(videoData.value?.projectId ? `/project/${videoData.value.projectId}` : '/');
+                        return;
+                    }
+
+                    try {
+                        const hasPermission = await verifyPermission(videoData.value.fileHandle);
+                        if (!hasPermission) {
+                            toastStore.addToast('Permission denied for video file access.', 'error', 5000);
+                            return; // User may need to re-add video or browser may prompt for permission
+                        }
+                        const file = await videoData.value.fileHandle.getFile();
+                        if (videoSrc.value) URL.revokeObjectURL(videoSrc.value); // Revoke old src if any
+                        videoSrc.value = URL.createObjectURL(file);
+                    } catch (err) {
+                        console.error("Error loading video file:", err);
+                        toastStore.addToast('Failed to load video file. It might be corrupted or inaccessible.', 'error', 5000);
+                        videoSrc.value = null; // Ensure no broken player
+                    }
+                    await loadLogs();
+                };
+
+                const handleLoadedMetadata = () => duration.value = videoPlayerRef.value?.duration || 0;
+                const handleTimeUpdate = () => currentTime.value = videoPlayerRef.value?.currentTime || 0;
+                const handlePlay = () => isPlaying.value = true;
+                const handlePause = () => isPlaying.value = false;
+                const handleEnded = () => {
+                    isPlaying.value = false;
+                    currentTime.value = duration.value; // Ensure currentTime is at the end
+                };
+                const videoError = (e) => {
+                    console.error("Video Error:", e, videoPlayerRef.value?.error);
+                    toastStore.addToast('Error playing video. The file might be unsupported or corrupted.', 'error', 5000);
+                    videoSrc.value = null; // Clear src to stop further errors
+                };
+
+
+                onMounted(() => {
+                    loadVideoAndLogs();
+                    const player = videoPlayerRef.value;
+                    if (player) {
+                        player.addEventListener('loadedmetadata', handleLoadedMetadata);
+                        player.addEventListener('timeupdate', handleTimeUpdate);
+                        player.addEventListener('play', handlePlay);
+                        player.addEventListener('pause', handlePause);
+                        player.addEventListener('ended', handleEnded);
+                        player.addEventListener('error', videoError);
+                    }
+                    document.addEventListener('keydown', handleGlobalKeydown);
+                });
+
+                onUnmounted(() => {
+                    const player = videoPlayerRef.value;
+                    if (player) {
+                        player.removeEventListener('loadedmetadata', handleLoadedMetadata);
+                        player.removeEventListener('timeupdate', handleTimeUpdate);
+                        player.removeEventListener('play', handlePlay);
+                        player.removeEventListener('pause', handlePause);
+                        player.removeEventListener('ended', handleEnded);
+                        player.removeEventListener('error', videoError);
+                    }
+                    if (videoSrc.value) {
+                        URL.revokeObjectURL(videoSrc.value);
+                    }
+                    document.removeEventListener('keydown', handleGlobalKeydown);
+                });
+                
+                const togglePlayPause = () => {
+                    if (!videoPlayerRef.value || !videoSrc.value) return;
+                    if (videoPlayerRef.value.paused || videoPlayerRef.value.ended) {
+                        videoPlayerRef.value.play().catch(e => console.warn("Play interrupted:", e));
+                    } else {
+                        videoPlayerRef.value.pause();
+                    }
+                };
+
+                const seekOnTimeline = (event) => {
+                    if (!timelineRef.value || !duration.value || !videoSrc.value) return;
+                    const timelineRect = timelineRef.value.getBoundingClientRect();
+                    const clickX = event.clientX - timelineRect.left;
+                    const percentage = Math.max(0, Math.min(1, clickX / timelineRect.width));
+                    videoPlayerRef.value.currentTime = duration.value * percentage;
+                };
+
+                const currentProgressPercent = computed(() => duration.value ? (currentTime.value / duration.value) * 100 : 0);
+                const markInPercent = computed(() => (markIn.value !== null && duration.value) ? (markIn.value / duration.value) * 100 : null);
+                const markOutPercent = computed(() => (markOut.value !== null && duration.value) ? (markOut.value / duration.value) * 100 : null);
+                
+                const showHoursInTimecode = computed(() => duration.value >= 3600);
+
+                const setMarkIn = () => {
+                    if (!videoSrc.value) return;
+                    markIn.value = currentTime.value;
+                    if (markOut.value !== null && markOut.value < markIn.value) {
+                        markOut.value = null; 
+                    }
+                };
+                const setMarkOut = () => {
+                    if (!videoSrc.value) return;
+                    markOut.value = currentTime.value;
+                     if (markIn.value !== null && markOut.value < markIn.value) {
+                        markIn.value = markOut.value;
+                        toastStore.addToast('Mark In adjusted as it was after Mark Out.', 'info');
+                    }
+                };
+                
+                watch(() => logForm.keywordsText, (newVal) => {
+                    logForm.keywords = newVal.split(/[,;]+/).map(kw => kw.trim()).filter(kw => kw.length > 0);
+                });
+
+                const removeKeyword = (index) => {
+                    logForm.keywords.splice(index, 1);
+                    logForm.keywordsText = logForm.keywords.join(', ');
+                };
+                
+                const saveLog = async () => {
+                    if (markIn.value === null || markOut.value === null) {
+                        toastStore.addToast('Set Mark In and Mark Out.', 'error'); return;
+                    }
+                    if (markIn.value >= markOut.value) {
+                        toastStore.addToast('Mark In must be before Mark Out.', 'error'); return;
+                    }
+                    if (!logForm.notes.trim() && logForm.rating === 0 && logForm.keywords.length === 0) {
+                        toastStore.addToast('Add notes, rating, or keywords.', 'error'); return;
+                    }
+
+                    try {
+                        await db.logs.add({
+                            videoId: videoId.value,
+                            notes: logForm.notes.trim(),
+                            rating: logForm.rating,
+                            keywords: [...logForm.keywords],
+                            markIn: markIn.value,
+                            markOut: markOut.value,
+                            createdAt: new Date()
+                        });
+                        toastStore.addToast('Log saved!', 'success');
+                        logForm.notes = ''; logForm.rating = 0; logForm.keywordsText = ''; logForm.keywords = [];
+                        markIn.value = null; markOut.value = null;
+                        await loadLogs();
+                    } catch (error) {
+                        console.error("Failed to save log:", error);
+                        if (error.name === 'ConstraintError') {
+                            toastStore.addToast('Log at this Mark In time already exists.', 'error');
+                        } else {
+                            toastStore.addToast('Error saving log.', 'error');
+                        }
+                    }
+                };
+
+                const loadLogs = async () => {
+                    if (!videoId.value) return;
+                    logs.value = await db.logs.where('videoId').equals(videoId.value).orderBy('markIn').toArray();
+                };
+
+                const goToLogTime = (seconds) => {
+                    if (videoPlayerRef.value && videoSrc.value) {
+                        videoPlayerRef.value.currentTime = seconds;
+                        if (videoPlayerRef.value.paused) videoPlayerRef.value.play().catch(e => console.warn("Play interrupted:", e));
+                    }
+                };
+
+                const confirmDeleteLog = (logId) => logToDelete.value = logId;
+
+                const deleteLog = async () => {
+                    if (!logToDelete.value) return;
+                    try {
+                        await db.logs.delete(logToDelete.value);
+                        toastStore.addToast('Log deleted.', 'success');
+                        logToDelete.value = null;
+                        await loadLogs();
+                    } catch (error) {
+                        console.error("Failed to delete log:", error);
+                        toastStore.addToast('Error deleting log.', 'error');
+                    }
+                };
+
+                const handleGlobalKeydown = (event) => {
+                    const activeElement = document.activeElement;
+                    const inInputField = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
+
+                    if (event.code === 'Space' && !inInputField && videoSrc.value) {
+                        event.preventDefault(); togglePlayPause();
+                    } else if (event.key.toLowerCase() === 'i' && !inInputField && videoSrc.value) {
+                        event.preventDefault(); setMarkIn();
+                    } else if (event.key.toLowerCase() === 'o' && !inInputField && videoSrc.value) {
+                        event.preventDefault(); setMarkOut();
+                    }
+                };
+
+                return {
+                    videoData, videoPlayerRef, timelineRef, videoSrc,
+                    currentTime, duration, isPlaying, showHoursInTimecode, showControls,
+                    formatTimecode,
+                    togglePlayPause, seekOnTimeline, currentProgressPercent,
+                    markIn, markOut, setMarkIn, setMarkOut,
+                    markInPercent, markOutPercent,
+                    logForm, saveLog, removeKeyword,
+                    logs, goToLogTime, confirmDeleteLog, deleteLog, logToDelete,
+                    router,
+                    projectId // for back button
+                };
+            },
+            template: `
+                <div class="h-screen flex flex-col bg-stone-950">
+                    <header class="bg-stone-900 shadow-md p-3 sm:p-4 flex items-center shrink-0 z-10">
+                        <button @click="router.push(videoData ? \`/project/\${videoData.projectId}\` : '/')" 
+                                class="text-indigo-400 hover:text-indigo-300 mr-3 p-1 btn-sm" aria-label="Back to project">
+                            <i class="ph-bold ph-arrow-left text-2xl"></i>
+                        </button>
+                        <h2 class="text-lg sm:text-xl font-semibold text-stone-100 truncate" :title="videoData?.filename">
+                            {{ videoData?.filename || 'Loading video...' }}
+                        </h2>
+                    </header>
+
+                    <div class="flex-grow overflow-y-auto" v-if="videoData">
+                        <div class="max-w-5xl mx-auto p-3 sm:p-4">
+                            <div class="sticky top-0 bg-stone-950 z-5 py-4">
+                                <div class="relative group/videoplayer">
+                                    <video ref="videoPlayerRef" :src="videoSrc" 
+                                           class="w-full max-h-[60vh] bg-black rounded aspect-video outline-none" 
+                                           :controls="showControls"
+                                           @click="togglePlayPause"
+                                           @dblclick="showControls = !showControls"
+                                           preload="metadata"
+                                           > Your browser does not support the video tag. </video>
+                                    <div v-if="!videoSrc && videoData" class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 rounded">
+                                        <i class="ph-bold ph-warning-circle text-4xl text-yellow-400 mb-2"></i>
+                                        <p class="text-stone-300">Video could not be loaded.</p>
+                                        <p class="text-xs text-stone-400">Check permissions or file integrity.</p>
+                                    </div>
+                                    <div v-if="!showControls && videoSrc" @click="togglePlayPause" class="absolute inset-0 flex items-center justify-center opacity-0 group-hover/videoplayer:opacity-100 transition-opacity bg-black/20 cursor-pointer">
+                                        <i :class="['ph-bold text-6xl text-white/80', isPlaying ? 'ph-pause-circle' : 'ph-play-circle']"></i>
+                                    </div>
+                                </div>
+                                
+                                <div v-if="videoSrc" ref="timelineRef" @click="seekOnTimeline" class="mt-3 h-5 bg-stone-800 rounded cursor-pointer relative group/timeline">
+                                    <div class="h-full bg-stone-600 rounded" :style="{ width: currentProgressPercent + '%' }"></div>
+                                    <div v-if="markInPercent !== null && markOutPercent !== null && markOutPercent > markInPercent" 
+                                         class="absolute top-0 h-full bg-indigo-600/50 rounded pointer-events-none"
+                                         :style="{ left: markInPercent + '%', width: (markOutPercent - markInPercent) + '%' }">
+                                    </div>
+                                    <div v-if="markInPercent !== null" 
+                                         class="absolute top-0 h-full w-1 bg-indigo-400 pointer-events-none" 
+                                         :style="{ left: markInPercent + '%' }">
+                                        <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-indigo-300 bg-stone-700 px-1 rounded opacity-0 group-hover/timeline:opacity-100 transition-opacity whitespace-nowrap">IN</span>
+                                    </div>
+                                    <div v-if="markOutPercent !== null" 
+                                         class="absolute top-0 h-full w-1 bg-indigo-400 pointer-events-none" 
+                                         :style="{ left: markOutPercent + '%' }">
+                                         <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-indigo-300 bg-stone-700 px-1 rounded opacity-0 group-hover/timeline:opacity-100 transition-opacity whitespace-nowrap">OUT</span>
+                                    </div>
+                                     <div class="absolute -bottom-6 left-0 text-xs text-stone-400 pointer-events-none">{{ formatTimecode(currentTime, showHoursInTimecode) }}</div>
+                                     <div class="absolute -bottom-6 right-0 text-xs text-stone-400 pointer-events-none">{{ formatTimecode(duration, showHoursInTimecode) }}</div>
+                                </div>
+                                <div v-else class="mt-3 h-5 bg-stone-800 rounded flex items-center justify-center">
+                                    <p class="text-xs text-stone-500">Video timeline unavailable</p>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 my-4 sm:my-6 items-center">
+                                <button @click="togglePlayPause" :disabled="!videoSrc" class="btn btn-secondary col-span-1 sm:col-span-1 flex items-center justify-center text-lg py-3">
+                                    <i :class="['ph-bold text-2xl mr-2', isPlaying ? 'ph-pause' : 'ph-play']"></i>
+                                    <span>{{ isPlaying ? 'Pause' : 'Play' }} (Space)</span>
+                                </button>
+                                <button @click="setMarkIn" :disabled="!videoSrc" class="btn btn-secondary flex items-center justify-center py-3">
+                                    <span class="text-indigo-400 mr-2 font-bold">I</span> Mark In: {{ markIn !== null ? formatTimecode(markIn, showHoursInTimecode) : '--:--.---' }}
+                                </button>
+                                <button @click="setMarkOut" :disabled="!videoSrc" class="btn btn-secondary flex items-center justify-center py-3">
+                                    <span class="text-indigo-400 mr-2 font-bold">O</span> Mark Out: {{ markOut !== null ? formatTimecode(markOut, showHoursInTimecode) : '--:--.---' }}
+                                </button>
+                            </div>
+
+                            <form @submit.prevent="saveLog" class="card mb-6">
+                                <h3 class="text-xl font-semibold text-stone-100 mb-4">Create Log Entry</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="notes" class="label">Notes</label>
+                                        <textarea id="notes" v-model="logForm.notes" rows="4" class="input-field" placeholder="Enter notes for this segment..."></textarea>
+                                    </div>
+                                    <div>
+                                        <label class="label">Rating</label>
+                                        <div class="flex space-x-1 mb-4">
+                                            <button type="button" v-for="star in 5" :key="star" @click="logForm.rating = star" class="focus:outline-none p-1 btn-sm" :aria-label="'Rate ' + star + ' star' + (star > 1 ? 's' : '')">
+                                                <i :class="['ph-star text-3xl transition-colors', star <= logForm.rating ? 'ph-fill text-yellow-400' : 'ph text-stone-600 hover:text-yellow-300']"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <label for="keywords" class="label">Keywords (comma/semicolon separated)</label>
+                                        <input type="text" id="keywords" v-model="logForm.keywordsText" class="input-field" placeholder="e.g., b-roll, interview, good take">
+                                        <div class="mt-2 flex flex-wrap gap-1.5" v-if="logForm.keywords.length > 0">
+                                            <span v-for="(kw, index) in logForm.keywords" :key="index" class="bg-indigo-600 text-indigo-50 text-xs px-2 py-1 rounded-full flex items-center">
+                                                {{ kw }}
+                                                <button type="button" @click="removeKeyword(index)" class="ml-1.5 text-indigo-200 hover:text-white p-0.5 btn-sm" aria-label="Remove keyword">
+                                                    <i class="ph-bold ph-x text-[0.6rem]"></i>
+                                                </button>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-6 flex justify-end">
+                                    <button type="submit" class="btn btn-primary" :disabled="!videoSrc">Save Log</button>
+                                </div>
+                            </form>
+
+                            <div v-if="logs.length > 0">
+                                <h3 class="text-xl font-semibold text-stone-100 mb-4">Saved Logs ({{ logs.length }})</h3>
+                                <div class="space-y-4">
+                                    <div v-for="log_item in logs" :key="log_item.id" class="card bg-stone-800/50">
+                                        <div class="flex flex-col sm:flex-row justify-between items-start gap-2">
+                                            <div class="flex-grow min-w-0"> <!-- For text wrapping -->
+                                                <div class="font-semibold text-indigo-400 mb-1">
+                                                    {{ formatTimecode(log_item.markIn, showHoursInTimecode) }} - {{ formatTimecode(log_item.markOut, showHoursInTimecode) }}
+                                                </div>
+                                                <div class="flex items-center mb-1">
+                                                    <i v-for="n in 5" :key="n" :class="['ph-star text-lg mr-0.5', n <= log_item.rating ? 'ph-fill text-yellow-400' : 'ph text-stone-600']"></i>
+                                                </div>
+                                                <p class="text-stone-300 text-sm whitespace-pre-wrap break-words mb-2">{{ log_item.notes || 'No notes.' }}</p>
+                                                <div v-if="log_item.keywords && log_item.keywords.length" class="flex flex-wrap gap-1.5">
+                                                    <span v-for="kw in log_item.keywords" :key="kw" class="text-indigo-300 bg-indigo-800/60 px-2 py-0.5 rounded-full text-xs">{{ kw }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="flex sm:flex-col items-end sm:items-center gap-2 shrink-0 self-start sm:self-center">
+                                                <button @click="goToLogTime(log_item.markIn)" class="btn btn-secondary !py-1 !px-2 !text-xs whitespace-nowrap" :disabled="!videoSrc">
+                                                    <i class="ph ph-play-circle mr-1"></i> Go
+                                                </button>
+                                                <button @click="confirmDeleteLog(log_item.id)" class="text-stone-500 hover:text-red-500 p-1 btn-sm" aria-label="Delete log">
+                                                    <i class="ph ph-trash text-lg"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                             <div v-else-if="videoData" class="text-center py-8">
+                                <i class="ph-light ph-list-checks text-5xl text-stone-600 mb-3"></i>
+                                <p class="text-stone-400">No logs saved for this video yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                     <div v-else class="flex-grow flex items-center justify-center">
+                        <i class="ph-light ph-spinner-gap text-6xl text-stone-600 mb-4 animate-spin"></i>
+                        <p class="text-xl text-stone-400">Loading video data...</p>
+                    </div>
+
+                     <ConfirmationModal
+                        :is-open="!!logToDelete"
+                        title="Delete Log?"
+                        message="Are you sure you want to delete this log entry? This action cannot be undone."
+                        @confirm="deleteLog"
+                        @cancel="logToDelete = null"
+                    />
+                </div>
+            `
+        };
+
+        // --- Vue Router Setup ---
+        const routes = [
+            { path: '/', component: ProjectDashboard },
+            { path: '/project/:id', component: AssemblyHub, props: true },
+            { path: '/video/:id', component: LoggingStation, props: true },
+            { path: '/:pathMatch(.*)*', redirect: '/' } // Catch all redirect to home
+        ];
+
+        const router = createRouter({
+            history: createWebHashHistory(),
+            routes,
+        });
+
+        // --- Vue App Initialization ---
+        const app = createApp({
+            components: { ToastNotifications },
+            setup() {
+                onMounted(() => {
+                    if (!('showOpenFilePicker' in window)) {
+                        toastStore.addToast('File System Access API not fully supported. Video import may be limited.', 'info', 7000);
+                    }
+                     if (!('indexedDB' in window)) {
+                        toastStore.addToast('IndexedDB not supported. Application data cannot be saved.', 'error', 10000);
+                    }
+                });
             }
-        );
-    }
-
-
-    // --- Initialization ---
-    async function initApp() {
-        console.log("[INITAPP] Initializing application...");
-        // Cache DOM Elements - Crucial to do this early and correctly
-        DOMElements.app = document.getElementById('app');
-        DOMElements.projectDashboardScreen = document.getElementById('project-dashboard-screen');
-        DOMElements.assemblyHubScreen = document.getElementById('assembly-hub-screen');
-        DOMElements.loggingStationScreen = document.getElementById('logging-station-screen');
-        
-        DOMElements.createNewProjectBtn = document.getElementById('create-new-project-btn');
-        DOMElements.projectList = document.getElementById('project-list');
-        DOMElements.projectDashboardEmptyState = document.getElementById('project-dashboard-empty-state');
-        DOMElements.exportAllDataBtn = document.getElementById('export-all-data-btn');
-
-        DOMElements.assemblyBackToDashboardBtn = document.getElementById('assembly-back-to-dashboard-btn');
-        DOMElements.assemblyProjectTitle = document.getElementById('assembly-project-title');
-        DOMElements.assemblySearchBar = document.getElementById('assembly-search-bar');
-        DOMElements.addVideosBtn = document.getElementById('add-videos-btn');
-        DOMElements.videoFileInput = document.getElementById('video-file-input');
-        DOMElements.videoList = document.getElementById('video-list');
-        DOMElements.assemblyHubEmptyState = document.getElementById('assembly-hub-empty-state');
-
-        DOMElements.loggingBackToAssemblyBtn = document.getElementById('logging-back-to-assembly-btn');
-        DOMElements.loggingVideoFilename = document.getElementById('logging-video-filename');
-        DOMElements.videoPlayer = document.getElementById('video-player');
-        DOMElements.videoTimelineContainer = document.getElementById('video-timeline-container');
-        DOMElements.timelineProgress = document.getElementById('timeline-progress');
-        DOMElements.timelineMarkInOut = document.getElementById('timeline-mark-in-out');
-        DOMElements.playbackSpeed = document.getElementById('playback-speed');
-        DOMElements.markInBtn = document.getElementById('mark-in-btn');
-        DOMElements.markOutBtn = document.getElementById('mark-out-btn');
-        DOMElements.markInTimeDisplay = document.getElementById('mark-in-time-display');
-        DOMElements.markOutTimeDisplay = document.getElementById('mark-out-time-display');
-        DOMElements.logNotes = document.getElementById('log-notes');
-        DOMElements.logRating = document.getElementById('log-rating');
-        DOMElements.logKeywordsInput = document.getElementById('log-keywords-input');
-        DOMElements.logKeywordsContainer = document.getElementById('log-keywords-container');
-        DOMElements.saveLogBtn = document.getElementById('save-log-btn');
-        DOMElements.savedLogsList = document.getElementById('saved-logs-list');
-        DOMElements.loggingStationEmptyState = document.getElementById('logging-station-empty-state');
-
-        DOMElements.previewSelectsModal = document.getElementById('preview-selects-modal');
-        DOMElements.previewSelectsPlayer = document.getElementById('preview-selects-player');
-        DOMElements.previewSelectsInfo = document.getElementById('preview-selects-info');
-        DOMElements.previewSelectsNotes = document.getElementById('preview-selects-notes');
-        
-        DOMElements.confirmDialog = document.getElementById('confirm-dialog');
-        DOMElements.confirmDialogTitle = document.getElementById('confirm-dialog-title');
-        DOMElements.confirmDialogMessage = document.getElementById('confirm-dialog-message');
-        DOMElements.confirmDialogCancelBtn = document.getElementById('confirm-dialog-cancel-btn');
-        DOMElements.confirmDialogConfirmBtn = document.getElementById('confirm-dialog-confirm-btn');
-        
-        DOMElements.notificationsContainer = document.getElementById('notifications-container');
-
-        // Verify all critical screen elements are cached
-        if (!DOMElements.projectDashboardScreen || !DOMElements.assemblyHubScreen || !DOMElements.loggingStationScreen) {
-            console.error("[INITAPP] CRITICAL ERROR: One or more main screen elements could not be found in the DOM. Halting initialization.");
-            document.body.innerHTML = "<h1 style='color:red; text-align:center; padding-top: 20vh;'>Application UI Error: Core screen elements missing. Check console.</h1>";
-            return;
-        }
-        console.log("[INITAPP] All DOMElements cached successfully.");
-
-
-        // Init DB
-        try {
-            await initDB();
-            // Moved "Application ready" to after initial navigation
-        } catch (error) {
-            showNotification("Failed to initialize database. App may not work correctly.", "error", 10000);
-            console.error("[INITAPP] DB Init failed:", error);
-            // Consider disabling features or showing a more permanent error message
-        }
-
-        // Setup Event Listeners (ensure elements exist before adding listeners)
-        if (DOMElements.createNewProjectBtn) DOMElements.createNewProjectBtn.addEventListener('click', handleCreateNewProject);
-        if (DOMElements.exportAllDataBtn) DOMElements.exportAllDataBtn.addEventListener('click', exportAllData);
-        if (DOMElements.projectList) {
-            DOMElements.projectList.addEventListener('click', (event) => {
-                const deleteButton = event.target.closest('.delete-project-btn');
-                if (deleteButton && deleteButton.dataset.projectId) {
-                    handleDeleteProject(parseInt(deleteButton.dataset.projectId));
-                }
-                // Navigation to project handled in loadAndRenderProjects' item creation
-            });
-        }
-
-        if (DOMElements.assemblyBackToDashboardBtn) DOMElements.assemblyBackToDashboardBtn.addEventListener('click', () => navigateTo('project-dashboard'));
-        if (DOMElements.addVideosBtn) DOMElements.addVideosBtn.addEventListener('click', handleAddVideos);
-        if (DOMElements.videoFileInput) {
-            DOMElements.videoFileInput.addEventListener('change', (event) => {
-                processSelectedVideoFiles(event.target.files);
-                event.target.value = null; 
-            });
-        }
-        if (DOMElements.assemblySearchBar) DOMElements.assemblySearchBar.addEventListener('input', handleAssemblySearch);
-
-
-        if (DOMElements.loggingBackToAssemblyBtn) {
-            DOMElements.loggingBackToAssemblyBtn.addEventListener('click', () => {
-                if (logVideoPlayer) {
-                    logVideoPlayer.pause();
-                    if (logVideoPlayer.src && logVideoPlayer.src.startsWith('blob:')) {
-                        URL.revokeObjectURL(logVideoPlayer.src);
-                    }
-                    logVideoPlayer.src = ""; 
-                    logVideoPlayer.onloadedmetadata = null;
-                    logVideoPlayer.ontimeupdate = null;
-                    logVideoPlayer.onseeked = null;
-                }
-                navigateTo('assembly-hub', { projectId: state.currentProjectId, projectName: state.currentProjectName });
-            });
-        }
-        if (DOMElements.markInBtn) DOMElements.markInBtn.addEventListener('click', handleMarkIn);
-        if (DOMElements.markOutBtn) DOMElements.markOutBtn.addEventListener('click', handleMarkOut);
-        if (DOMElements.videoTimelineContainer) DOMElements.videoTimelineContainer.addEventListener('click', handleTimelineClick);
-        if (DOMElements.logRating) DOMElements.logRating.addEventListener('click', handleStarRatingClick);
-        if (DOMElements.logKeywordsInput) DOMElements.logKeywordsInput.addEventListener('keydown', handleKeywordInputKeydown);
-        if (DOMElements.saveLogBtn) DOMElements.saveLogBtn.addEventListener('click', handleSaveLog);
-        if (DOMElements.playbackSpeed) {
-            DOMElements.playbackSpeed.addEventListener('change', (e) => {
-                if(logVideoPlayer) logVideoPlayer.playbackRate = parseFloat(e.target.value);
-            });
-        }
-
-        document.querySelectorAll('.close-modal-btn').forEach(btn => {
-            btn.addEventListener('click', (event) => {
-                const modalId = event.target.dataset.targetModal;
-                if (modalId === 'preview-selects-modal') {
-                    closePreviewSelectsModal();
-                } else if (modalId && document.getElementById(modalId)) { // Check if modalId is valid
-                    document.getElementById(modalId).classList.add('hidden');
-                } else if (event.target.closest('.modal')) { // Fallback for any close btn inside a modal
-                     event.target.closest('.modal').classList.add('hidden');
-                }
-            });
         });
-        if (DOMElements.confirmDialogCancelBtn) DOMElements.confirmDialogCancelBtn.addEventListener('click', () => {
-            if (DOMElements.confirmDialog) DOMElements.confirmDialog.classList.add('hidden');
-        });
+        app.use(router);
+        app.mount('#app');
 
-
-        document.addEventListener('keydown', handleKeyboardShortcuts);
-        
-        // Initial Render
-        console.log("[INITAPP] Navigating to initial screen: project-dashboard");
-        navigateTo('project-dashboard');
-        showNotification("Application ready.", "success", 2000); // Show after initial screen is supposed to be visible
-        console.log("[INITAPP] Application initialization complete.");
-    }
-
-    // Start the application
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initApp);
-    } else {
-        // DOMContentLoaded has already fired
-        initApp();
-    }
-
-})();
-</script>
+    </script>
 </body>
 </html>
