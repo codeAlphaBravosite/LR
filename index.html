@@ -191,18 +191,20 @@
             flex-direction: column;
             gap: 15px;
         }
-        #video-selector-area { max-height: 200px; overflow-y: auto; border: 1px solid var(--medium-gray); padding: 10px; border-radius: 5px; background: white;}
-        #video-selector-area .video-select-item { padding: 8px; cursor: pointer; border-bottom: 1px solid var(--light-gray); }
-        #video-selector-area .video-select-item:hover, #video-selector-area .video-select-item.active { background-color: var(--primary-color); color: white; }
-        #video-selector-area .video-select-item:last-child { border-bottom: none; }
+        #video-selector-wrapper-s2 { max-height: 200px; overflow-y: auto; border: 1px solid var(--medium-gray); padding: 10px; border-radius: 5px; background: white;}
+        #video-selector-items-s2 .video-select-item { padding: 8px; cursor: pointer; border-bottom: 1px solid var(--light-gray); }
+        #video-selector-items-s2 .video-select-item:hover, #video-selector-items-s2 .video-select-item.active { background-color: var(--primary-color); color: white; }
+        #video-selector-items-s2 .video-select-item:last-child { border-bottom: none; }
         #selected-video-area { margin-top: 15px; }
-        #search-results-container { margin-top: 10px; }
+        #search-results-container-s2 { margin-top: 10px; }
         .search-result-item { border: 1px solid var(--medium-gray); padding: 10px; margin-bottom: 5px; border-radius: 4px; background: white;}
         
-        /* Utility */
+        /* Utility & Empty States */
         .hidden { display: none !important; }
         .text-sm { font-size: 0.9rem; }
         .text-muted { color: var(--dark-gray); }
+        .empty-state { text-align: center; color: var(--dark-gray); padding: 20px; font-style: italic;}
+
 
         /* Responsive adjustments */
         @media (min-width: 768px) {
@@ -228,10 +230,10 @@
             </header>
             <main class="container">
                 <h2>My Projects</h2>
-                <div id="projects-list-container">
+                <div id="projects-list-items-s1">
                     <!-- Project cards will be rendered here -->
-                    <p class="empty-state hidden">No projects yet. Create one to get started!</p>
                 </div>
+                <p id="projects-empty-message-s1" class="empty-state hidden">No projects yet. Create one to get started!</p>
             </main>
         </section>
 
@@ -253,8 +255,11 @@
                 <div class="content-wrapper">
                     <div>
                         <h3>Videos in Project</h3>
-                        <div id="video-selector-area">
-                             <p class="empty-state hidden">No videos in this project. Add some!</p>
+                        <div id="video-selector-wrapper-s2"> <!-- Renamed from video-selector-area -->
+                             <div id="video-selector-items-s2">
+                                <!-- Video select items rendered here -->
+                             </div>
+                             <p id="video-selector-empty-message-s2" class="empty-state hidden">No videos in this project. Add some!</p>
                         </div>
                     </div>
                     <div id="selected-video-area" class="card hidden">
@@ -267,12 +272,12 @@
                         </div>
                         <div id="screen2-video-player-container">
                             <video id="screen2-video-player" controls></video>
-                             <!-- Basic controls. Custom controls if needed for specific segment playback features. -->
                         </div>
                         <h4>Logged Clips</h4>
-                        <div id="screen2-logs-list">
-                            <p class="empty-state hidden">No logs for this video yet.</p>
+                        <div id="screen2-logs-list-items">
+                            <!-- Log items rendered here -->
                         </div>
+                        <p id="screen2-logs-empty-message" class="empty-state hidden">No logs for this video yet.</p>
                     </div>
                 </div>
             </main>
@@ -329,9 +334,10 @@
 
                 <div class="card">
                     <h4>Saved Logs</h4>
-                    <div id="saved-logs-list-s3">
-                         <p class="empty-state hidden">No logs saved for this video yet.</p>
+                    <div id="saved-logs-list-items-s3">
+                         <!-- Log items rendered here -->
                     </div>
+                    <p id="saved-logs-empty-message-s3" class="empty-state hidden">No logs saved for this video yet.</p>
                 </div>
             </main>
         </section>
@@ -382,19 +388,13 @@
             let appData = { projects: [] };
             let currentScreen = 'screen-projects';
             let currentProjectId = null;
-            let currentVideoId_S2 = null; // For screen 2 selected video
-            let currentVideoData_S3 = null; // For screen 3 { id, name, fileObject (transient), logs: [] }
-            
-            // In-memory store for File objects this session
-            // Key: videoId, Value: File object
+            let currentVideoId_S2 = null; 
+            let currentVideoData_S3 = null; 
             let videoFileObjects = {}; 
-            
-            // Logging form state for Screen 3
             let s3_markInTime = 0;
             let s3_markOutTime = 0;
             let s3_currentRating = 0;
             let s3_editingLogId = null;
-
             const LOCAL_STORAGE_KEY = 'logReelData';
 
             // --- DOM Elements Cache ---
@@ -412,7 +412,8 @@
             const btnNewProject = document.getElementById('btn-new-project');
             const btnImportProjects = document.getElementById('btn-import-projects');
             const importFileInput = document.getElementById('import-file-input');
-            const projectsListContainer = document.getElementById('projects-list-container');
+            const projectsListItemsS1 = document.getElementById('projects-list-items-s1'); // Updated
+            const projectsEmptyMessageS1 = document.getElementById('projects-empty-message-s1'); // New
             const newProjectNameInput = document.getElementById('new-project-name-input');
             const btnConfirmNewProject = document.getElementById('btn-confirm-new-project');
             const btnCancelNewProject = document.getElementById('btn-cancel-new-project');
@@ -425,14 +426,16 @@
             const btnExportProject = document.getElementById('btn-export-project');
             const searchLogsInputS2 = document.getElementById('search-logs-input-s2');
             const searchResultsContainerS2 = document.getElementById('search-results-container-s2');
-            const videoSelectorArea = document.getElementById('video-selector-area');
+            const videoSelectorWrapperS2 = document.getElementById('video-selector-wrapper-s2'); // Wrapper for items and empty message
+            const videoSelectorItemsS2 = document.getElementById('video-selector-items-s2'); // Updated
+            const videoSelectorEmptyMessageS2 = document.getElementById('video-selector-empty-message-s2'); // New
             const selectedVideoArea = document.getElementById('selected-video-area');
             const selectedVideoFilenameS2 = document.getElementById('selected-video-filename-s2');
             const screen2VideoPlayer = document.getElementById('screen2-video-player');
-            const screen2LogsList = document.getElementById('screen2-logs-list');
+            const screen2LogsListItems = document.getElementById('screen2-logs-list-items'); // Updated
+            const screen2LogsEmptyMessage = document.getElementById('screen2-logs-empty-message'); // New
             const btnGoToLoggingS3 = document.getElementById('btn-go-to-logging-s3');
             const btnDeleteSelectedVideoS2 = document.getElementById('btn-delete-selected-video-s2');
-
 
             // Screen 3
             const btnBackToProjectVideosS3 = document.getElementById('btn-back-to-project-videos-s3');
@@ -452,7 +455,8 @@
             const logKeywordsS3 = document.getElementById('log-keywords-s3');
             const btnSaveLogS3 = document.getElementById('btn-save-log-s3');
             const btnClearLogFormS3 = document.getElementById('btn-clear-log-form-s3');
-            const savedLogsListS3 = document.getElementById('saved-logs-list-s3');
+            const savedLogsListItemsS3 = document.getElementById('saved-logs-list-items-s3'); // Updated
+            const savedLogsEmptyMessageS3 = document.getElementById('saved-logs-empty-message-s3'); // New
             
             // Modals
             const confirmationMessage = document.getElementById('confirmation-message');
@@ -467,7 +471,6 @@
             const btnConfirmReselectVideo = document.getElementById('btn-confirm-reselect-video');
             const btnCancelReselect = document.getElementById('btn-cancel-reselect');
             let reselectVideoPromiseResolve = null;
-
 
             // --- Utility Functions ---
             const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -485,18 +488,10 @@
 
                 return includeMillis ? `${hh}:${mm}:${ss}.${ms}` : `${hh}:${mm}:${ss}`;
             }
-
-            function toggleEmptyState(container, dataArray) {
-                const emptyStateEl = container.querySelector('.empty-state');
-                if (emptyStateEl) {
-                    emptyStateEl.classList.toggle('hidden', dataArray && dataArray.length > 0);
-                }
-            }
             
             // --- Local Storage ---
             function saveData() {
                 try {
-                    // Create a deep copy of appData without File objects for serialization
                     const serializableAppData = JSON.parse(JSON.stringify(appData));
                     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(serializableAppData));
                 } catch (error) {
@@ -509,7 +504,6 @@
                 const data = localStorage.getItem(LOCAL_STORAGE_KEY);
                 if (data) {
                     appData = JSON.parse(data);
-                    // Initialize transient File object store. User will need to re-select files.
                     videoFileObjects = {}; 
                 } else {
                     appData = { projects: [] };
@@ -521,7 +515,7 @@
                 Object.values(screens).forEach(s => s.classList.remove('active'));
                 screens[screenId].classList.add('active');
                 currentScreen = screenId;
-                window.scrollTo(0, 0); // Scroll to top on screen change
+                window.scrollTo(0, 0); 
             }
 
             // --- Modal Management ---
@@ -543,7 +537,7 @@
                 return new Promise((resolve) => {
                     reselectVideoPromiseResolve = resolve;
                     reselectVideoMsg.textContent = `Please select the video file: "${videoName}" to continue.`;
-                    reselectVideoInput.value = ''; // Clear previous selection
+                    reselectVideoInput.value = ''; 
                     showModal('reselectVideo');
                 });
             }
@@ -561,63 +555,48 @@
             };
             btnCancelReselect.onclick = () => {
                  if (reselectVideoPromiseResolve) {
-                    reselectVideoPromiseResolve(null); // Indicate cancellation
+                    reselectVideoPromiseResolve(null); 
                 }
                 hideModal('reselectVideo');
             }
 
-
             // --- Thumbnail Generation ---
             async function generateThumbnail(videoElement, time) {
                 return new Promise((resolve) => {
-                    if (!videoElement.src || videoElement.readyState < 2) { // HAVE_CURRENT_DATA or more
-                        resolve(null); // Cannot generate thumbnail if video not ready
+                    if (!videoElement.src || videoElement.readyState < 2) { 
+                        resolve(null); 
                         return;
                     }
-                    
                     const wasPaused = videoElement.paused;
                     const originalTime = videoElement.currentTime;
-
                     videoElement.currentTime = time;
-
                     const onSeeked = () => {
                         videoElement.removeEventListener('seeked', onSeeked);
                         const canvas = document.createElement('canvas');
-                        // Standard thumbnail aspect ratio 16:9, e.g., 160x90
                         canvas.width = 160; 
                         canvas.height = 90; 
-                        
                         const ctx = canvas.getContext('2d');
-                        // Calculate dimensions to maintain aspect ratio
                         const videoAspect = videoElement.videoWidth / videoElement.videoHeight;
                         const canvasAspect = canvas.width / canvas.height;
                         let drawWidth, drawHeight, offsetX, offsetY;
-
-                        if (videoAspect > canvasAspect) { // Video wider than canvas
+                        if (videoAspect > canvasAspect) { 
                             drawHeight = canvas.height;
                             drawWidth = drawHeight * videoAspect;
                             offsetX = (canvas.width - drawWidth) / 2;
                             offsetY = 0;
-                        } else { // Video taller than canvas or same aspect
+                        } else { 
                             drawWidth = canvas.width;
                             drawHeight = drawWidth / videoAspect;
                             offsetY = (canvas.height - drawHeight) / 2;
                             offsetX = 0;
                         }
                         ctx.drawImage(videoElement, offsetX, offsetY, drawWidth, drawHeight);
-                        
-                        // Restore video state
                         if (wasPaused) videoElement.pause(); else videoElement.play();
                         videoElement.currentTime = originalTime;
-                        
-                        resolve(canvas.toDataURL('image/jpeg', 0.7)); // Quality 0.7
+                        resolve(canvas.toDataURL('image/jpeg', 0.7)); 
                     };
-                    
                     videoElement.addEventListener('seeked', onSeeked, { once: true });
-
-                    // If already at the correct time and seeked, manually trigger
                     if (videoElement.currentTime === time && videoElement.seekable.length > 0) {
-                         // A small timeout to ensure the frame is rendered
                         setTimeout(onSeeked, 50);
                     }
                 });
@@ -625,26 +604,28 @@
 
             // --- Screen 1: Projects List ---
             function renderProjectsScreen() {
-                projectsListContainer.innerHTML = ''; // Clear existing
-                if (appData.projects.length === 0) {
-                    toggleEmptyState(projectsListContainer, appData.projects);
-                    return;
-                }
+                projectsListItemsS1.innerHTML = ''; // Clear existing items
                 
-                appData.projects.forEach(project => {
-                    const card = document.createElement('div');
-                    card.className = 'card project-card';
-                    card.innerHTML = `
-                        <h3>${project.name}</h3>
-                        <p>Videos: ${project.videos.length}</p>
-                        <div class="actions">
-                            <button class="btn-open-project" data-project-id="${project.id}"><i class="fas fa-folder-open"></i> Open</button>
-                            <button class="btn-delete-project danger" data-project-id="${project.id}"><i class="fas fa-trash"></i> Delete</button>
-                        </div>
-                    `;
-                    projectsListContainer.appendChild(card);
-                });
-                toggleEmptyState(projectsListContainer, appData.projects);
+                if (appData.projects.length === 0) {
+                    projectsListItemsS1.classList.add('hidden');
+                    projectsEmptyMessageS1.classList.remove('hidden');
+                } else {
+                    projectsListItemsS1.classList.remove('hidden');
+                    projectsEmptyMessageS1.classList.add('hidden');
+                    appData.projects.forEach(project => {
+                        const card = document.createElement('div');
+                        card.className = 'card project-card';
+                        card.innerHTML = `
+                            <h3>${project.name}</h3>
+                            <p>Videos: ${project.videos.length}</p>
+                            <div class="actions">
+                                <button class="btn-open-project" data-project-id="${project.id}"><i class="fas fa-folder-open"></i> Open</button>
+                                <button class="btn-delete-project danger" data-project-id="${project.id}"><i class="fas fa-trash"></i> Delete</button>
+                            </div>
+                        `;
+                        projectsListItemsS1.appendChild(card);
+                    });
+                }
 
                 document.querySelectorAll('.btn-open-project').forEach(btn => {
                     btn.onclick = () => openProject(btn.dataset.projectId);
@@ -664,12 +645,8 @@
             btnConfirmNewProject.onclick = () => {
                 const name = newProjectNameInput.value.trim();
                 if (name) {
-                    const newProject = {
-                        id: generateId(),
-                        name: name,
-                        videos: []
-                    };
-                    appData.projects.unshift(newProject); // Add to beginning
+                    const newProject = { id: generateId(), name: name, videos: [] };
+                    appData.projects.unshift(newProject);
                     saveData();
                     renderProjectsScreen();
                     hideModal('newProject');
@@ -683,10 +660,10 @@
                 const project = appData.projects.find(p => p.id === projectId);
                 if (project) {
                     projectNameHeaderS2.textContent = project.name;
-                    currentVideoId_S2 = null; // Reset selected video for the project
-                    selectedVideoArea.classList.add('hidden'); // Hide video details initially
-                    searchLogsInputS2.value = ''; // Clear search
-                    searchResultsContainerS2.classList.add('hidden'); // Hide search results
+                    currentVideoId_S2 = null; 
+                    selectedVideoArea.classList.add('hidden'); 
+                    searchLogsInputS2.value = ''; 
+                    searchResultsContainerS2.classList.add('hidden'); 
                     renderVideoSelectorS2();
                     showScreen('projectVideos');
                 }
@@ -696,7 +673,6 @@
                 const project = appData.projects.find(p => p.id === projectId);
                 showConfirmation(`Are you sure you want to delete project "${project.name}" and all its data? This cannot be undone.`, () => {
                     appData.projects = appData.projects.filter(p => p.id !== projectId);
-                    // Also clear any associated file objects for videos in this project
                     project.videos.forEach(v => delete videoFileObjects[v.id]);
                     saveData();
                     renderProjectsScreen();
@@ -712,26 +688,23 @@
                         try {
                             const importedData = JSON.parse(e.target.result);
                             if (importedData && Array.isArray(importedData.projects)) {
-                                // Simple merge: add imported projects to existing ones.
-                                // Could add more sophisticated merging/conflict resolution later.
                                 importedData.projects.forEach(p => {
                                     if (!appData.projects.find(existingP => existingP.id === p.id)) {
                                         appData.projects.push(p);
                                     } else {
-                                        // TODO: Handle conflicts, e.g. overwrite or skip
-                                        console.warn(`Project with ID ${p.id} already exists. Skipping import for this project.`);
+                                        console.warn(`Project with ID ${p.id} already exists. Skipping import.`);
                                     }
                                 });
                                 saveData();
                                 renderProjectsScreen();
-                                alert('Projects imported successfully! Note: Video files will need to be re-linked manually if not already loaded.');
+                                alert('Projects imported successfully! Note: Video files will need to be re-linked manually.');
                             } else {
                                 alert('Invalid import file format.');
                             }
                         } catch (err) {
                             alert('Error reading or parsing import file: ' + err.message);
                         }
-                        importFileInput.value = ''; // Reset file input
+                        importFileInput.value = ''; 
                     };
                     reader.readAsText(file);
                 }
@@ -741,7 +714,7 @@
             btnBackToProjects.onclick = () => {
                 currentProjectId = null;
                 currentVideoId_S2 = null;
-                screen2VideoPlayer.src = ''; // Clear player
+                screen2VideoPlayer.src = ''; 
                 showScreen('projects');
             };
 
@@ -750,36 +723,35 @@
             }
 
             function renderVideoSelectorS2() {
-                videoSelectorArea.innerHTML = '';
+                videoSelectorItemsS2.innerHTML = '';
                 const project = getCurrentProjectS2();
                 if (!project || project.videos.length === 0) {
-                    toggleEmptyState(videoSelectorArea, project ? project.videos : []);
-                    selectedVideoArea.classList.add('hidden'); // Ensure detail area is hidden
-                    return;
-                }
-
-                project.videos.forEach(video => {
-                    const item = document.createElement('div');
-                    item.className = 'video-select-item';
-                    item.textContent = video.name;
-                    item.dataset.videoId = video.id;
-                    if (video.id === currentVideoId_S2) {
-                        item.classList.add('active');
-                    }
-                    item.onclick = () => {
-                        selectVideoS2(video.id);
-                        searchResultsContainerS2.classList.add('hidden'); // Hide search results when new video selected
-                        searchLogsInputS2.value = '';
-                    };
-                    videoSelectorArea.appendChild(item);
-                });
-                toggleEmptyState(videoSelectorArea, project.videos);
-
-                // If a video was previously selected, re-render its details
-                if (currentVideoId_S2) {
-                     selectVideoS2(currentVideoId_S2); // This will re-render details
+                    videoSelectorItemsS2.classList.add('hidden');
+                    videoSelectorEmptyMessageS2.classList.remove('hidden');
+                    selectedVideoArea.classList.add('hidden'); 
                 } else {
-                    selectedVideoArea.classList.add('hidden');
+                    videoSelectorItemsS2.classList.remove('hidden');
+                    videoSelectorEmptyMessageS2.classList.add('hidden');
+                    project.videos.forEach(video => {
+                        const item = document.createElement('div');
+                        item.className = 'video-select-item';
+                        item.textContent = video.name;
+                        item.dataset.videoId = video.id;
+                        if (video.id === currentVideoId_S2) {
+                            item.classList.add('active');
+                        }
+                        item.onclick = () => {
+                            selectVideoS2(video.id);
+                            searchResultsContainerS2.classList.add('hidden'); 
+                            searchLogsInputS2.value = '';
+                        };
+                        videoSelectorItemsS2.appendChild(item);
+                    });
+                    if (currentVideoId_S2) {
+                         selectVideoS2(currentVideoId_S2); 
+                    } else {
+                        selectedVideoArea.classList.add('hidden');
+                    }
                 }
             }
             
@@ -793,14 +765,13 @@
                     return;
                 }
                 
-                document.querySelectorAll('#video-selector-area .video-select-item').forEach(el => {
+                document.querySelectorAll('#video-selector-items-s2 .video-select-item').forEach(el => {
                     el.classList.toggle('active', el.dataset.videoId === videoId);
                 });
 
                 selectedVideoFilenameS2.textContent = videoData.name;
                 selectedVideoArea.classList.remove('hidden');
                 
-                // Load video into player
                 if (videoFileObjects[videoId]) {
                     screen2VideoPlayer.src = URL.createObjectURL(videoFileObjects[videoId]);
                 } else {
@@ -808,42 +779,43 @@
                     if (reselectedFile) {
                         videoFileObjects[videoId] = reselectedFile;
                         screen2VideoPlayer.src = URL.createObjectURL(reselectedFile);
-                         // Optionally verify filename match, though for now trust user
                     } else {
-                        screen2VideoPlayer.src = ''; // Clear src if no file selected
-                        alert(`Video file for "${videoData.name}" not available. Some functions may be limited.`);
+                        screen2VideoPlayer.src = ''; 
+                        alert(`Video file for "${videoData.name}" not available. Functions may be limited.`);
                     }
                 }
                 renderLogsListS2(videoData.logs || []);
             }
             
             function renderLogsListS2(logs) {
-                screen2LogsList.innerHTML = '';
+                screen2LogsListItems.innerHTML = '';
                 if (!logs || logs.length === 0) {
-                    toggleEmptyState(screen2LogsList, logs);
-                    return;
-                }
-                logs.forEach((log, index) => {
-                    const item = document.createElement('div');
-                    item.className = 'log-item';
-                    const ratingHtml = Array(5).fill(0).map((_, i) => 
-                        `<i class="${i < log.rating ? 'fas' : 'far'} fa-star" style="color: #f39c12;"></i>`
-                    ).join('');
+                    screen2LogsListItems.classList.add('hidden');
+                    screen2LogsEmptyMessage.classList.remove('hidden');
+                } else {
+                    screen2LogsListItems.classList.remove('hidden');
+                    screen2LogsEmptyMessage.classList.add('hidden');
+                    logs.forEach((log, index) => {
+                        const item = document.createElement('div');
+                        item.className = 'log-item';
+                        const ratingHtml = Array(5).fill(0).map((_, i) => 
+                            `<i class="${i < log.rating ? 'fas' : 'far'} fa-star" style="color: #f39c12;"></i>`
+                        ).join('');
 
-                    item.innerHTML = `
-                        ${log.thumbnail ? `<img src="${log.thumbnail}" class="thumbnail" alt="Log thumbnail">` : '<div class="thumbnail">No Preview</div>'}
-                        <div class="details">
-                            <p><strong>#${index + 1}: ${log.notes.substring(0, 50)}${log.notes.length > 50 ? '...' : ''}</strong></p>
-                            <p class="text-sm text-muted">Time: ${formatTime(log.markIn)} - ${formatTime(log.markOut)} | Rating: ${ratingHtml}</p>
-                            ${log.keywords && log.keywords.length > 0 ? `<p class="text-sm text-muted">Keywords: ${log.keywords.join(', ')}</p>` : ''}
-                        </div>
-                        <div class="actions">
-                            <button class="btn-play-clip-s2 secondary" data-log-id="${log.id}"><i class="fas fa-play"></i> Play Clip</button>
-                        </div>
-                    `;
-                    screen2LogsList.appendChild(item);
-                });
-                toggleEmptyState(screen2LogsList, logs);
+                        item.innerHTML = `
+                            ${log.thumbnail ? `<img src="${log.thumbnail}" class="thumbnail" alt="Log thumbnail">` : '<div class="thumbnail">No Preview</div>'}
+                            <div class="details">
+                                <p><strong>#${index + 1}: ${log.notes.substring(0, 50)}${log.notes.length > 50 ? '...' : ''}</strong></p>
+                                <p class="text-sm text-muted">Time: ${formatTime(log.markIn)} - ${formatTime(log.markOut)} | Rating: ${ratingHtml}</p>
+                                ${log.keywords && log.keywords.length > 0 ? `<p class="text-sm text-muted">Keywords: ${log.keywords.join(', ')}</p>` : ''}
+                            </div>
+                            <div class="actions">
+                                <button class="btn-play-clip-s2 secondary" data-log-id="${log.id}"><i class="fas fa-play"></i> Play Clip</button>
+                            </div>
+                        `;
+                        screen2LogsListItems.appendChild(item);
+                    });
+                }
 
                 document.querySelectorAll('.btn-play-clip-s2').forEach(btn => {
                     btn.onclick = () => {
@@ -853,7 +825,6 @@
                         if (log && screen2VideoPlayer.src) {
                             screen2VideoPlayer.currentTime = log.markIn;
                             screen2VideoPlayer.play();
-                            // Optional: auto-pause at markOut
                             const onTimeUpdate = () => {
                                 if (screen2VideoPlayer.currentTime >= log.markOut) {
                                     screen2VideoPlayer.pause();
@@ -873,23 +844,17 @@
 
                 Array.from(event.target.files).forEach(file => {
                     const videoId = generateId();
-                    const videoData = {
-                        id: videoId,
-                        name: file.name,
-                        type: file.type,
-                        logs: []
-                    };
-                    // Check for duplicates by name in current project
+                    const videoData = { id: videoId, name: file.name, type: file.type, logs: [] };
                     if (project.videos.some(v => v.name === file.name)) {
-                        alert(`Video "${file.name}" already exists in this project. Skipping.`);
+                        alert(`Video "${file.name}" already exists. Skipping.`);
                         return;
                     }
                     project.videos.push(videoData);
-                    videoFileObjects[videoId] = file; // Store File object in session
+                    videoFileObjects[videoId] = file; 
                 });
                 saveData();
                 renderVideoSelectorS2();
-                addVideosInputS2.value = ''; // Reset input
+                addVideosInputS2.value = ''; 
             };
 
             btnDeleteSelectedVideoS2.onclick = () => {
@@ -898,9 +863,9 @@
                 const video = project.videos.find(v => v.id === currentVideoId_S2);
                 showConfirmation(`Are you sure you want to delete video "${video.name}" and all its logs?`, () => {
                     project.videos = project.videos.filter(v => v.id !== currentVideoId_S2);
-                    delete videoFileObjects[currentVideoId_S2]; // Remove from session store
+                    delete videoFileObjects[currentVideoId_S2]; 
                     saveData();
-                    currentVideoId_S2 = null; // Reset selection
+                    currentVideoId_S2 = null; 
                     selectedVideoArea.classList.add('hidden');
                     renderVideoSelectorS2();
                 });
@@ -910,9 +875,8 @@
                 const project = getCurrentProjectS2();
                 if (project) {
                     const filename = `${project.name.replace(/\s+/g, '_')}_LogReel_Export.json`;
-                    const dataStr = JSON.stringify({ projects: [project] }, null, 2); // Export as an array with one project for consistency
+                    const dataStr = JSON.stringify({ projects: [project] }, null, 2); 
                     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-                    
                     const linkElement = document.createElement('a');
                     linkElement.setAttribute('href', dataUri);
                     linkElement.setAttribute('download', filename);
@@ -925,11 +889,11 @@
                     const project = getCurrentProjectS2();
                     const videoData = project.videos.find(v => v.id === currentVideoId_S2);
                     if (videoData) {
-                        currentVideoData_S3 = { // Prepare data for Screen 3
+                        currentVideoData_S3 = { 
                             id: videoData.id,
                             name: videoData.name,
-                            logs: videoData.logs || [], // Ensure logs array exists
-                            fileObject: videoFileObjects[videoData.id] // Pass the File object if available
+                            logs: videoData.logs || [], 
+                            fileObject: videoFileObjects[videoData.id] 
                         };
                         setupVideoLoggingScreen();
                     }
@@ -943,13 +907,12 @@
 
                 if (!searchTerm || !project) {
                     searchResultsContainerS2.classList.add('hidden');
-                    // Show default view (video selector and selected video details)
-                    videoSelectorArea.classList.remove('hidden');
+                    videoSelectorWrapperS2.classList.remove('hidden'); // Show video selector wrapper
                     if(currentVideoId_S2) selectedVideoArea.classList.remove('hidden'); else selectedVideoArea.classList.add('hidden');
                     return;
                 }
 
-                videoSelectorArea.classList.add('hidden');
+                videoSelectorWrapperS2.classList.add('hidden'); // Hide video selector wrapper
                 selectedVideoArea.classList.add('hidden');
                 searchResultsContainerS2.classList.remove('hidden');
 
@@ -976,27 +939,22 @@
                 });
                 
                 if (!resultsFound) {
-                    searchResultsContainerS2.innerHTML = '<p class="text-muted">No clips found matching your search.</p>';
+                    searchResultsContainerS2.innerHTML = '<p class="text-muted empty-state">No clips found matching your search.</p>';
                 }
 
                 document.querySelectorAll('.btn-goto-log-from-search').forEach(btn => {
                     btn.onclick = async () => {
                         const videoId = btn.dataset.videoId;
                         const logId = btn.dataset.logId;
-                        await selectVideoS2(videoId); // Selects video, loads it, and shows its logs
-                        
-                        // Scroll to log and play (optional, might be complex for S2)
-                        // For now, selecting the video and showing its logs is the main action.
-                        // The user can then find the log in the list and play it.
-                        // Or, could enhance selectVideoS2 to highlight a specific log.
-                        const logToHighlight = screen2LogsList.querySelector(`.btn-play-clip-s2[data-log-id="${logId}"]`);
+                        await selectVideoS2(videoId); 
+                        const logToHighlight = screen2LogsListItems.querySelector(`.btn-play-clip-s2[data-log-id="${logId}"]`);
                         if (logToHighlight) {
                              logToHighlight.closest('.log-item').scrollIntoView({ behavior: 'smooth', block: 'center' });
-                             logToHighlight.click(); // Auto-play the clip
+                             logToHighlight.click(); 
                         }
-                        searchLogsInputS2.value = ''; // Clear search after navigating
+                        searchLogsInputS2.value = ''; 
                         searchResultsContainerS2.classList.add('hidden');
-                        videoSelectorArea.classList.remove('hidden');
+                        videoSelectorWrapperS2.classList.remove('hidden');
                         selectedVideoArea.classList.remove('hidden');
                     };
                 });
@@ -1005,13 +963,12 @@
             // --- Screen 3: Video Logging ---
             btnBackToProjectVideosS3.onclick = () => {
                 mainVideoPlayerS3.pause();
-                mainVideoPlayerS3.src = ''; // Release video resources
+                mainVideoPlayerS3.src = ''; 
                 currentVideoData_S3 = null;
                 showScreen('projectVideos');
-                // Ensure Screen 2 is correctly re-rendered if needed (e.g., if logs were updated)
                 if (currentProjectId) {
-                   renderVideoSelectorS2(); // Re-render video list (shows updated log counts)
-                   if(currentVideoId_S2) selectVideoS2(currentVideoId_S2); // Re-render selected video details
+                   renderVideoSelectorS2(); 
+                   if(currentVideoId_S2) selectVideoS2(currentVideoId_S2); 
                 }
             };
 
@@ -1028,30 +985,25 @@
                     const reselectedFile = await promptForVideoFile(currentVideoData_S3.name);
                     if (reselectedFile) {
                         currentVideoData_S3.fileObject = reselectedFile;
-                        // Persist this re-selected file in the session store
                         videoFileObjects[currentVideoData_S3.id] = reselectedFile;
                         mainVideoPlayerS3.src = URL.createObjectURL(reselectedFile);
                     } else {
                         mainVideoPlayerS3.src = '';
                         alert(`Cannot load video "${currentVideoData_S3.name}". Logging screen may not function fully.`);
-                        // Potentially disable logging controls or navigate back
-                        btnBackToProjectVideosS3.click(); // Go back if no video
+                        btnBackToProjectVideosS3.click(); 
                         return;
                     }
                 }
                 showScreen('videoLogging');
             }
 
-            // Screen 3 Video Player Listeners
             mainVideoPlayerS3.onloadedmetadata = () => {
                 durationDisplayS3.textContent = formatTime(mainVideoPlayerS3.duration);
                 timelineSliderS3.max = mainVideoPlayerS3.duration;
-                // Set initial Mark Out to duration if not already set, or sensible default
                 if (s3_markOutTime === 0 || s3_markOutTime > mainVideoPlayerS3.duration) {
-                     s3_markOutTime = mainVideoPlayerS3.duration; // Default mark out to end
+                     s3_markOutTime = mainVideoPlayerS3.duration; 
                      markOutTimecodeS3.textContent = formatTime(s3_markOutTime, true);
                 }
-                 // Reset mark in to 0
                 s3_markInTime = 0;
                 markInTimecodeS3.textContent = formatTime(s3_markInTime, true);
             };
@@ -1076,34 +1028,33 @@
                 if (!mainVideoPlayerS3.src) return;
                 s3_markInTime = mainVideoPlayerS3.currentTime;
                 markInTimecodeS3.textContent = formatTime(s3_markInTime, true);
-                if (s3_markInTime > s3_markOutTime && s3_markOutTime !== 0) { // If Mark In is after Mark Out
-                    s3_markOutTime = s3_markInTime; // Set Mark Out to Mark In
+                if (s3_markInTime > s3_markOutTime && s3_markOutTime !== 0) { 
+                    s3_markOutTime = s3_markInTime; 
                     markOutTimecodeS3.textContent = formatTime(s3_markOutTime, true);
                 }
             };
             btnMarkOutS3.onclick = () => {
                 if (!mainVideoPlayerS3.src) return;
                 s3_markOutTime = mainVideoPlayerS3.currentTime;
-                 if (s3_markOutTime < s3_markInTime) { // If Mark Out is before Mark In
-                    s3_markInTime = s3_markOutTime; // Set Mark In to Mark Out
+                 if (s3_markOutTime < s3_markInTime) { 
+                    s3_markInTime = s3_markOutTime; 
                     markInTimecodeS3.textContent = formatTime(s3_markInTime, true);
                 }
                 markOutTimecodeS3.textContent = formatTime(s3_markOutTime, true);
             };
 
-            // Star Rating Logic S3
             ratingStarsS3.querySelectorAll('.star').forEach(star => {
                 star.onclick = () => {
                     s3_currentRating = parseInt(star.dataset.value);
                     updateStarDisplayS3();
                 };
-                 star.onmouseover = () => { // Hover effect
+                 star.onmouseover = () => { 
                     const hoverValue = parseInt(star.dataset.value);
                     ratingStarsS3.querySelectorAll('.star').forEach((s, i) => {
                         s.innerHTML = `<i class="${i < hoverValue ? 'fas' : 'far'} fa-star"></i>`;
                     });
                 };
-                star.onmouseout = () => updateStarDisplayS3(); // Revert to current rating on mouse out
+                star.onmouseout = () => updateStarDisplayS3(); 
             });
 
             function updateStarDisplayS3() {
@@ -1119,7 +1070,7 @@
                 s3_currentRating = 0;
                 updateStarDisplayS3();
                 s3_markInTime = 0;
-                s3_markOutTime = mainVideoPlayerS3.duration || 0; // Default to video duration if available
+                s3_markOutTime = mainVideoPlayerS3.duration || 0; 
                 markInTimecodeS3.textContent = formatTime(s3_markInTime, true);
                 markOutTimecodeS3.textContent = formatTime(s3_markOutTime, true);
                 s3_editingLogId = null;
@@ -1134,105 +1085,88 @@
                     alert("No video loaded to save a log for.");
                     return;
                 }
-                if (s3_markOutTime <= s3_markInTime && (s3_markOutTime !== 0 || s3_markInTime !==0)) { // Allow 0-0 for full video if needed, but typically not.
+                if (s3_markOutTime <= s3_markInTime) {
                     if (s3_markInTime === 0 && s3_markOutTime === 0 && mainVideoPlayerS3.duration > 0) {
-                         // If both are 0, and video has duration, assume they want to log full video.
                          s3_markOutTime = mainVideoPlayerS3.duration;
                     } else if (s3_markOutTime <= s3_markInTime) {
                         alert('Mark Out time must be after Mark In time.');
                         return;
                     }
                 }
-
                 const notes = logNotesS3.value.trim();
                 const keywords = logKeywordsS3.value.split(',').map(k => k.trim()).filter(k => k);
-
                 if (!notes && s3_currentRating === 0 && keywords.length === 0) {
                     alert("Please provide notes, rating, or keywords for the log.");
                     return;
                 }
-                
-                // Thumbnail generation
-                mainVideoPlayerS3.pause(); // Pause for stable thumbnail
+                mainVideoPlayerS3.pause(); 
                 const thumbnail = await generateThumbnail(mainVideoPlayerS3, s3_markInTime);
-
                 const logEntry = {
                     id: s3_editingLogId || generateId(),
-                    markIn: s3_markInTime,
-                    markOut: s3_markOutTime,
-                    notes: notes,
-                    rating: s3_currentRating,
-                    keywords: keywords,
-                    thumbnail: thumbnail
+                    markIn: s3_markInTime, markOut: s3_markOutTime,
+                    notes: notes, rating: s3_currentRating, keywords: keywords, thumbnail: thumbnail
                 };
-
-                const project = getCurrentProjectS2(); // Get project from S2's currentProjectId
+                const project = getCurrentProjectS2(); 
                 const videoInProject = project.videos.find(v => v.id === currentVideoData_S3.id);
-
-                if (s3_editingLogId) { // Update existing log
+                if (s3_editingLogId) { 
                     const logIndex = videoInProject.logs.findIndex(l => l.id === s3_editingLogId);
                     if (logIndex > -1) videoInProject.logs[logIndex] = logEntry;
-                } else { // Add new log
-                    if(!videoInProject.logs) videoInProject.logs = []; // Ensure logs array exists
+                } else { 
+                    if(!videoInProject.logs) videoInProject.logs = []; 
                     videoInProject.logs.push(logEntry);
                 }
-                
-                // Sort logs by Mark In time
                 videoInProject.logs.sort((a,b) => a.markIn - b.markIn);
-
-                currentVideoData_S3.logs = videoInProject.logs; // Update S3's copy
+                currentVideoData_S3.logs = videoInProject.logs; 
                 saveData();
                 renderSavedLogsS3();
                 resetLogFormS3();
             };
 
             function renderSavedLogsS3() {
-                savedLogsListS3.innerHTML = '';
+                savedLogsListItemsS3.innerHTML = '';
                 if (!currentVideoData_S3 || !currentVideoData_S3.logs || currentVideoData_S3.logs.length === 0) {
-                    toggleEmptyState(savedLogsListS3, currentVideoData_S3 ? currentVideoData_S3.logs : []);
-                    return;
+                    savedLogsListItemsS3.classList.add('hidden');
+                    savedLogsEmptyMessageS3.classList.remove('hidden');
+                } else {
+                    savedLogsListItemsS3.classList.remove('hidden');
+                    savedLogsEmptyMessageS3.classList.add('hidden');
+                    currentVideoData_S3.logs.forEach(log => {
+                        const item = document.createElement('div');
+                        item.className = 'log-item';
+                        const ratingHtml = Array(5).fill(0).map((_, i) => 
+                            `<i class="${i < log.rating ? 'fas' : 'far'} fa-star" style="color: #f39c12;"></i>`
+                        ).join('');
+                        item.innerHTML = `
+                            ${log.thumbnail ? `<img src="${log.thumbnail}" class="thumbnail" alt="Log thumbnail">` : '<div class="thumbnail">No Preview</div>'}
+                            <div class="details">
+                                <p><strong>${log.notes.substring(0, 50)}${log.notes.length > 50 ? '...' : ''}</strong></p>
+                                <p class="text-sm text-muted">Time: ${formatTime(log.markIn, true)} - ${formatTime(log.markOut, true)}</p>
+                                <p class="text-sm text-muted">Rating: ${ratingHtml}</p>
+                                ${log.keywords && log.keywords.length > 0 ? `<p class="text-sm text-muted">Keywords: ${log.keywords.join(', ')}</p>` : ''}
+                            </div>
+                            <div class="actions">
+                                <button class="btn-goto-log-s3 secondary" data-log-id="${log.id}"><i class="fas fa-search-location"></i> Go To</button>
+                                <button class="btn-edit-log-s3 secondary" data-log-id="${log.id}"><i class="fas fa-edit"></i> Edit</button>
+                                <button class="btn-delete-log-s3 danger" data-log-id="${log.id}"><i class="fas fa-trash"></i> Delete</button>
+                            </div>
+                        `;
+                        savedLogsListItemsS3.appendChild(item);
+                    });
                 }
-                
-                currentVideoData_S3.logs.forEach(log => {
-                    const item = document.createElement('div');
-                    item.className = 'log-item';
-                    const ratingHtml = Array(5).fill(0).map((_, i) => 
-                        `<i class="${i < log.rating ? 'fas' : 'far'} fa-star" style="color: #f39c12;"></i>`
-                    ).join('');
 
-                    item.innerHTML = `
-                        ${log.thumbnail ? `<img src="${log.thumbnail}" class="thumbnail" alt="Log thumbnail">` : '<div class="thumbnail">No Preview</div>'}
-                        <div class="details">
-                            <p><strong>${log.notes.substring(0, 50)}${log.notes.length > 50 ? '...' : ''}</strong></p>
-                            <p class="text-sm text-muted">Time: ${formatTime(log.markIn, true)} - ${formatTime(log.markOut, true)}</p>
-                            <p class="text-sm text-muted">Rating: ${ratingHtml}</p>
-                            ${log.keywords && log.keywords.length > 0 ? `<p class="text-sm text-muted">Keywords: ${log.keywords.join(', ')}</p>` : ''}
-                        </div>
-                        <div class="actions">
-                            <button class="btn-goto-log-s3 secondary" data-log-id="${log.id}"><i class="fas fa-search-location"></i> Go To</button>
-                            <button class="btn-edit-log-s3 secondary" data-log-id="${log.id}"><i class="fas fa-edit"></i> Edit</button>
-                            <button class="btn-delete-log-s3 danger" data-log-id="${log.id}"><i class="fas fa-trash"></i> Delete</button>
-                        </div>
-                    `;
-                    savedLogsListS3.appendChild(item);
-                });
-                toggleEmptyState(savedLogsListS3, currentVideoData_S3.logs);
-
-                // Attach event listeners for log items
                 document.querySelectorAll('.btn-goto-log-s3').forEach(btn => {
                     btn.onclick = () => {
                         const log = currentVideoData_S3.logs.find(l => l.id === btn.dataset.logId);
                         if (log && mainVideoPlayerS3.src) {
                             mainVideoPlayerS3.currentTime = log.markIn;
                             mainVideoPlayerS3.play();
-                            // Optional: auto-pause at markOut
                             const onTimeUpdateGoTo = () => {
                                 if (mainVideoPlayerS3.currentTime >= log.markOut) {
                                     mainVideoPlayerS3.pause();
                                     mainVideoPlayerS3.removeEventListener('timeupdate', onTimeUpdateGoTo);
                                 }
                             };
-                            if (log.markOut > log.markIn) { // Only set listener if it's a segment
+                            if (log.markOut > log.markIn) { 
                                 mainVideoPlayerS3.addEventListener('timeupdate', onTimeUpdateGoTo);
                             }
                         }
@@ -1265,7 +1199,7 @@
                             const project = getCurrentProjectS2();
                             const videoInProject = project.videos.find(v => v.id === currentVideoData_S3.id);
                             videoInProject.logs = videoInProject.logs.filter(l => l.id !== logId);
-                            currentVideoData_S3.logs = videoInProject.logs; // Update S3's copy
+                            currentVideoData_S3.logs = videoInProject.logs; 
                             saveData();
                             renderSavedLogsS3();
                         });
@@ -1275,11 +1209,7 @@
 
             // --- Initial Load ---
             loadData();
-            renderProjectsScreen(); // Start on projects screen
-            // If there's only one project and it's empty, perhaps guide user to create new.
-            if (appData.projects.length === 0) {
-                 projectsListContainer.querySelector('.empty-state').classList.remove('hidden');
-            }
+            renderProjectsScreen(); // This will show the projects screen and handle its empty state.
 
         }); // End DOMContentLoaded
     </script>
