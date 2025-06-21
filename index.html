@@ -203,6 +203,7 @@
         }
         .form-group input[type="text"],
         .form-group input[type="search"],
+        .form-group input[type="url"],
         .form-group textarea {
             width: 100%;
             padding: 12px 15px;
@@ -214,6 +215,7 @@
         }
         .form-group input[type="text"]:focus,
         .form-group input[type="search"]:focus,
+        .form-group input[type="url"]:focus,
         .form-group textarea:focus {
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
@@ -240,7 +242,7 @@
             width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6);
             backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
         }
-        .loader-overlay { z-index: 1001; /* Above modals if needed */ }
+        .loader-overlay { z-index: 1001; }
         .modal-content, .loader-content {
             background-color: var(--card-bg-color); margin: 10% auto; padding: 25px;
             border-radius: var(--border-radius); width: 90%; max-width: 500px;
@@ -323,6 +325,11 @@
             min-width: 0; 
             flex-grow: 1; 
         }
+        .video-entry-title .youtube-icon {
+            color: #FF0000; /* YouTube Red */
+            margin-left: 6px;
+            font-size: 0.9em;
+        }
         .video-card-number {
             font-weight: normal;
             color: var(--text-color-light);
@@ -344,16 +351,26 @@
         }
 
 
-        .inline-clip-player-area {
+        .player-wrapper { /* Common wrapper for HTML5 video and YouTube iframe */
             background-color: #000;
             position: relative;
             min-height: 200px; 
+        }
+        .inline-clip-player-area { /* Existing style, but now .player-wrapper is its child */
              display: none; 
         }
         .inline-clip-player-area.active { display: block; }
+        
+        .player-wrapper iframe {
+            width: 100%;
+            height: 100%;
+            min-height: 200px; /* Ensure iframe takes up space */
+            aspect-ratio: 16/9; /* Maintain aspect ratio */
+            display: block;
+        }
+        .player-wrapper video { width: 100%; display: block; max-height: 400px; }
 
-        .inline-clip-player-area video { width: 100%; display: block; max-height: 400px; }
-        .inline-clip-player-prompt {
+        .inline-clip-player-prompt { /* For local file selection */
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             background-color: rgba(0,0,0,0.85); color: white; padding: 20px; text-align: center;
@@ -392,11 +409,19 @@
         .clip-item-actions .button-small { padding: 5px 8px; font-size: 0.8em; }
 
         /* Screen 3: Video Logging */
-        #video-player-container {
+        #video-player-container { /* This will now contain either HTML5 video or YouTube iframe */
             width: 100%; background-color: black; margin-bottom: 15px;
             position: relative; border-radius: var(--border-radius); overflow:hidden;
+            aspect-ratio: 16/9; /* Default for video players */
         }
-        #video-player { width: 100%; display: block; max-height: 50vh;}
+        #video-player-container > video, 
+        #video-player-container > iframe {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
         #video-file-prompt { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -455,6 +480,9 @@
         /* Utility classes */
         .mt-1 { margin-top: 10px; }
         .mb-1 { margin-bottom: 10px; }
+        .text-center { text-align: center; }
+        .form-group hr { border: none; border-top: 1px solid var(--border-color); margin: 15px 0;}
+        .form-group .or-divider { text-align:center; color: var(--text-color-light); margin-bottom:15px; }
 
 
         /* Responsive adjustments */
@@ -490,56 +518,51 @@
             <div class="container">
                 <div class="actions-bar">
                     <button id="btn-new-project" class="button button-primary">
-                        <span class="button-icon">+</span> New Project
+                        <span class="button-icon">&#43;</span> New Project
                     </button>
                     <label class="button button-secondary">
-                        <span class="button-icon"></span> Import Projects
+                        <span class="button-icon">&#x1F4E5;</span> Import Projects
                         <input type="file" id="import-projects-input" accept=".json">
                     </label>
                 </div>
-                <div id="projects-list">
-                    <!-- Project cards will be rendered here -->
-                </div>
+                <div id="projects-list"></div>
             </div>
         </div>
 
         <!-- Screen 2: Project Videos -->
         <div id="screen-project-videos" class="screen">
             <header class="header-with-back">
-                <button id="btn-back-to-projects" class="back-button">←</button> 
+                <button id="btn-back-to-projects" class="back-button">&#x2190;</button> 
                 <h2 id="project-name-header">Project Name</h2>
             </header>
             <div class="container">
                 <div class="actions-bar">
-                    <label class="button button-primary">
-                         <span class="button-icon">+</span> Add Videos
-                        <input type="file" id="add-videos-input" multiple accept="video/*">
-                    </label>
+                     <button id="btn-show-add-video-modal" class="button button-primary">
+                        <span class="button-icon">&#43;</span> Add Video
+                    </button>
                     <button id="btn-export-project" class="button button-secondary">
-                        <span class="button-icon"></span> Export Project
+                        <span class="button-icon">&#x1F4E4;</span> Export Project
                     </button>
                 </div>
                 <input type="search" id="project-videos-search" placeholder="Search videos or clips by name, notes, tags...">
-                
-                <div id="project-videos-container">
-                    <!-- Video Entry Cards will be rendered here -->
-                </div>
+                <div id="project-videos-container"></div>
             </div>
         </div>
 
         <!-- Screen 3: Video Logging -->
         <div id="screen-video-logging" class="screen">
             <header class="header-with-back">
-                <button id="btn-back-to-project-videos" class="back-button">←</button>
+                <button id="btn-back-to-project-videos" class="back-button">&#x2190;</button>
                 <h2 id="video-filename-header">Video Filename</h2>
             </header>
             <div class="container">
                 <div id="video-player-container">
-                    <video id="video-player" playsinline controls></video>
-                     <div id="video-file-prompt" class="card hidden"> 
+                    <video id="video-player" class="hidden" playsinline controls></video>
+                    <div id="youtube-player-placeholder" class="hidden"></div> <!-- For YouTube iframe -->
+                    <div id="video-file-prompt" class="card hidden"> 
                         <p id="video-file-prompt-message">Please select the video file.</p>
                         <label class="button button-primary mt-1">
-                            Select Video File
+                            Select Local Video File
                             <input type="file" id="video-file-input-logging" accept="video/*">
                         </label>
                     </div>
@@ -547,7 +570,7 @@
 
                 <div id="timeline-container" class="mb-1"><div id="timeline-progress"></div></div>
                 <div class="video-controls">
-                    <button id="play-pause-btn" class="button button-subtle"><span class="button-icon">►</span>Play</button> 
+                    <button id="play-pause-btn" class="button button-subtle"><span class="button-icon">&#9658;</span>Play</button> 
                     <div id="timecode-display" class="timecode-display">00:00 / 00:00</div>
                     <label for="speed-select" class="sr-only">Speed:</label>
                     <select id="speed-select" class="button button-subtle" aria-label="Playback speed">
@@ -572,11 +595,11 @@
                     <div class="form-group">
                         <label>Rating:</label>
                         <div id="log-rating" class="star-rating">
-                            <span class="star" data-value="1">★</span>
-                            <span class="star" data-value="2">★</span>
-                            <span class="star" data-value="3">★</span>
-                            <span class="star" data-value="4">★</span>
-                            <span class="star" data-value="5">★</span>
+                            <span class="star" data-value="1">&#9733;</span>
+                            <span class="star" data-value="2">&#9733;</span>
+                            <span class="star" data-value="3">&#9733;</span>
+                            <span class="star" data-value="4">&#9733;</span>
+                            <span class="star" data-value="5">&#9733;</span>
                         </div>
                     </div>
                     <div class="form-group">
@@ -588,9 +611,7 @@
                 </div>
 
                 <h3 class="section-title mt-2">Saved Logs for this Video</h3>
-                <div id="saved-logs-list">
-                    <!-- Saved logs will be rendered here -->
-                </div>
+                <div id="saved-logs-list"></div>
             </div>
         </div>
 
@@ -599,7 +620,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 class="modal-title">Create New Project</h3>
-                    <span class="close-button" data-modal-id="modal-new-project">×</span>
+                    <span class="close-button" data-modal-id="modal-new-project">&times;</span>
                 </div>
                 <div class="form-group">
                     <label for="new-project-name">Project Name:</label>
@@ -609,11 +630,32 @@
             </div>
         </div>
 
+        <div id="modal-add-video" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Add New Video</h3>
+                    <span class="close-button" data-modal-id="modal-add-video">&times;</span>
+                </div>
+                <div class="form-group">
+                    <label for="add-video-local-file" class="button button-secondary button-full-width">
+                        <span class="button-icon">&#x1F4C1;</span> Select Local Video File
+                        <input type="file" id="add-video-local-file-input" accept="video/*">
+                    </label>
+                </div>
+                <div class="form-group">
+                     <p class="or-divider">OR</p>
+                    <label for="add-video-youtube-url">Enter YouTube Video URL:</label>
+                    <input type="url" id="add-video-youtube-url" placeholder="https://www.youtube.com/watch?v=...">
+                </div>
+                <button id="btn-add-video-confirm" class="button button-primary button-full-width">Add Video</button>
+            </div>
+        </div>
+
         <div id="modal-confirm-delete" class="modal">
             <div class="modal-content">
                  <div class="modal-header">
                     <h3 class="modal-title">Confirm Deletion</h3>
-                    <span class="close-button" data-modal-id="modal-confirm-delete">×</span>
+                    <span class="close-button" data-modal-id="modal-confirm-delete">&times;</span>
                 </div>
                 <p id="confirm-delete-message" style="margin-bottom: 20px; font-size: 1.05em;">Are you sure?</p>
                 <div class="card-actions" style="margin-top:0;">
@@ -622,34 +664,19 @@
                 </div>
             </div>
         </div>
-
-        <!-- Loader Overlay -->
-        <div id="loader-overlay" class="loader-overlay">
-            <div class="loader-content">
-                <div class="spinner"></div>
-                <p id="loader-message">Loading...</p>
-            </div>
-        </div>
-
-
         <canvas id="thumbnail-canvas" style="display:none;"></canvas>
     </div>
 
     <script>
-    // idb.js (UMD build from https://github.com/jakearchibald/idb)
-    !function(e,t){"object"==typeof exports&&"undefined"!=typeof module?t(exports):"function"==typeof define&&define.amd?define(["exports"],t):t((e="undefined"!=typeof globalThis?globalThis:e||self).idb={})}(this,(function(e){"use strict";let t,n;consto=new WeakMap,r=new WeakMap,i=new WeakMap,s=new WeakMap,a=new WeakMap;function d(e){return new Promise((t=>{e.onsuccess=()=>{t(e.result)},e.onerror=()=>{t(e.error)}}))}function c(e,c,l={}){void 0===n&&(n=function(){try{return indexedDB}catch(e){return}}());const u=n();if(!u)return l.blocked&&l.blocked(),void console.warn("IndexedDB capabilities are not available in this browser environment.");let p=l.blocking?d(l.blocking):Promise.resolve();return(l.upgrade||(t=e,(m=c,g=o.get(t),g||(g=new Map,o.set(t,g)),(f=g.get(m))||(f=Object.getOwnPropertyDescriptor(IDBDatabase.prototype,"version")&&Object.getOwnPropertyDescriptor(IDBDatabase.prototype,"version").get?{get(){const e=this.['_v'];return e||(this.['_v']=new Proxy({},{get:(e,t)=>(console.warn(`An IDBDatabase version is not available. '${String(t)}' will always be undefined.`),void 0)}),this.['_v'])},set(e){this.['_v']=e}}:(console.warn("IDBDatabase.prototype.version is not an accessor property; results may be unexpected."),{}),g.set(m,f)),f))).prototype?(console.warn("The user agent doesn't support IDBDatabase.prototype.version like it should; some features may not work."),c=1):void 0,new Promise(((n,o)=>{const g=u.open(e,c);let f,m;g.onupgradeneeded=e=>{const n=g.result;l.upgrade&&l.upgrade(n,e.oldVersion,e.newVersion,g.transaction),f=g.transaction},g.onsuccess=()=>{const e=g.result;f?f.done.then((()=>e.close()),(()=>e.close())).then((()=>n(e))):n(e),m=e},g.onerror=()=>{const e=g.error;"VersionError"===e.name&&(m&&m.close(),o(e))},g.onblocked=()=>{l.blocked?l.blocked():(m&&m.close(),console.warn(`IDBDatabase '${e}' blocked.`))}})).finally(p)}const l={get:(e,t,n)=>"put"===t||"add"===t||"delete"===t?e[t]:("clear"===t?()=>e.clear():"count"===t?()=>e.count():d(e[t].apply(e,n)))},u={get:(e,t,n)=>t in e?e[t]:"get"===t||"getAll"===t||"getKey"===t||"getAllKeys"===t||"count"===t?e[t].bind(e):("openCursor"===t||"openKeyCursor"===t?function(...t){return function e(t,n,o){let r=t.value;"value"in t&&(r=t.value),n&&n(r),t.continue(),o&&o()}(e.openCursor(...t),n[0],n[1])}:d(e[t]))},p={get:function(e,t){const n=e[t];if(n instanceof IDBTransaction)return function(e){if(i.has(e))return i.get(e);const t=new Promise(((t,n)=>{e.oncomplete=()=>t(),e.onerror=()=>n(e.error),e.onabort=()=>n(e.error)}));return i.set(e,t),t}(n);if(n instanceof IDBObjectStore)return function(e){if(r.has(e))return r.get(e);const t=new Proxy(e,l);return r.set(e,t),t}(n);if(n instanceof IDBIndex||n instanceof IDBCursor)return function(e){if(s.has(e))return s.get(e);const t=new Proxy(e,u);return s.set(e,t),t}(n)}}}function g(e){return new Proxy(e,p)}e.deleteDB=function(e,{blocked:t}={}){return void 0===n&&(n=function(){try{return indexedDB}catch(e){return}}()),n()?new Promise(((o,r)=>{const i=n().deleteDatabase(e);t&&(i.onblocked=()=>t()),i.onsuccess=()=>o(),i.onerror=()=>r(i.error)})):(console.warn("IndexedDB capabilities are not available in this browser environment."),Promise.resolve())},e.openDB=c,e.unwrap=function(e){const t=a.get(e);return t||(console.warn("The given object is not a proxy an IDB value; it will be returned as is."),e)},e.wrap=function(e){if("function"!=typeof e.objectStoreNames.contains||"function"!=typeof e.objectStoreNames.item)return e;if(o.has(e))return o.get(e);const t=g(e);return o.set(e,t),t},Object.defineProperty(e,"__esModule",{value:!0})}));
-    
     const app = {
-        DB_NAME: 'LogReelDB',
-        DB_VERSION: 1,
-        VIDEO_STORE_NAME: 'videos',
-        dbPromise: null,
-
         data: {
             projects: [],
             currentProjectId: null,
             currentVideoId: null, 
-            videoElement: null,
+            currentVideoType: null, // 'local' or 'youtube'
+            videoElement: null, // HTML5 video player
+            youtubePlayer: null, // YouTube API player instance
+            youtubePlayerReady: false,
             timelineProgress: null,
             timelineContainer: null,
             playPauseBtn: null,
@@ -660,10 +687,12 @@
             markInTime: 0,
             markOutTime: null,
             currentRating: 0,
-            videoFileCache: {}, // videoId (string) -> objectURL (string)
+            videoFileCache: {}, // videoId (string) -> objectURL (string) for LOCAL files only
             activeInlinePlayer: { 
                 videoId: null,
-                playerElement: null,
+                videoType: null,
+                playerElement: null, // Could be HTML5 video or a div for YT iframe
+                youtubePlayerInstance: null,
                 promptElement: null,
                 fileInputElement: null,
                 pendingLogIdToPlay: null 
@@ -671,114 +700,15 @@
         },
         dom: {}, 
 
-        async init() {
-            this.showLoader("Initializing App...");
-            try {
-                this.dbPromise = idb.openDB(this.DB_NAME, this.DB_VERSION, {
-                    upgrade(db) {
-                        if (!db.objectStoreNames.contains(app.VIDEO_STORE_NAME)) {
-                            db.createObjectStore(app.VIDEO_STORE_NAME); 
-                        }
-                    },
-                });
-                await this.dbPromise; 
-                console.log("IndexedDB connection established.");
-            } catch (error) {
-                console.error("Failed to open IndexedDB:", error);
-                alert("LogReel requires IndexedDB to function. Please ensure it's enabled and not in private/incognito mode without storage permissions.");
-                this.hideLoader();
-                // Potentially disable parts of the app or show a permanent error message
-                return; // Stop further initialization if DB fails
-            }
-
+        init() {
             this.cacheDomElements();
             this.loadData(); 
+            this.loadYouTubeAPI(); // Load YouTube API
             this.registerEventListeners();
             this.navigateTo('screen-projects');
-            this.hideLoader();
-            console.log("LogReel App Initialized with IndexedDB support.");
+            console.log("LogReel App Initialized (Hybrid: Local Files + YouTube)");
         },
         
-        async saveVideoFileToDB(videoId, file) {
-            if (!this.dbPromise || !file) return;
-            try {
-                const db = await this.dbPromise;
-                await db.put(this.VIDEO_STORE_NAME, file, videoId);
-                console.log(`Video file ${file.name} (ID: ${videoId}) saved to IndexedDB.`);
-            } catch (error) {
-                console.error(`Error saving video ${file.name} to IndexedDB:`, error);
-                alert(`Could not cache video file "${file.name}" for offline use. It might be too large or IndexedDB is full.`);
-            }
-        },
-
-        async getVideoFileFromDB(videoId) {
-            if (!this.dbPromise) return null;
-            try {
-                const db = await this.dbPromise;
-                const file = await db.get(this.VIDEO_STORE_NAME, videoId);
-                if (file instanceof File) {
-                    console.log(`Video file (ID: ${videoId}, Name: ${file.name}) retrieved from IndexedDB.`);
-                    return file;
-                }
-                console.log(`No file found in IndexedDB for video ID: ${videoId}`);
-                return null;
-            } catch (error) {
-                console.error(`Error retrieving video ID ${videoId} from IndexedDB:`, error);
-                return null;
-            }
-        },
-
-        async deleteVideoFileFromDB(videoId) {
-            if (!this.dbPromise) return;
-            try {
-                const db = await this.dbPromise;
-                await db.delete(this.VIDEO_STORE_NAME, videoId);
-                console.log(`Video file (ID: ${videoId}) deleted from IndexedDB.`);
-            } catch (error) {
-                console.error(`Error deleting video ID ${videoId} from IndexedDB:`, error);
-            }
-        },
-
-        async getVideoObjectURL(videoData) {
-            if (!videoData || !videoData.id || !videoData.filename) return null;
-
-            if (this.data.videoFileCache[videoData.id]) {
-                try {
-                    const response = await fetch(this.data.videoFileCache[videoData.id], { method: 'HEAD' }); // HEAD request is lighter
-                    if (response.ok) {
-                        return this.data.videoFileCache[videoData.id];
-                    } else {
-                        console.warn(`Cached ObjectURL for ${videoData.filename} (ID: ${videoData.id}) is no longer valid. Revoking.`);
-                        URL.revokeObjectURL(this.data.videoFileCache[videoData.id]);
-                        delete this.data.videoFileCache[videoData.id];
-                    }
-                } catch (e) {
-                    console.warn(`Error verifying cached ObjectURL for ${videoData.filename} (ID: ${videoData.id}). Revoking. Error:`, e);
-                    URL.revokeObjectURL(this.data.videoFileCache[videoData.id]);
-                    delete this.data.videoFileCache[videoData.id];
-                }
-            }
-            this.showLoader(`Loading video "${videoData.filename}" from cache...`);
-            const fileFromDB = await this.getVideoFileFromDB(videoData.id);
-            this.hideLoader();
-
-            if (fileFromDB) {
-                const objectURL = URL.createObjectURL(fileFromDB);
-                this.data.videoFileCache[videoData.id] = objectURL; 
-                return objectURL;
-            }
-            return null; 
-        },
-        
-        showLoader(message = "Loading...") {
-            if (this.dom.loaderMessage) this.dom.loaderMessage.textContent = message;
-            if (this.dom.loaderOverlay) this.dom.loaderOverlay.style.display = 'flex';
-        },
-        hideLoader() {
-            if (this.dom.loaderOverlay) this.dom.loaderOverlay.style.display = 'none';
-        },
-
-
         cacheDomElements() {
             this.dom.screens = {
                 'projects': document.getElementById('screen-projects'),
@@ -787,26 +717,29 @@
             };
             this.dom.modals = {
                 newProject: document.getElementById('modal-new-project'),
+                addVideo: document.getElementById('modal-add-video'),
                 confirmDelete: document.getElementById('modal-confirm-delete'),
             };
-            this.dom.loaderOverlay = document.getElementById('loader-overlay');
-            this.dom.loaderMessage = document.getElementById('loader-message');
             this.dom.projectsList = document.getElementById('projects-list');
             this.dom.btnNewProject = document.getElementById('btn-new-project');
             this.dom.importProjectsInput = document.getElementById('import-projects-input');
+            
             this.dom.btnBackToProjects = document.getElementById('btn-back-to-projects');
             this.dom.projectNameHeader = document.getElementById('project-name-header');
-            this.dom.addVideosInput = document.getElementById('add-videos-input');
+            this.dom.btnShowAddVideoModal = document.getElementById('btn-show-add-video-modal'); // New button
             this.dom.btnExportProject = document.getElementById('btn-export-project');
             this.dom.projectVideosSearch = document.getElementById('project-videos-search');
             this.dom.projectVideosContainer = document.getElementById('project-videos-container');
+
             this.dom.btnBackToProjectVideos = document.getElementById('btn-back-to-project-videos');
             this.dom.videoFilenameHeader = document.getElementById('video-filename-header');
-            this.data.videoElement = document.getElementById('video-player');
-            this.dom.videoPlayerContainer = document.getElementById('video-player-container'); 
-            this.dom.videoFilePrompt = document.getElementById('video-file-prompt');
+            this.dom.videoPlayerContainer = document.getElementById('video-player-container');
+            this.data.videoElement = document.getElementById('video-player'); // HTML5
+            this.dom.youtubePlayerPlaceholder = document.getElementById('youtube-player-placeholder'); // YT
+            this.dom.videoFilePrompt = document.getElementById('video-file-prompt'); // For local files
             this.dom.videoFilePromptMessage = document.getElementById('video-file-prompt-message');
-            this.dom.videoFileInputLogging = document.getElementById('video-file-input-logging');
+            this.dom.videoFileInputLogging = document.getElementById('video-file-input-logging'); // For local files on Screen 3
+
             this.data.timelineContainer = document.getElementById('timeline-container');
             this.data.timelineProgress = document.getElementById('timeline-progress');
             this.data.playPauseBtn = document.getElementById('play-pause-btn');
@@ -821,16 +754,53 @@
             this.dom.editingLogIdInput = document.getElementById('editing-log-id');
             this.dom.savedLogsList = document.getElementById('saved-logs-list');
             this.dom.thumbnailCanvas = document.getElementById('thumbnail-canvas');
+
             this.dom.newProjectNameInput = document.getElementById('new-project-name');
             this.dom.btnCreateProjectConfirm = document.getElementById('btn-create-project-confirm');
+            this.dom.addVideoLocalFileInput = document.getElementById('add-video-local-file-input');
+            this.dom.addVideoYouTubeUrlInput = document.getElementById('add-video-youtube-url');
+            this.dom.btnAddVideoConfirm = document.getElementById('btn-add-video-confirm');
             this.dom.confirmDeleteMessage = document.getElementById('confirm-delete-message');
             this.dom.btnConfirmDeleteCancel = document.getElementById('btn-confirm-delete-cancel');
             this.dom.btnConfirmDeleteConfirm = document.getElementById('btn-confirm-delete-confirm');
         },
 
+        loadYouTubeAPI() {
+            if (typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
+                const tag = document.createElement('script');
+                tag.src = "https://www.youtube.com/iframe_api";
+                const firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+                window.onYouTubeIframeAPIReady = () => {
+                    console.log("YouTube IFrame API Ready");
+                    this.data.youtubePlayerReady = true;
+                    // If a YouTube video was pending load, try loading it now
+                    if (this.currentScreen === 'screen-video-logging' && this.data.currentVideoType === 'youtube') {
+                        this.renderVideoLoggingScreen(); 
+                    }
+                };
+            } else {
+                 this.data.youtubePlayerReady = true;
+            }
+        },
+
+        // --- Video File/URL Handling (Session cache for local, URL for YouTube) ---
+        getLocalVideoObjectURL(videoId) { // Only for local files
+            if (this.data.videoFileCache[videoId]) {
+                // Basic check if it's an object URL, doesn't guarantee validity
+                if (this.data.videoFileCache[videoId].startsWith('blob:')) {
+                    return this.data.videoFileCache[videoId];
+                }
+                delete this.data.videoFileCache[videoId]; // Invalid entry
+            }
+            return null;
+        },
+        
         navigateTo(screenId, params = {}) {
+            // ... (navigateTo logic mostly same, just ensure it handles currentVideoType)
             const targetScreenKey = screenId.replace('screen-', '');
-            if(this.dom.screens && Object.values(this.dom.screens).length > 0) { // Check if dom.screens is populated
+            if(this.dom.screens && Object.values(this.dom.screens).length > 0) {
                 Object.values(this.dom.screens).forEach(screen => screen.classList.remove('active'));
                 if (this.dom.screens[targetScreenKey]) {
                     this.dom.screens[targetScreenKey].classList.add('active');
@@ -839,18 +809,26 @@
                     if(this.dom.screens['projects']) this.dom.screens['projects'].classList.add('active'); 
                     screenId = 'screen-projects';
                 }
-            } else if (targetScreenKey !== 'projects') { // If trying to navigate somewhere else before DOM is ready
-                console.warn("navigateTo called before DOM elements fully cached, redirecting to projects screen if possible later.");
-                // This scenario should be rare now with awaited init, but as a safeguard.
+            } else if (targetScreenKey !== 'projects') {
+                console.warn("navigateTo called before DOM elements fully cached.");
             }
 
             this.currentScreen = screenId;
             window.scrollTo(0, 0);
-            if (this.data.activeInlinePlayer.playerElement && screenId !== 'screen-project-videos') {
-                this.data.activeInlinePlayer.playerElement.pause();
+
+            // Pause active players when navigating away
+            if (this.data.videoElement && !this.data.videoElement.paused) this.data.videoElement.pause();
+            if (this.data.youtubePlayer && typeof this.data.youtubePlayer.pauseVideo === 'function') this.data.youtubePlayer.pauseVideo();
+            if (this.data.activeInlinePlayer.playerElement && this.data.activeInlinePlayer.videoType === 'local' && !this.data.activeInlinePlayer.playerElement.paused) {
+                 this.data.activeInlinePlayer.playerElement.pause();
             }
+            if (this.data.activeInlinePlayer.youtubePlayerInstance && typeof this.data.activeInlinePlayer.youtubePlayerInstance.pauseVideo === 'function') {
+                this.data.activeInlinePlayer.youtubePlayerInstance.pauseVideo();
+            }
+
+
             switch (screenId) {
-                case 'screen-projects': if(this.dom.projectsList) this.renderProjectsScreen(); break; // Check if DOM element exists
+                case 'screen-projects': if(this.dom.projectsList) this.renderProjectsScreen(); break;
                 case 'screen-project-videos':
                     if (params && params.projectId) this.data.currentProjectId = params.projectId;
                     else if (!this.data.currentProjectId && this.data.projects.length > 0) this.data.currentProjectId = this.data.projects[0].id; 
@@ -861,6 +839,8 @@
                     if (params && params.videoId && params.projectId) {
                         this.data.currentProjectId = params.projectId;
                         this.data.currentVideoId = params.videoId;
+                        const videoData = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId);
+                        this.data.currentVideoType = videoData ? (videoData.youtubeVideoId ? 'youtube' : 'local') : null;
                     } else if (!this.data.currentProjectId || !this.data.currentVideoId) {
                         console.error("Navigating to video logging without project/video ID!");
                         const targetProjectId = this.data.currentProjectId || (this.data.projects.length > 0 ? this.data.projects[0].id : null);
@@ -868,12 +848,12 @@
                         else this.navigateTo('screen-projects');
                         return;
                     }
-                    if(this.dom.videoFilenameHeader) this.renderVideoLoggingScreen(); // Check DOM element
+                    if(this.dom.videoFilenameHeader) this.renderVideoLoggingScreen();
                     if(params && params.logIdToEdit) this.editLogEntry(params.logIdToEdit, true);
                     break;
             }
         },
-        loadData() { 
+        loadData() { /* ... Same ... */ 
             const storedData = localStorage.getItem('logReelData');
             if (storedData) {
                 try {
@@ -882,25 +862,23 @@
                         if (project.videos) {
                             project.videos.forEach(video => {
                                 if (typeof video.isImportant === 'undefined') video.isImportant = false;
+                                // Ensure videoType is set if migrating old data (though new videos will have it)
+                                if (!video.youtubeVideoId && !video.videoType) video.videoType = 'local';
+                                else if (video.youtubeVideoId && !video.videoType) video.videoType = 'youtube';
                             });
                         }
                     });
-                } catch (e) {
-                    console.error("Error parsing data from localStorage:", e);
-                    this.data.projects = [];
-                }
-            } else {
-                this.data.projects = [];
-            }
+                } catch (e) { console.error("Error parsing data from localStorage:", e); this.data.projects = []; }
+            } else { this.data.projects = []; }
         },
-        saveData() { localStorage.setItem('logReelData', JSON.stringify(this.data.projects)); },
-        generateId() { return Date.now().toString(36) + Math.random().toString(36).substring(2, 9); },
-        getProjectById(projectId) { return this.data.projects.find(p => p.id === projectId); },
-        getVideoById(projectId, videoId) { 
+        saveData() { /* ... Same ... */ localStorage.setItem('logReelData', JSON.stringify(this.data.projects)); },
+        generateId() { /* ... Same ... */ return Date.now().toString(36) + Math.random().toString(36).substring(2, 9); },
+        getProjectById(projectId) { /* ... Same ... */ return this.data.projects.find(p => p.id === projectId); },
+        getVideoById(projectId, videoId) { /* ... Same ... */ 
             const project = this.getProjectById(projectId);
             return project ? project.videos.find(v => v.id === videoId) : null;
         },
-        getLogById(projectId, videoId, logId) { 
+        getLogById(projectId, videoId, logId) { /* ... Same ... */ 
             const video = this.getVideoById(projectId, videoId);
             return video && video.logs ? video.logs.find(l => l.id === logId) : null;
         },
@@ -908,23 +886,32 @@
             this.dom.btnNewProject.addEventListener('click', () => this.showNewProjectModal());
             this.dom.importProjectsInput.addEventListener('change', (e) => this.importProjects(e));
             this.dom.btnBackToProjects.addEventListener('click', () => this.navigateTo('screen-projects'));
-            this.dom.addVideosInput.addEventListener('change', async (e) => await this.handleAddVideos(e.target.files));
+            
+            this.dom.btnShowAddVideoModal.addEventListener('click', () => this.showAddVideoModal());
+            this.dom.btnAddVideoConfirm.addEventListener('click', () => this.handleAddVideoConfirm());
+
             this.dom.btnExportProject.addEventListener('click', () => this.exportCurrentProject());
             this.dom.projectVideosSearch.addEventListener('input', (e) => this.renderProjectVideosScreen(e.target.value.trim()));
             this.dom.btnBackToProjectVideos.addEventListener('click', () => this.navigateTo('screen-project-videos', { projectId: this.data.currentProjectId }));
-            this.data.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
-            this.data.videoElement.addEventListener('play', () => { if(this.data.playPauseBtn) this.data.playPauseBtn.innerHTML = '<span class="button-icon">❚❚</span>Pause'; });
-            this.data.videoElement.addEventListener('pause', () => { if(this.data.playPauseBtn) this.data.playPauseBtn.innerHTML = '<span class="button-icon">►</span>Play'; });
-            this.data.videoElement.addEventListener('loadedmetadata', () => this.updateVideoTimes());
-            this.data.videoElement.addEventListener('timeupdate', () => this.updateVideoTimes());
-            this.data.videoElement.addEventListener('durationchange', () => this.updateVideoTimes());
+            
+            // HTML5 Video Player Events (only if this.data.videoElement exists)
+            if (this.data.videoElement) {
+                this.data.videoElement.addEventListener('play', () => { if(this.data.playPauseBtn && this.data.currentVideoType === 'local') this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#10074;&#10074;</span>Pause'; });
+                this.data.videoElement.addEventListener('pause', () => { if(this.data.playPauseBtn && this.data.currentVideoType === 'local') this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#9658;</span>Play'; });
+                this.data.videoElement.addEventListener('loadedmetadata', () => this.updateVideoTimes());
+                this.data.videoElement.addEventListener('timeupdate', () => this.updateVideoTimes());
+                this.data.videoElement.addEventListener('durationchange', () => this.updateVideoTimes());
+            }
+
             this.data.timelineContainer.addEventListener('click', (e) => this.seekVideo(e));
-            this.data.speedSelect.addEventListener('change', (e) => { if(this.data.videoElement) this.data.videoElement.playbackRate = parseFloat(e.target.value); });
+            this.data.speedSelect.addEventListener('change', (e) => this.setPlaybackSpeed(parseFloat(e.target.value)));
+            this.data.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
             this.data.markInBtn.addEventListener('click', () => this.setMarkIn());
             this.data.markOutBtn.addEventListener('click', () => this.setMarkOut());
             this.dom.logRatingContainer.addEventListener('click', (e) => this.handleStarRating(e));
             this.dom.saveLogBtn.addEventListener('click', () => this.saveLogEntry());
-            this.dom.videoFileInputLogging.addEventListener('change', async (e) => await this.handleVideoFileSelectionForLogging(e.target.files[0])); 
+            this.dom.videoFileInputLogging.addEventListener('change', (e) => this.handleVideoFileSelectionForLogging(e.target.files[0])); 
+            
             document.querySelectorAll('.close-button').forEach(btn => {
                 btn.addEventListener('click', () => this.hideModal(btn.dataset.modalId));
             });
@@ -935,33 +922,37 @@
                     Object.values(this.dom.modals).forEach(modal => {
                         if (modal.style.display === 'block') this.hideModal(modal.id);
                     });
-                     this.hideLoader(); 
                 }
             });
 
             this.dom.projectVideosContainer.addEventListener('click', (e) => {
+                // ... (delegation logic similar, but needs to consider video type for playClipInline)
                 const targetButton = e.target.closest('button');
                 if (!targetButton) return;
                 const videoEntryCard = targetButton.closest('.video-entry-card');
                 if (!videoEntryCard) return; 
                 const videoId = videoEntryCard.dataset.videoId;
+                const videoData = this.getVideoById(this.data.currentProjectId, videoId);
+                const videoType = videoData ? (videoData.youtubeVideoId ? 'youtube' : 'local') : null;
+
 
                 if (targetButton.classList.contains('btn-log-full-video')) this.navigateTo('screen-video-logging', { projectId: this.data.currentProjectId, videoId: videoId });
                 else if (targetButton.classList.contains('btn-delete-this-video')) this.confirmDeleteVideo(videoId);
                 else if (targetButton.classList.contains('btn-toggle-important')) this.toggleVideoImportance(videoId);
-                else if (targetButton.classList.contains('btn-play-this-clip-inline')) this.playClipInline(videoId, targetButton.dataset.logId);
+                else if (targetButton.classList.contains('btn-play-this-clip-inline')) this.playClipInline(videoId, targetButton.dataset.logId, videoType);
                 else if (targetButton.classList.contains('btn-edit-this-clip')) this.navigateTo('screen-video-logging', { projectId: this.data.currentProjectId, videoId: videoId, logIdToEdit: targetButton.dataset.logId });
                 else if (targetButton.classList.contains('btn-delete-this-log-item')) this.confirmDeleteLogItemFromScreen2(videoId, targetButton.dataset.logId);
             });
-            this.dom.projectVideosContainer.addEventListener('change', async (e) => { 
+             // For local file selection within an inline player prompt
+            this.dom.projectVideosContainer.addEventListener('change', (e) => { 
                 if (e.target.classList.contains('inline-clip-file-input')) {
                     const videoEntryCard = e.target.closest('.video-entry-card');
                     const videoId = videoEntryCard.dataset.videoId;
-                    await this.handleInlinePlayerFileSelection(e.target.files[0], videoId);
+                    this.handleInlinePlayerFileSelection(e.target.files[0], videoId);
                 }
             });
         },
-        renderProjectsScreen() {
+        renderProjectsScreen() { /* ... Same ... */ 
             this.dom.projectsList.innerHTML = '';
             if (this.data.projects.length === 0) {
                 this.dom.projectsList.innerHTML = '<div class="empty-state"><p>No projects yet.</p><p>Create one or import existing projects to get started!</p></div>';
@@ -987,49 +978,50 @@
                 btn.addEventListener('click', (e) => this.confirmDeleteProject(e.currentTarget.dataset.projectId));
             });
         },
-        showNewProjectModal() { 
-            this.dom.newProjectNameInput.value = ''; this.showModal('modal-new-project'); this.dom.newProjectNameInput.focus();
-        },
-        createNewProject() { 
+        showNewProjectModal() { /* ... Same ... */ this.dom.newProjectNameInput.value = ''; this.showModal('modal-new-project'); this.dom.newProjectNameInput.focus(); },
+        createNewProject() { /* ... Same ... */
             const name = this.dom.newProjectNameInput.value.trim();
             if (!name) { alert('Project name cannot be empty.'); return; }
             const newProject = { id: this.generateId(), name: name, videos: [], createdAt: new Date().toISOString() };
             this.data.projects.unshift(newProject); this.saveData(); this.renderProjectsScreen(); this.hideModal('modal-new-project');
         },
-        confirmDeleteProject(projectId) { 
+        confirmDeleteProject(projectId) { /* ... Same ... (message implies local cache only now) */
             const project = this.getProjectById(projectId); if (!project) return;
-            this.dom.confirmDeleteMessage.innerHTML = `Are you sure you want to delete the project "<strong>${this.escapeHtml(project.name)}</strong>"? <br>This action cannot be undone. All associated video files in the browser cache will also be removed.`;
+            this.dom.confirmDeleteMessage.innerHTML = `Are you sure you want to delete the project "<strong>${this.escapeHtml(project.name)}</strong>"? <br>This action cannot be undone.`;
             this.showModal('modal-confirm-delete');
-            this.dom.btnConfirmDeleteConfirm.onclick = async () => { await this.deleteProject(projectId); this.hideModal('modal-confirm-delete'); }; 
+            this.dom.btnConfirmDeleteConfirm.onclick = () => { this.deleteProject(projectId); this.hideModal('modal-confirm-delete'); }; 
         },
-        async deleteProject(projectId){ 
+        deleteProject(projectId){ /* ... Same ... (no IndexedDB cleanup needed) */
             const project = this.getProjectById(projectId);
             if (project && project.videos) {
-                this.showLoader("Deleting project and cached videos...");
-                for (const video of project.videos) {
-                    await this.deleteVideoFileFromDB(video.id);
-                    if (this.data.videoFileCache[video.id]) { // Check by video.id
+                project.videos.forEach(video => {
+                    if (video.videoType === 'local' && this.data.videoFileCache[video.id]) {
                         URL.revokeObjectURL(this.data.videoFileCache[video.id]);
                         delete this.data.videoFileCache[video.id];
                     }
-                }
-                this.hideLoader();
+                });
             }
             this.data.projects = this.data.projects.filter(p => p.id !== projectId);
             if (this.data.currentProjectId === projectId) { this.data.currentProjectId = null; this.data.currentVideoId = null; }
             this.saveData(); this.renderProjectsScreen();
         },
-        importProjects(event) { 
-            const file = event.target.files[0];
+        importProjects(event) { /* ... Same, but YT videos would just be URLs ... */
+             const file = event.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     try {
                         const importedData = JSON.parse(e.target.result);
                         if (Array.isArray(importedData) && importedData.every(p => p.id && p.name && Array.isArray(p.videos))) {
-                            importedData.forEach(p => { p.videos.forEach(v => { if(typeof v.isImportant === 'undefined') v.isImportant = false; }); });
+                            importedData.forEach(p => { 
+                                p.videos.forEach(v => { 
+                                    if(typeof v.isImportant === 'undefined') v.isImportant = false;
+                                    // Infer type if missing during import
+                                    if (!v.videoType) v.videoType = v.youtubeVideoId ? 'youtube' : 'local';
+                                }); 
+                            });
                             if (confirm("Importing will replace all current projects. Continue?")) { 
-                                this.data.projects = importedData; this.saveData(); this.renderProjectsScreen(); alert('Projects imported successfully! You may need to re-select video files.');
+                                this.data.projects = importedData; this.saveData(); this.renderProjectsScreen(); alert('Projects imported successfully! For local videos, you may need to re-select files.');
                             }
                         } else { alert('Invalid project file format.'); }
                     } catch (error) { alert('Error reading or parsing project file.'); console.error("Import error:", error); }
@@ -1037,7 +1029,7 @@
                 reader.readAsText(file); event.target.value = null; 
             }
         },
-        exportCurrentProject() { 
+        exportCurrentProject() { /* ... Same ... */ 
             const project = this.getProjectById(this.data.currentProjectId); if (!project) { alert("No project selected or found to export."); return; }
             const projectToExport = JSON.parse(JSON.stringify(project)); 
             projectToExport.videos.forEach(video => { delete video.fileURL; }); 
@@ -1048,7 +1040,70 @@
             linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', exportFileDefaultName);
             linkElement.click(); linkElement.remove();
         },
+        showAddVideoModal() {
+            this.dom.addVideoLocalFileInput.value = ''; // Clear file input
+            this.dom.addVideoYouTubeUrlInput.value = ''; // Clear URL input
+            this.showModal('modal-add-video');
+        },
+        handleAddVideoConfirm() {
+            const project = this.getProjectById(this.data.currentProjectId);
+            if (!project) { alert("No active project found."); return; }
+            if (!project.videos) project.videos = [];
+
+            const localFile = this.dom.addVideoLocalFileInput.files[0];
+            const youtubeUrl = this.dom.addVideoYouTubeUrlInput.value.trim();
+
+            if (!localFile && !youtubeUrl) {
+                alert("Please select a local file or enter a YouTube URL.");
+                return;
+            }
+            if (localFile && youtubeUrl) {
+                alert("Please add either a local file OR a YouTube URL, not both.");
+                return;
+            }
+
+            const videoId = this.generateId();
+            let newVideoData = {
+                id: videoId,
+                logs: [],
+                createdAt: new Date().toISOString(),
+                isImportant: false
+            };
+
+            if (localFile) {
+                if (localFile.type.startsWith('video/')) {
+                    const objectURL = URL.createObjectURL(localFile);
+                    this.data.videoFileCache[videoId] = objectURL; // Cache by videoId for session
+                    newVideoData.filename = localFile.name;
+                    newVideoData.videoType = 'local';
+                } else {
+                    alert(`File "${localFile.name}" is not a recognized video format.`);
+                    return;
+                }
+            } else if (youtubeUrl) {
+                const ytVideoId = this.extractYouTubeVideoId(youtubeUrl);
+                if (ytVideoId) {
+                    newVideoData.filename = `YouTube: ${ytVideoId}`; // Or fetch title later
+                    newVideoData.youtubeVideoId = ytVideoId;
+                    newVideoData.videoType = 'youtube';
+                } else {
+                    alert("Invalid YouTube URL provided.");
+                    return;
+                }
+            }
+            
+            project.videos.push(newVideoData);
+            this.saveData();
+            this.renderProjectVideosScreen();
+            this.hideModal('modal-add-video');
+        },
+        extractYouTubeVideoId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        },
         renderProjectVideosScreen(searchTerm = '') {
+            // ... (structure same, but title needs to show if it's a YouTube video)
             const project = this.getProjectById(this.data.currentProjectId);
             if (!project) { this.navigateTo('screen-projects'); return; }
             this.dom.projectNameHeader.textContent = this.escapeHtml(project.name);
@@ -1057,7 +1112,7 @@
             let foundItems = false;
 
             if (videosToDisplay.length === 0 && !searchTerm) {
-                this.dom.projectVideosContainer.innerHTML = '<div class="empty-state"><p>No videos in this project yet.</p><p>Click "Add Videos" to begin.</p></div>';
+                this.dom.projectVideosContainer.innerHTML = '<div class="empty-state"><p>No videos in this project yet.</p><p>Click "Add Video" to begin.</p></div>';
                 return;
             }
             videosToDisplay.forEach((video, index) => {
@@ -1071,114 +1126,161 @@
                 foundItems = true;
                 const videoCard = document.createElement('div');
                 videoCard.className = 'video-entry-card'; videoCard.dataset.videoId = video.id;
+                
+                let titleDisplay = this.escapeHtml(video.filename);
+                if (video.videoType === 'youtube') {
+                    titleDisplay += ` <span class="youtube-icon" title="YouTube Video">&#9658;</span>`; // Simple play icon for YT
+                }
+
                 let clipsHtml = '';
+                // ... (clipsHtml generation same as before)
                 if (clipsToDisplay.length > 0) {
                     clipsToDisplay.sort((a,b) => a.markIn - b.markIn).forEach(log => {
-                        const ratingStars = Array(5).fill(0).map((_, i) => `<span class="star ${i < log.rating ? 'selected' : ''}">★</span>`).join('');
-                        clipsHtml += `<div class="clip-item-card"> <img src="${log.thumbnail || 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=='}" alt="Clip thumbnail" class="clip-item-thumbnail"> <div class="clip-item-info"> <p class="notes">${this.escapeHtml(log.notes)}</p> <p class="time">Time: ${this.formatTime(log.markIn)} - ${this.formatTime(log.markOut)}</p> <p class="rating">Rating: ${ratingStars}</p> ${log.keywords && log.keywords.length > 0 ? `<p class="keywords">Keywords: ${this.escapeHtml(log.keywords.join(', '))}</p>` : ''} </div> <div class="clip-item-actions"> <button class="button button-primary button-small btn-play-this-clip-inline" data-log-id="${log.id}"><span class="button-icon">►</span>Play</button> <button class="button button-subtle button-small btn-edit-this-clip" data-log-id="${log.id}">Edit</button> <button class="button button-subtle button-small btn-delete-this-log-item" data-log-id="${log.id}">Del</button> </div> </div>`;
+                        const ratingStars = Array(5).fill(0).map((_, i) => `<span class="star ${i < log.rating ? 'selected' : ''}">&#9733;</span>`).join('');
+                        let logThumbnail = log.thumbnail;
+                        if (video.videoType === 'youtube' && video.youtubeVideoId && !log.thumbnail) { // Get default YT thumb if local not set
+                            logThumbnail = `https://img.youtube.com/vi/${video.youtubeVideoId}/mqdefault.jpg`;
+                        } else if (!log.thumbnail) {
+                            logThumbnail = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+                        }
+
+                        clipsHtml += `<div class="clip-item-card"> <img src="${logThumbnail}" alt="Clip thumbnail" class="clip-item-thumbnail"> <div class="clip-item-info"> <p class="notes">${this.escapeHtml(log.notes)}</p> <p class="time">Time: ${this.formatTime(log.markIn)} - ${this.formatTime(log.markOut)}</p> <p class="rating">Rating: ${ratingStars}</p> ${log.keywords && log.keywords.length > 0 ? `<p class="keywords">Keywords: ${this.escapeHtml(log.keywords.join(', '))}</p>` : ''} </div> <div class="clip-item-actions"> <button class="button button-primary button-small btn-play-this-clip-inline" data-log-id="${log.id}"><span class="button-icon">&#9658;</span>Play</button> <button class="button button-subtle button-small btn-edit-this-clip" data-log-id="${log.id}">Edit</button> <button class="button button-subtle button-small btn-delete-this-log-item" data-log-id="${log.id}">Del</button> </div> </div>`;
                     });
                 } else if (searchTerm && videoMatchesSearch) clipsHtml = '<p style="padding: 10px 0; text-align:center; color: var(--text-color-light); font-size:0.9em;">No logged clips match search for this video.</p>';
                 else if (!searchTerm) clipsHtml = '<p style="padding: 10px 0; text-align:center; color: var(--text-color-light); font-size:0.9em;">No clips logged for this video yet.</p>';
 
-                videoCard.innerHTML = `<div class="video-entry-header"> <span class="video-entry-title" title="${this.escapeHtml(video.filename)}"> <span class="video-card-number">${index + 1}. </span>${this.escapeHtml(video.filename)} </span> <div class="video-entry-actions"> <button class="button button-subtle button-small btn-toggle-important ${video.isImportant ? 'is-important' : ''}" title="${video.isImportant ? 'Unmark as important' : 'Mark as important'}"> <span class="button-icon button-icon-only">${video.isImportant ? '★' : '☆'}</span> </button> <button class="button button-secondary button-small btn-log-full-video">Log Full Video</button> <button class="button button-subtle button-small btn-delete-this-video">Delete Video</button> </div> </div> <div class="inline-clip-player-area" id="inline-player-area-${video.id}"> <video class="inline-clip-player" id="inline-player-${video.id}" playsinline controls width="100%"></video> <div class="inline-clip-player-prompt hidden" id="inline-player-prompt-${video.id}"> <p id="inline-player-prompt-msg-${video.id}">Select video file to play clip.</p> <label class="button button-primary button-small mt-1"> Select Video File <input type="file" class="inline-clip-file-input" data-target-player-id="${video.id}" accept="video/*"> </label> </div> </div> <div class="video-clips-list-container"> ${clipsToDisplay.length > 0 || (searchTerm && videoMatchesSearch) ? `<h4>Logged Clips (${clipsToDisplay.length})</h4>` : ''} ${clipsHtml} </div>`;
+
+                videoCard.innerHTML = `
+                    <div class="video-entry-header"> 
+                        <span class="video-entry-title" title="${this.escapeHtml(video.filename)}"> 
+                           <span class="video-card-number">${index + 1}. </span>${titleDisplay}
+                        </span> 
+                        <div class="video-entry-actions"> <button class="button button-subtle button-small btn-toggle-important ${video.isImportant ? 'is-important' : ''}" title="${video.isImportant ? 'Unmark as important' : 'Mark as important'}"> <span class="button-icon button-icon-only">${video.isImportant ? '&#9733;' : '&#9734;'}</span> </button> <button class="button button-secondary button-small btn-log-full-video">Log Full Video</button> <button class="button button-subtle button-small btn-delete-this-video">Delete Video</button> </div> 
+                    </div> 
+                    <div class="inline-clip-player-area player-wrapper" id="inline-player-area-${video.id}"> 
+                        <!-- Placeholder for YT or HTML5 video -->
+                        <div class="inline-clip-player-prompt hidden" id="inline-player-prompt-${video.id}"> <p id="inline-player-prompt-msg-${video.id}">Select video file to play clip.</p> <label class="button button-primary button-small mt-1"> Select Local Video File <input type="file" class="inline-clip-file-input" data-target-player-id="${video.id}" accept="video/*"> </label> </div> 
+                    </div> 
+                    <div class="video-clips-list-container"> ${clipsToDisplay.length > 0 || (searchTerm && videoMatchesSearch) ? `<h4>Logged Clips (${clipsToDisplay.length})</h4>` : ''} ${clipsHtml} </div>`;
                 this.dom.projectVideosContainer.appendChild(videoCard);
             });
             if (!foundItems && searchTerm) this.dom.projectVideosContainer.innerHTML = `<div class="empty-state"><p>No videos or clips found matching "<strong>${this.escapeHtml(searchTerm)}</strong>".</p></div>`;
             else if (!foundItems && !searchTerm && videosToDisplay.length > 0) this.dom.projectVideosContainer.innerHTML = '<div class="empty-state"><p>No videos to display.</p></div>';
         },
-        async handleAddVideos(files) { 
-            const project = this.getProjectById(this.data.currentProjectId); if (!project) return;
-            if (!project.videos) project.videos = [];
-            this.showLoader(`Adding ${files.length} video(s)...`);
-            for (let file of files) {
-                if (file.type.startsWith('video/')) {
-                    const videoId = this.generateId();
-                    const objectURL = URL.createObjectURL(file);
-                    this.data.videoFileCache[videoId] = objectURL; // Cache by videoId
-                    const newVideo = { id: videoId, filename: file.name, logs: [], createdAt: new Date().toISOString(), isImportant: false };
-                    project.videos.push(newVideo);
-                    await this.saveVideoFileToDB(videoId, file);
-                } else { alert(`File "${file.name}" is not a recognized video format and was skipped.`); }
-            }
-            this.hideLoader();
-            this.saveData(); this.renderProjectVideosScreen(); this.dom.addVideosInput.value = null; 
-        },
-        confirmDeleteVideo(videoId) { 
-            const video = this.getVideoById(this.data.currentProjectId, videoId); if (!video) return;
-            this.dom.confirmDeleteMessage.innerHTML = `Are you sure you want to delete the video "<strong>${this.escapeHtml(video.filename)}</strong>" and all its logs? <br>The cached video file will also be removed from this browser. This cannot be undone.`;
-            this.showModal('modal-confirm-delete');
-            this.dom.btnConfirmDeleteConfirm.onclick = async () => { await this.deleteVideo(videoId); this.hideModal('modal-confirm-delete'); }; 
-        },
-        async deleteVideo(videoId) { 
-            const project = this.getProjectById(this.data.currentProjectId); if (!project || !project.videos) return;
-            this.showLoader("Deleting video and cached file...");
-            await this.deleteVideoFileFromDB(videoId); 
-            if (this.data.videoFileCache[videoId]) { 
-                URL.revokeObjectURL(this.data.videoFileCache[videoId]);
-                delete this.data.videoFileCache[videoId]; // Delete by videoId
-            }
-            this.hideLoader();
-            project.videos = project.videos.filter(v => v.id !== videoId);
-            if (this.data.currentVideoId === videoId) this.data.currentVideoId = null; 
-            if (this.data.activeInlinePlayer.videoId === videoId) {
-                this.data.activeInlinePlayer = { videoId: null, playerElement: null, promptElement: null, fileInputElement: null, pendingLogIdToPlay: null };
-            }
-            this.saveData(); this.renderProjectVideosScreen();
-        },
-        toggleVideoImportance(videoId) {
+        toggleVideoImportance(videoId) { /* ... Same ... */ 
             const project = this.getProjectById(this.data.currentProjectId); if (!project) return;
             const video = project.videos.find(v => v.id === videoId); if (!video) return;
             video.isImportant = !video.isImportant; this.saveData();
             this.renderProjectVideosScreen(this.dom.projectVideosSearch.value.trim()); 
         },
-        async playClipInline(videoId, logId) { 
+        playClipInline(videoId, logId, videoType) {
             const videoData = this.getVideoById(this.data.currentProjectId, videoId);
             const logData = this.getLogById(this.data.currentProjectId, videoId, logId);
             if (!videoData || !logData) { alert("Clip or video data not found."); return; }
 
-            if (this.data.activeInlinePlayer.playerElement && this.data.activeInlinePlayer.videoId !== videoId) {
-                this.data.activeInlinePlayer.playerElement.pause(); this.data.activeInlinePlayer.playerElement.removeAttribute('src');
+            // Clean up previous active inline player
+            if (this.data.activeInlinePlayer.videoId && this.data.activeInlinePlayer.videoId !== videoId) {
                 const oldPlayerArea = document.getElementById(`inline-player-area-${this.data.activeInlinePlayer.videoId}`);
-                if (oldPlayerArea) oldPlayerArea.classList.remove('active');
-                if(this.data.activeInlinePlayer.promptElement) this.data.activeInlinePlayer.promptElement.classList.add('hidden');
+                if (oldPlayerArea) {
+                    oldPlayerArea.classList.remove('active');
+                    oldPlayerArea.innerHTML = `<div class="inline-clip-player-prompt hidden" id="inline-player-prompt-${this.data.activeInlinePlayer.videoId}"> <p id="inline-player-prompt-msg-${this.data.activeInlinePlayer.videoId}">Select video file to play clip.</p> <label class="button button-primary button-small mt-1"> Select Local Video File <input type="file" class="inline-clip-file-input" data-target-player-id="${this.data.activeInlinePlayer.videoId}" accept="video/*"> </label> </div>`; // Reset content
+                }
+                if (this.data.activeInlinePlayer.youtubePlayerInstance) {
+                    this.data.activeInlinePlayer.youtubePlayerInstance.destroy();
+                }
             }
+            
             const playerArea = document.getElementById(`inline-player-area-${videoId}`);
-            const player = document.getElementById(`inline-player-${videoId}`);
-            const prompt = document.getElementById(`inline-player-prompt-${videoId}`);
-            const fileInput = prompt.querySelector('.inline-clip-file-input');
-            if (!playerArea || !player || !prompt) { console.error("Inline player elements not found for videoId:", videoId); return; }
+            if (!playerArea) { console.error("Inline player area not found for videoId:", videoId); return; }
             
             playerArea.classList.add('active'); 
-            this.data.activeInlinePlayer = { videoId, playerElement: player, promptElement: prompt, fileInputElement: fileInput, pendingLogIdToPlay: logId };
-            player.pause(); player.removeAttribute('src'); prompt.classList.add('hidden'); 
+            playerArea.innerHTML = ''; // Clear previous content (like prompts or old players)
 
-            const objectURL = await this.getVideoObjectURL(videoData); 
+            this.data.activeInlinePlayer = { 
+                videoId, 
+                videoType,
+                playerElement: null, // Will be set below
+                youtubePlayerInstance: null,
+                promptElement: null, // Will be set for local
+                fileInputElement: null, // Will be set for local
+                pendingLogIdToPlay: logId 
+            };
+            
+            if (videoType === 'youtube' && videoData.youtubeVideoId) {
+                const ytPlayerDivId = `inline-yt-player-${videoId}`;
+                const ytPlayerDiv = document.createElement('div');
+                ytPlayerDiv.id = ytPlayerDivId;
+                playerArea.appendChild(ytPlayerDiv);
+                this.data.activeInlinePlayer.playerElement = ytPlayerDiv;
 
-            if (objectURL) {
-                player.src = `${objectURL}#t=${logData.markIn},${logData.markOut}`; player.load(); 
-                player.play().catch(e => { console.error("Inline play error:", e); this.showInlinePlayerPrompt(videoData.filename, videoId, logId); });
-                this.data.activeInlinePlayer.pendingLogIdToPlay = null; 
-            } else {
-                this.showInlinePlayerPrompt(videoData.filename, videoId, logId); 
+                if (this.data.youtubePlayerReady) {
+                    this.data.activeInlinePlayer.youtubePlayerInstance = new YT.Player(ytPlayerDivId, {
+                        height: '100%',
+                        width: '100%',
+                        videoId: videoData.youtubeVideoId,
+                        playerVars: { 
+                            'playsinline': 1, 
+                            'start': Math.floor(logData.markIn), // YouTube API uses seconds
+                            'end': Math.floor(logData.markOut) 
+                        },
+                        events: {
+                            'onReady': (event) => { event.target.playVideo(); this.data.activeInlinePlayer.pendingLogIdToPlay = null; },
+                            'onError': () => alert("Error playing YouTube video inline.")
+                        }
+                    });
+                } else {
+                    playerArea.innerHTML = '<p style="color:white; text-align:center; padding:20px;">YouTube Player API is loading...</p>';
+                }
+            } else if (videoType === 'local') {
+                const html5Video = document.createElement('video');
+                html5Video.id = `inline-html5-player-${videoId}`;
+                html5Video.className = 'inline-clip-player';
+                html5Video.playsInline = true;
+                html5Video.controls = true;
+                playerArea.appendChild(html5Video);
+                this.data.activeInlinePlayer.playerElement = html5Video;
+
+                // Re-add prompt structure inside playerArea if needed for local files
+                const promptDiv = document.createElement('div');
+                promptDiv.className = 'inline-clip-player-prompt hidden'; // Start hidden
+                promptDiv.id = `inline-player-prompt-${videoId}`;
+                promptDiv.innerHTML = `<p id="inline-player-prompt-msg-${videoId}">Select video file to play clip.</p> <label class="button button-primary button-small mt-1"> Select Local Video File <input type="file" class="inline-clip-file-input" data-target-player-id="${videoId}" accept="video/*"> </label>`;
+                playerArea.appendChild(promptDiv);
+                this.data.activeInlinePlayer.promptElement = promptDiv;
+                this.data.activeInlinePlayer.fileInputElement = promptDiv.querySelector('input[type="file"]');
+
+
+                const objectURL = this.getLocalVideoObjectURL(videoId);
+                if (objectURL) {
+                    html5Video.src = `${objectURL}#t=${logData.markIn},${logData.markOut}`; 
+                    html5Video.load(); 
+                    html5Video.play().catch(e => { console.error("Inline HTML5 play error:", e); this.showInlineLocalFilePrompt(videoData.filename, videoId, logId); });
+                    this.data.activeInlinePlayer.pendingLogIdToPlay = null; 
+                } else {
+                    this.showInlineLocalFilePrompt(videoData.filename, videoId, logId);
+                }
             }
-            player.closest('.video-entry-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            playerArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         },
-        showInlinePlayerPrompt(videoFilename, videoId, logIdToPlay = null) { 
-            const prompt = document.getElementById(`inline-player-prompt-${videoId}`);
+        showInlineLocalFilePrompt(videoFilename, videoId, logIdToPlay = null) { 
+            const prompt = document.getElementById(`inline-player-prompt-${videoId}`); // This is within the active playerArea
             const msgElement = document.getElementById(`inline-player-prompt-msg-${videoId}`);
             if (prompt && msgElement) {
-                msgElement.innerHTML = `This browser needs you to select "<strong>${this.escapeHtml(videoFilename)}</strong>" again to play it.<br><small>(Video data is cached locally if possible after selection.)</small>`;
+                msgElement.innerHTML = `To play "<strong>${this.escapeHtml(videoFilename)}</strong>", please select the local file again for this session.`;
                 prompt.classList.remove('hidden');
-                const player = document.getElementById(`inline-player-${videoId}`);
-                if (player) { player.pause(); player.removeAttribute('src'); player.load(); }
+                
+                // Ensure the HTML5 video element is cleared if it exists
+                const html5Player = document.getElementById(`inline-html5-player-${videoId}`);
+                if (html5Player) { html5Player.pause(); html5Player.removeAttribute('src'); html5Player.load(); html5Player.classList.add('hidden'); }
+
             }
             if (this.data.activeInlinePlayer.videoId === videoId && logIdToPlay) {
                 this.data.activeInlinePlayer.pendingLogIdToPlay = logIdToPlay;
             }
         },
-        async handleInlinePlayerFileSelection(file, videoIdToMatch) { 
+        handleInlinePlayerFileSelection(file, videoIdToMatch) { // For local files in inline player
             const videoData = this.getVideoById(this.data.currentProjectId, videoIdToMatch);
-            const inputEl = document.querySelector(`.inline-clip-file-input[data-target-player-id="${videoIdToMatch}"]`);
+            const inputEl = this.data.activeInlinePlayer.videoId === videoIdToMatch ? this.data.activeInlinePlayer.fileInputElement : null;
 
             if (!file || !videoData ) {
                 alert(`Error: Video data not found for ID ${videoIdToMatch}.`);
@@ -1188,71 +1290,139 @@
                  alert(`Incorrect file selected. Expected "${videoData.filename}", but got "${file.name}".`);
                 if(inputEl) inputEl.value = ''; return;
             }
-            this.showLoader(`Caching "${file.name}"...`);
-            await this.saveVideoFileToDB(videoIdToMatch, file); 
-            this.hideLoader();
 
             const objectURL = URL.createObjectURL(file);
-            this.data.videoFileCache[videoIdToMatch] = objectURL; // Cache by videoId
+            this.data.videoFileCache[videoIdToMatch] = objectURL; 
 
-            if (this.data.activeInlinePlayer.videoId === videoIdToMatch && this.data.activeInlinePlayer.playerElement) {
-                this.data.activeInlinePlayer.promptElement.classList.add('hidden');
+            if (this.data.activeInlinePlayer.videoId === videoIdToMatch && this.data.activeInlinePlayer.playerElement && this.data.activeInlinePlayer.videoType === 'local') {
+                if (this.data.activeInlinePlayer.promptElement) this.data.activeInlinePlayer.promptElement.classList.add('hidden');
+                
+                const html5Player = this.data.activeInlinePlayer.playerElement;
+                html5Player.classList.remove('hidden'); // Show the player
+                
                 if (this.data.activeInlinePlayer.pendingLogIdToPlay) {
                     const pendingLogId = this.data.activeInlinePlayer.pendingLogIdToPlay;
-                    await this.playClipInline(videoIdToMatch, pendingLogId); 
-                } else {
-                    alert(`"${file.name}" loaded and cached. Please click "Play" on a clip.`);
+                    const logData = this.getLogById(this.data.currentProjectId, videoIdToMatch, pendingLogId);
+                    if (logData) {
+                        html5Player.src = `${objectURL}#t=${logData.markIn},${logData.markOut}`;
+                        html5Player.load();
+                        html5Player.play().catch(e => console.error("Error playing after file selection:", e));
+                        this.data.activeInlinePlayer.pendingLogIdToPlay = null;
+                    }
+                } else { // Should not happen if prompt was shown for a specific clip
+                    html5Player.src = objectURL;
+                    html5Player.play().catch(e => console.error("Error playing after file selection:", e));
                 }
             }
              if(inputEl) inputEl.value = '';
         },
-        confirmDeleteLogItemFromScreen2(videoId, logId){
-            const log = this.getLogById(this.data.currentProjectId, videoId, logId); if (!log) return;
+        confirmDeleteLogItemFromScreen2(videoId, logId){ /* ... Same ... */ 
+             const log = this.getLogById(this.data.currentProjectId, videoId, logId); if (!log) return;
             this.dom.confirmDeleteMessage.innerHTML = `Are you sure you want to delete this log entry? <br><small style="color:var(--text-color-light);">${this.escapeHtml(log.notes.substring(0,50))}...</small><br>This action cannot be undone.`;
             this.showModal('modal-confirm-delete');
             this.dom.btnConfirmDeleteConfirm.onclick = () => { this.deleteLogItem(videoId, logId); this.hideModal('modal-confirm-delete'); };
         },
-        deleteLogItem(videoId, logId) { 
+        deleteLogItem(videoId, logId) { /* ... Same ... */ 
             const video = this.getVideoById(this.data.currentProjectId, videoId); if (!video || !video.logs) return;
             video.logs = video.logs.filter(l => l.id !== logId); this.saveData();
             this.renderProjectVideosScreen(this.dom.projectVideosSearch.value.trim()); 
         },
-        async renderVideoLoggingScreen() { 
+        renderVideoLoggingScreen() {
             const videoData = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId);
-            if (!videoData) { 
-                this.navigateTo('screen-project-videos', { projectId: this.data.currentProjectId }); 
-                alert("Error: Video not found for logging."); return; 
-            }
+            if (!videoData) { this.navigateTo('screen-project-videos', { projectId: this.data.currentProjectId }); alert("Error: Video not found."); return; }
+
+            this.data.currentVideoType = videoData.videoType || (videoData.youtubeVideoId ? 'youtube' : 'local');
             this.dom.videoFilenameHeader.textContent = this.escapeHtml(videoData.filename);
             this.resetLogForm(); this.renderSavedLogsList();
-            this.data.videoElement.pause(); this.data.videoElement.removeAttribute('src'); 
-            this.data.videoElement.load(); this.data.playPauseBtn.innerHTML = '<span class="button-icon">►</span>Play';
-            this.updateVideoTimes(); 
+
+            // Clear previous players
+            this.data.videoElement.classList.add('hidden');
+            this.data.videoElement.pause(); this.data.videoElement.removeAttribute('src');
+            this.dom.youtubePlayerPlaceholder.classList.add('hidden');
+            this.dom.youtubePlayerPlaceholder.innerHTML = ''; // Remove old iframe
+            if (this.data.youtubePlayer) { this.data.youtubePlayer.destroy(); this.data.youtubePlayer = null; }
+            
+            this.dom.videoFilePrompt.classList.add('hidden');
             this.dom.videoPlayerContainer.classList.remove('hidden'); 
-            this.dom.videoFilePrompt.classList.add('hidden'); this.data.videoElement.classList.add('hidden'); 
+            this.updateVideoTimes(); // Reset time display
 
-            const objectURL = await this.getVideoObjectURL(videoData); 
-
-            if (objectURL) {
-                this.data.videoElement.src = objectURL; 
-                this.data.videoElement.classList.remove('hidden'); 
-            } else { 
-                this.promptForVideoFileOnLoggingScreen(videoData.filename); 
+            if (this.data.currentVideoType === 'youtube' && videoData.youtubeVideoId) {
+                this.dom.timelineContainer.classList.add('hidden'); // Hide custom timeline for YT for now
+                if (this.data.youtubePlayerReady) {
+                    this.data.youtubePlayer = new YT.Player(this.dom.youtubePlayerPlaceholder, {
+                        height: '100%', width: '100%', videoId: videoData.youtubeVideoId,
+                        playerVars: { 'playsinline': 1, 'controls': 1, 'modestbranding': 1, 'rel': 0 },
+                        events: {
+                            'onReady': (event) => { /* event.target.playVideo(); */ this.onYouTubePlayerReady(event); },
+                            'onStateChange': (event) => this.onYouTubePlayerStateChange(event),
+                            'onError': () => alert("Error playing YouTube video.")
+                        }
+                    });
+                    this.dom.youtubePlayerPlaceholder.classList.remove('hidden');
+                } else {
+                    this.dom.youtubePlayerPlaceholder.innerHTML = '<p style="color:var(--text-color-light); text-align:center; padding: 20px;">Loading YouTube Player...</p>';
+                    this.dom.youtubePlayerPlaceholder.classList.remove('hidden');
+                }
+            } else if (this.data.currentVideoType === 'local') {
+                this.dom.timelineContainer.classList.remove('hidden');
+                const objectURL = this.getLocalVideoObjectURL(videoData.id);
+                if (objectURL) {
+                    this.data.videoElement.src = objectURL; 
+                    this.data.videoElement.classList.remove('hidden');
+                } else { 
+                    this.promptForVideoFileOnLoggingScreen(videoData.filename); 
+                }
             }
         },
-        promptForVideoFileOnLoggingScreen(filename) { 
+        onYouTubePlayerReady(event) {
+            console.log("Main YouTube Player Ready");
+            // Auto-update time can be done via setInterval or listening to state changes
+            // For simplicity, we can enable our custom controls if desired, or rely on YT's.
+             if (this.data.playPauseBtn) this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#9658;</span>Play';
+             this.updateYouTubeTimeDisplay();
+        },
+        onYouTubePlayerStateChange(event) {
+            if (this.data.currentVideoType !== 'youtube' || !this.data.youtubePlayer) return;
+            
+            if (event.data === YT.PlayerState.PLAYING) {
+                if(this.data.playPauseBtn) this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#10074;&#10074;</span>Pause';
+                this._ytTimeUpdater = setInterval(() => this.updateYouTubeTimeDisplay(), 250);
+            } else {
+                if(this.data.playPauseBtn) this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#9658;</span>Play';
+                clearInterval(this._ytTimeUpdater);
+                 if (event.data === YT.PlayerState.ENDED || event.data === YT.PlayerState.PAUSED) {
+                    this.updateYouTubeTimeDisplay(); // final update
+                }
+            }
+        },
+        updateYouTubeTimeDisplay() {
+            if (this.data.currentVideoType !== 'youtube' || !this.data.youtubePlayer || typeof this.data.youtubePlayer.getCurrentTime !== 'function') {
+                if(this.data.timecodeDisplay) this.data.timecodeDisplay.textContent = '00:00 / 00:00';
+                return;
+            }
+            const currentTime = this.data.youtubePlayer.getCurrentTime();
+            const duration = this.data.youtubePlayer.getDuration();
+            if(this.data.timecodeDisplay) this.data.timecodeDisplay.textContent = `${this.formatTime(currentTime)} / ${this.formatTime(duration)}`;
+            // Update mark in/out buttons based on YT player time
+            if (this.data.markInTime === 0 || this.data.markInBtn.classList.contains('default-mark')) { if(this.data.markInBtn) this.data.markInBtn.textContent = `Mark In (${this.formatTime(currentTime, true)})`; }
+            if (this.data.markOutTime === null || this.data.markOutBtn.classList.contains('default-mark')) { if(this.data.markOutBtn) this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(currentTime, true)})`; }
+        },
+        setPlaybackSpeed(speed) {
+            if (this.data.currentVideoType === 'local' && this.data.videoElement) {
+                this.data.videoElement.playbackRate = speed;
+            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer && typeof this.data.youtubePlayer.setPlaybackRate === 'function') {
+                this.data.youtubePlayer.setPlaybackRate(speed);
+            }
+        },
+        promptForVideoFileOnLoggingScreen(filename) { /* ... Same ... */ 
             this.data.videoElement.classList.add('hidden'); 
             this.dom.videoFilePrompt.classList.remove('hidden'); 
-            this.dom.videoFilePromptMessage.innerHTML = `To log "<strong>${this.escapeHtml(filename)}</strong>", please select the file.<br><small>(It will be cached locally in your browser if possible.)</small>`;
+            this.dom.videoFilePromptMessage.innerHTML = `To log "<strong>${this.escapeHtml(filename)}</strong>", please select the local file again for this session.`;
             this.dom.videoFileInputLogging.dataset.expectedFilename = filename; 
         },
-        async handleVideoFileSelectionForLogging(file) { 
+        handleVideoFileSelectionForLogging(file) { // For Screen 3 local file selection
             const expectedFilename = this.dom.videoFileInputLogging.dataset.expectedFilename;
             if (file && file.name === expectedFilename) {
-                this.showLoader(`Caching "${file.name}"...`);
-                await this.saveVideoFileToDB(this.data.currentVideoId, file); 
-                this.hideLoader();
-
                 const objectURL = URL.createObjectURL(file); 
                 this.data.videoFileCache[this.data.currentVideoId] = objectURL; // Cache by videoId
                 this.data.videoElement.src = objectURL; 
@@ -1263,55 +1433,89 @@
             }
             this.dom.videoFileInputLogging.value = ''; 
         },
-        updateVideoTimes() { 
-            if (!this.data.videoElement || !this.data.videoElement.duration || isNaN(this.data.videoElement.duration)) {
-                this.data.timecodeDisplay.textContent = '00:00 / 00:00'; this.data.timelineProgress.style.width = '0%';
-                if(this.data.markInBtn) this.data.markInBtn.textContent = `Mark In (00:00.0)`;
-                if(this.data.markOutBtn) this.data.markOutBtn.textContent = `Mark Out (00:00.0)`; return;
+        updateVideoTimes() { // Primarily for HTML5 video
+            if (this.data.currentVideoType !== 'local' || !this.data.videoElement || !this.data.videoElement.duration || isNaN(this.data.videoElement.duration)) {
+                if (this.data.currentVideoType === 'local' && this.data.timecodeDisplay) { // Only clear if it's for local and no YT
+                     this.data.timecodeDisplay.textContent = '00:00 / 00:00'; 
+                     if(this.data.timelineProgress) this.data.timelineProgress.style.width = '0%';
+                     if(this.data.markInBtn) this.data.markInBtn.textContent = `Mark In (00:00.0)`;
+                     if(this.data.markOutBtn) this.data.markOutBtn.textContent = `Mark Out (00:00.0)`;
+                }
+                return;
             }
             const currentTime = this.data.videoElement.currentTime; const duration = this.data.videoElement.duration;
-            this.data.timecodeDisplay.textContent = `${this.formatTime(currentTime)} / ${this.formatTime(duration)}`;
-            this.data.timelineProgress.style.width = `${(currentTime / duration) * 100}%`;
-            if (this.data.markInTime === 0 || this.data.markInBtn.classList.contains('default-mark')) { this.data.markInBtn.textContent = `Mark In (${this.formatTime(currentTime, true)})`; }
-            if (this.data.markOutTime === null || this.data.markOutBtn.classList.contains('default-mark')) { this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(currentTime, true)})`; }
+            if(this.data.timecodeDisplay) this.data.timecodeDisplay.textContent = `${this.formatTime(currentTime)} / ${this.formatTime(duration)}`;
+            if(this.data.timelineProgress) this.data.timelineProgress.style.width = `${(currentTime / duration) * 100}%`;
+            if (this.data.markInTime === 0 || this.data.markInBtn.classList.contains('default-mark')) { if(this.data.markInBtn) this.data.markInBtn.textContent = `Mark In (${this.formatTime(currentTime, true)})`; }
+            if (this.data.markOutTime === null || this.data.markOutBtn.classList.contains('default-mark')) { if(this.data.markOutBtn) this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(currentTime, true)})`; }
         },
         togglePlayPause() { 
-            if (!this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) { 
-                const currentVideoData = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId);
-                alert("Please select a video file first."); 
-                this.promptForVideoFileOnLoggingScreen(currentVideoData?.filename || "the video file"); return; 
+            if (this.data.currentVideoType === 'local') {
+                if (!this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) { 
+                    const currentVideoData = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId);
+                    alert("Please select a local video file first."); 
+                    this.promptForVideoFileOnLoggingScreen(currentVideoData?.filename || "the video file"); return; 
+                }
+                if (this.data.videoElement.paused || this.data.videoElement.ended) { this.data.videoElement.play().catch(e => console.error("Error playing video:", e)); } 
+                else { this.data.videoElement.pause(); }
+            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer) {
+                const playerState = this.data.youtubePlayer.getPlayerState();
+                if (playerState === YT.PlayerState.PLAYING) {
+                    this.data.youtubePlayer.pauseVideo();
+                } else {
+                    this.data.youtubePlayer.playVideo();
+                }
             }
-            if (this.data.videoElement.paused || this.data.videoElement.ended) { this.data.videoElement.play().catch(e => console.error("Error playing video:", e)); } else { this.data.videoElement.pause(); }
         },
-        seekVideo(event) { 
-            if (!this.data.videoElement.duration || !this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) return;
+        seekVideo(event) { // Only for HTML5 video with custom timeline
+            if (this.data.currentVideoType !== 'local' || !this.data.videoElement.duration || !this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) return;
             const timelineRect = this.data.timelineContainer.getBoundingClientRect();
             const clickX = event.clientX - timelineRect.left;
             const seekRatio = Math.max(0, Math.min(1, clickX / timelineRect.width));
             this.data.videoElement.currentTime = seekRatio * this.data.videoElement.duration;
         },
         setMarkIn() { 
-            if (!this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) { alert("Load video first."); return; }
-            this.data.markInTime = this.data.videoElement.currentTime;
-            this.data.markInBtn.textContent = `Mark In (${this.formatTime(this.data.markInTime, true)})`;
-            this.data.markInBtn.classList.remove('default-mark', 'button-secondary'); this.data.markInBtn.classList.add('button-primary'); 
-            setTimeout(() => { this.data.markInBtn.classList.remove('button-primary'); this.data.markInBtn.classList.add('button-secondary');}, 1000);
+            let currentTime;
+            if (this.data.currentVideoType === 'local') {
+                if (!this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) { alert("Load video first."); return; }
+                currentTime = this.data.videoElement.currentTime;
+            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer) {
+                currentTime = this.data.youtubePlayer.getCurrentTime();
+            } else { alert("Video not ready."); return; }
+
+            this.data.markInTime = currentTime;
+            if(this.data.markInBtn) {
+                this.data.markInBtn.textContent = `Mark In (${this.formatTime(this.data.markInTime, true)})`;
+                this.data.markInBtn.classList.remove('default-mark', 'button-secondary'); this.data.markInBtn.classList.add('button-primary'); 
+                setTimeout(() => { this.data.markInBtn.classList.remove('button-primary'); this.data.markInBtn.classList.add('button-secondary');}, 1000);
+            }
             if (this.data.markOutTime !== null && this.data.markOutTime < this.data.markInTime) {
-                this.data.markOutTime = null; this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(this.data.videoElement.currentTime, true)})`;
-                this.data.markOutBtn.classList.add('default-mark');
+                this.data.markOutTime = null; 
+                if(this.data.markOutBtn) {
+                     this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(currentTime, true)})`; // Update with current time
+                     this.data.markOutBtn.classList.add('default-mark');
+                }
             }
         },
         setMarkOut() { 
-            if (!this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) { alert("Load video first."); return; }
-            const currentTime = this.data.videoElement.currentTime;
+            let currentTime;
+            if (this.data.currentVideoType === 'local') {
+                if (!this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) { alert("Load video first."); return; }
+                currentTime = this.data.videoElement.currentTime;
+            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer) {
+                currentTime = this.data.youtubePlayer.getCurrentTime();
+            } else { alert("Video not ready."); return; }
+
             if (currentTime <= this.data.markInTime) { alert("Mark Out time must be after Mark In time."); return; }
             this.data.markOutTime = currentTime;
-            this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(this.data.markOutTime, true)})`;
-            this.data.markOutBtn.classList.remove('default-mark', 'button-secondary'); this.data.markOutBtn.classList.add('button-primary');
-            setTimeout(() => { this.data.markOutBtn.classList.remove('button-primary'); this.data.markOutBtn.classList.add('button-secondary'); }, 1000);
+            if(this.data.markOutBtn) {
+                this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(this.data.markOutTime, true)})`;
+                this.data.markOutBtn.classList.remove('default-mark', 'button-secondary'); this.data.markOutBtn.classList.add('button-primary');
+                setTimeout(() => { this.data.markOutBtn.classList.remove('button-primary'); this.data.markOutBtn.classList.add('button-secondary'); }, 1000);
+            }
         },
-        handleStarRating(event) { if (event.target.classList.contains('star')) { this.data.currentRating = parseInt(event.target.dataset.value); this.updateStarDisplay(); } },
-        updateStarDisplay() { this.dom.logRatingContainer.querySelectorAll('.star').forEach(star => { star.classList.toggle('selected', parseInt(star.dataset.value) <= this.data.currentRating); }); },
+        handleStarRating(event) { /* ... Same ... */ if (event.target.classList.contains('star')) { this.data.currentRating = parseInt(event.target.dataset.value); this.updateStarDisplay(); } },
+        updateStarDisplay() { /* ... Same ... */ this.dom.logRatingContainer.querySelectorAll('.star').forEach(star => { star.classList.toggle('selected', parseInt(star.dataset.value) <= this.data.currentRating); }); },
         async saveLogEntry() { 
             const notes = this.dom.logNotes.value.trim();
             const keywordsRaw = this.dom.logKeywords.value.trim();
@@ -1320,28 +1524,35 @@
             if (!notes) { alert("Notes cannot be empty."); return; }
             if (this.data.currentRating === 0) { alert("Please provide a rating."); return; }
             this.dom.saveLogBtn.disabled = true; this.dom.saveLogBtn.textContent = 'Saving...';
+            
             let thumbnail = null;
-            try {
-                if (this.data.videoElement.src && this.data.videoElement.readyState >= 2 && this.dom.videoFilePrompt.classList.contains('hidden')) { 
-                    thumbnail = await this.generateLogThumbnail(this.data.markInTime); 
-                } 
-                else { console.warn("Video not ready or available for thumbnail generation."); }
-            } catch (error) { console.error("Error generating thumbnail:", error); }
-            const video = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId);
-            if (!video) { alert("Error: Video not found."); this.dom.saveLogBtn.disabled = false; this.dom.saveLogBtn.textContent = 'Save Log'; return; }
-            if (!video.logs) video.logs = [];
+            const videoData = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId);
+
+            if (this.data.currentVideoType === 'local') {
+                try {
+                    if (this.data.videoElement.src && this.data.videoElement.readyState >= 2 && this.dom.videoFilePrompt.classList.contains('hidden')) { 
+                        thumbnail = await this.generateLogThumbnail(this.data.markInTime); 
+                    } else { console.warn("Local video not ready for thumbnail."); }
+                } catch (error) { console.error("Error generating thumbnail for local video:", error); }
+            } else if (this.data.currentVideoType === 'youtube' && videoData && videoData.youtubeVideoId) {
+                thumbnail = `https://img.youtube.com/vi/${videoData.youtubeVideoId}/mqdefault.jpg`; // Default YT thumbnail
+            }
+            
+            if (!videoData) { alert("Error: Video not found."); this.dom.saveLogBtn.disabled = false; this.dom.saveLogBtn.textContent = 'Save Log'; return; }
+            if (!videoData.logs) videoData.logs = [];
             const editingLogId = this.dom.editingLogIdInput.value;
             const logData = { markIn: this.data.markInTime, markOut: this.data.markOutTime, notes: notes, rating: this.data.currentRating, keywords: keywords, thumbnail: thumbnail };
             if (editingLogId) { 
-                const log = video.logs.find(l => l.id === editingLogId);
+                const log = videoData.logs.find(l => l.id === editingLogId);
                 if (log) { Object.assign(log, logData, { updatedAt: new Date().toISOString() }); }
-            } else { video.logs.push({ ...logData, id: this.generateId(), createdAt: new Date().toISOString() }); }
+            } else { videoData.logs.push({ ...logData, id: this.generateId(), createdAt: new Date().toISOString() }); }
             this.saveData(); this.renderSavedLogsList(); this.resetLogForm();
             this.dom.saveLogBtn.disabled = false; this.dom.saveLogBtn.textContent = 'Save Log';
         },
-        generateLogThumbnail(time) { 
+        generateLogThumbnail(time) { // Only for local HTML5 video
             return new Promise((resolve, reject) => {
-                if (!this.data.videoElement || !this.data.videoElement.src || this.data.videoElement.readyState < 2 || !this.dom.videoFilePrompt.classList.contains('hidden')) { return reject("Video not ready or available for thumbnail."); }
+                if (this.data.currentVideoType !== 'local' || !this.data.videoElement || !this.data.videoElement.src || this.data.videoElement.readyState < 2 || !this.dom.videoFilePrompt.classList.contains('hidden')) { return reject("Local video not ready for thumbnail."); }
+                // ... (rest of thumbnail generation logic same as before)
                 const video = this.data.videoElement; const canvas = this.dom.thumbnailCanvas; const ctx = canvas.getContext('2d');
                 const originalTime = video.currentTime; const originalPaused = video.paused; const originalMuted = video.muted; video.muted = true;
                 let seekTimeout; const cleanup = () => { video.removeEventListener('seeked', onSeeked); video.removeEventListener('error', onError); clearTimeout(seekTimeout); video.currentTime = originalTime; if (!originalPaused) video.play().catch(e=>console.warn("Resume play fail in cleanup:",e)); video.muted = originalMuted; };
@@ -1355,19 +1566,37 @@
         resetLogForm() { 
             this.dom.logNotes.value = ''; this.dom.logKeywords.value = ''; this.data.currentRating = 0; this.updateStarDisplay();
             this.data.markInTime = 0; this.data.markOutTime = null;
-            const defaultTime = (this.data.videoElement && this.data.videoElement.src && this.dom.videoFilePrompt.classList.contains('hidden')) ? this.data.videoElement.currentTime : 0;
-            this.data.markInBtn.textContent = `Mark In (${this.formatTime(defaultTime, true)})`; this.data.markInBtn.classList.add('default-mark');
-            this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(defaultTime, true)})`; this.data.markOutBtn.classList.add('default-mark');
+            let defaultTime = 0;
+            if (this.data.currentVideoType === 'local' && this.data.videoElement && this.data.videoElement.src && this.dom.videoFilePrompt.classList.contains('hidden')) {
+                defaultTime = this.data.videoElement.currentTime;
+            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer && typeof this.data.youtubePlayer.getCurrentTime === 'function') {
+                defaultTime = this.data.youtubePlayer.getCurrentTime();
+            }
+            if(this.data.markInBtn) {
+                this.data.markInBtn.textContent = `Mark In (${this.formatTime(defaultTime, true)})`; 
+                this.data.markInBtn.classList.add('default-mark');
+            }
+            if(this.data.markOutBtn) {
+                 this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(defaultTime, true)})`; 
+                 this.data.markOutBtn.classList.add('default-mark');
+            }
             this.dom.editingLogIdInput.value = ''; this.dom.saveLogBtn.textContent = 'Save Log';
         },
-        renderSavedLogsList() { 
+        renderSavedLogsList() { /* ... Same, but thumbnails for YT will be default ones ... */ 
             const video = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId); this.dom.savedLogsList.innerHTML = '';
             if (!video || !video.logs || video.logs.length === 0) { this.dom.savedLogsList.innerHTML = '<div class="empty-state" style="padding:20px; font-size:0.9em;"><p>No logs saved for this video yet.</p></div>'; return; }
             const sortedLogs = [...video.logs].sort((a, b) => a.markIn - b.markIn);
             sortedLogs.forEach(log => {
                 const item = document.createElement('div'); item.className = 'log-item'; item.id = `log-item-${log.id}`;
-                const ratingStars = Array(5).fill(0).map((_, i) => `<span class="star ${i < log.rating ? 'selected' : ''}">★</span>`).join('');
-                item.innerHTML = `<div class="log-item-header"> <span class="log-item-time">${this.formatTime(log.markIn)} - ${this.formatTime(log.markOut)}</span> <div class="log-item-rating">${ratingStars}</div> </div> <p class="log-item-notes">${this.escapeHtml(log.notes)}</p> ${log.keywords && log.keywords.length > 0 ? `<p class="log-item-keywords">Keywords: ${this.escapeHtml(log.keywords.join(', '))}</p>` : ''} ${log.thumbnail ? `<img src="${log.thumbnail}" alt="Log thumbnail">` : ''} <div class="card-actions" style="margin-top:10px;"> <button class="button button-subtle button-small btn-go-to-log-time" data-time="${log.markIn}">Go to</button> <button class="button button-secondary button-small btn-edit-log" data-log-id="${log.id}">Edit</button> <button class="button button-subtle button-small btn-delete-log" data-log-id="${log.id}">Delete</button> </div>`;
+                const ratingStars = Array(5).fill(0).map((_, i) => `<span class="star ${i < log.rating ? 'selected' : ''}">&#9733;</span>`).join('');
+                 let logThumbnail = log.thumbnail;
+                 if (video.videoType === 'youtube' && video.youtubeVideoId && !log.thumbnail) { // Get default YT thumb if local not set
+                    logThumbnail = `https://img.youtube.com/vi/${video.youtubeVideoId}/mqdefault.jpg`;
+                 } else if (!log.thumbnail) {
+                    logThumbnail = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+                 }
+
+                item.innerHTML = `<div class="log-item-header"> <span class="log-item-time">${this.formatTime(log.markIn)} - ${this.formatTime(log.markOut)}</span> <div class="log-item-rating">${ratingStars}</div> </div> <p class="log-item-notes">${this.escapeHtml(log.notes)}</p> ${log.keywords && log.keywords.length > 0 ? `<p class="log-item-keywords">Keywords: ${this.escapeHtml(log.keywords.join(', '))}</p>` : ''} <img src="${logThumbnail}" alt="Log thumbnail"> <div class="card-actions" style="margin-top:10px;"> <button class="button button-subtle button-small btn-go-to-log-time" data-time="${log.markIn}">Go to</button> <button class="button button-secondary button-small btn-edit-log" data-log-id="${log.id}">Edit</button> <button class="button button-subtle button-small btn-delete-log" data-log-id="${log.id}">Delete</button> </div>`;
                 this.dom.savedLogsList.appendChild(item);
             });
             this.dom.savedLogsList.querySelectorAll('.btn-go-to-log-time').forEach(btn => { btn.addEventListener('click', (e) => this.goToLogTime(parseFloat(e.currentTarget.dataset.time))); });
@@ -1375,21 +1604,33 @@
             this.dom.savedLogsList.querySelectorAll('.btn-delete-log').forEach(btn => { btn.addEventListener('click', (e) => this.confirmDeleteLogOnScreen3(e.currentTarget.dataset.logId)); });
         },
         goToLogTime(time) { 
-            if(this.data.videoElement && this.data.videoElement.src && this.dom.videoFilePrompt.classList.contains('hidden')) {
-                this.data.videoElement.currentTime = time; this.data.videoElement.play().catch(e => console.error("Play error:", e));
-                this.data.videoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            } else { 
-                const currentVideoData = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId);
-                alert("Video file not loaded. Please select it first."); 
-                this.promptForVideoFileOnLoggingScreen(currentVideoData?.filename || "the video file"); 
+            if (this.data.currentVideoType === 'local') {
+                if(this.data.videoElement && this.data.videoElement.src && this.dom.videoFilePrompt.classList.contains('hidden')) {
+                    this.data.videoElement.currentTime = time; this.data.videoElement.play().catch(e => console.error("Play error:", e));
+                    this.data.videoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else { 
+                    const currentVideoData = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId);
+                    alert("Local video file not loaded. Please select it first."); 
+                    this.promptForVideoFileOnLoggingScreen(currentVideoData?.filename || "the video file"); 
+                }
+            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer) {
+                this.data.youtubePlayer.seekTo(time, true);
+                this.data.youtubePlayer.playVideo();
+                this.dom.youtubePlayerPlaceholder.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         },
-        editLogEntry(logId, fromNavigation = false) { 
+        editLogEntry(logId, fromNavigation = false) { /* ... Same, relies on player being set up by renderVideoLoggingScreen ... */
             const videoIdForLog = this.data.currentVideoId; const log = this.getLogById(this.data.currentProjectId, videoIdForLog, logId); if (!log) return;
             this.dom.logNotes.value = log.notes; this.dom.logKeywords.value = log.keywords ? log.keywords.join(', ') : '';
             this.data.currentRating = log.rating; this.updateStarDisplay();
             this.data.markInTime = log.markIn; this.data.markOutTime = log.markOut;
-            if (this.data.videoElement && this.data.videoElement.src && this.dom.videoFilePrompt.classList.contains('hidden')) { this.data.videoElement.currentTime = log.markIn; }
+            
+            // For HTML5, try to seek if loaded
+            if (this.data.currentVideoType === 'local' && this.data.videoElement && this.data.videoElement.src && this.dom.videoFilePrompt.classList.contains('hidden')) { 
+                this.data.videoElement.currentTime = log.markIn; 
+            } 
+            // For YouTube, seeking is handled by GoTo or when player is ready.
+            // Just update button text based on stored log times.
             this.data.markInBtn.textContent = `Mark In (${this.formatTime(log.markIn, true)})`;
             this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(log.markOut, true)})`;
             this.data.markInBtn.classList.remove('default-mark'); this.data.markOutBtn.classList.remove('default-mark');
@@ -1397,18 +1638,18 @@
             this.dom.logNotes.focus();
             const logFormCard = this.dom.logNotes.closest('.card'); if (logFormCard) logFormCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
         },
-        confirmDeleteLogOnScreen3(logId) { 
+        confirmDeleteLogOnScreen3(logId) { /* ... Same ... */ 
             const log = this.getLogById(this.data.currentProjectId, this.data.currentVideoId, logId); if (!log) return;
             this.dom.confirmDeleteMessage.innerHTML = `Are you sure you want to delete this log entry? <br><small style="color:var(--text-color-light);">${this.escapeHtml(log.notes.substring(0,50))}...</small><br>This action cannot be undone.`;
             this.showModal('modal-confirm-delete');
             this.dom.btnConfirmDeleteConfirm.onclick = () => { this.deleteLogOnScreen3(logId); this.hideModal('modal-confirm-delete'); };
         },
-        deleteLogOnScreen3(logId) { 
+        deleteLogOnScreen3(logId) { /* ... Same ... */ 
             const video = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId); if (!video || !video.logs) return;
             video.logs = video.logs.filter(l => l.id !== logId); this.saveData(); this.renderSavedLogsList();
             if(this.dom.editingLogIdInput.value === logId) { this.resetLogForm(); }
         },
-        highlightAndScrollToLog(logId) { 
+        highlightAndScrollToLog(logId) { /* ... Same ... */ 
             const logElement = document.getElementById(`log-item-${logId}`);
             if (logElement) {
                 this.dom.savedLogsList.querySelectorAll('.log-item').forEach(el => el.style.backgroundColor = '');
@@ -1419,7 +1660,7 @@
         },
         showModal(modalId) { const modal = document.getElementById(modalId); if (modal) modal.style.display = 'block'; },
         hideModal(modalId) { const modal = document.getElementById(modalId); if (modal) modal.style.display = 'none'; },
-        formatTime(seconds, includeMillis = false) { 
+        formatTime(seconds, includeMillis = false) { /* ... Same ... */ 
             if (isNaN(seconds) || seconds < 0) return includeMillis ? '00:00.0' : '00:00';
             const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60);
             const s = Math.floor(seconds % 60); const ms = Math.floor((seconds - Math.floor(seconds)) * 10); 
@@ -1427,14 +1668,14 @@
             timeStr += `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
             if (includeMillis) timeStr += `.${ms}`; return timeStr;
         },
-        escapeHtml(unsafe) { 
+        escapeHtml(unsafe) { /* ... Same ... */ 
             if (typeof unsafe !== 'string') return String(unsafe);
-            return unsafe.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """).replace(/'/g, "'");
+            return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
     };
 
-    document.addEventListener('DOMContentLoaded', async () => { // Make this async
-        await app.init(); // Await the init function
+    document.addEventListener('DOMContentLoaded', () => { // No longer async, as init itself is not heavily async now
+        app.init();
     });
     </script>
 </body>
