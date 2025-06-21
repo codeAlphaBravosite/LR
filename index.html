@@ -351,29 +351,32 @@
         }
 
 
-        .player-wrapper { /* Common wrapper for HTML5 video and YouTube iframe */
+        .player-wrapper { 
             background-color: #000;
             position: relative;
             min-height: 200px; 
+            aspect-ratio: 16/9; /* Give it a default aspect ratio */
         }
-        .inline-clip-player-area { /* Existing style, but now .player-wrapper is its child */
+        .inline-clip-player-area { 
              display: none; 
         }
         .inline-clip-player-area.active { display: block; }
         
-        .player-wrapper iframe {
+        .player-wrapper iframe,
+        .player-wrapper video {
             width: 100%;
             height: 100%;
-            min-height: 200px; /* Ensure iframe takes up space */
-            aspect-ratio: 16/9; /* Maintain aspect ratio */
             display: block;
+            position: absolute; /* Allow prompt to overlay */
+            top: 0;
+            left: 0;
         }
-        .player-wrapper video { width: 100%; display: block; max-height: 400px; }
 
-        .inline-clip-player-prompt { /* For local file selection */
+        .inline-clip-player-prompt { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             background-color: rgba(0,0,0,0.85); color: white; padding: 20px; text-align: center;
+            z-index: 5; /* Ensure it's above the video/iframe if they are also absolute */
         }
         .inline-clip-player-prompt p { margin-bottom: 15px; font-size: 0.95em; line-height: 1.4; }
         .inline-clip-player-prompt strong { color: var(--secondary-color); }
@@ -409,13 +412,14 @@
         .clip-item-actions .button-small { padding: 5px 8px; font-size: 0.8em; }
 
         /* Screen 3: Video Logging */
-        #video-player-container { /* This will now contain either HTML5 video or YouTube iframe */
+        #video-player-container { 
             width: 100%; background-color: black; margin-bottom: 15px;
             position: relative; border-radius: var(--border-radius); overflow:hidden;
-            aspect-ratio: 16/9; /* Default for video players */
+            aspect-ratio: 16/9; 
         }
         #video-player-container > video, 
-        #video-player-container > iframe {
+        #video-player-container > #youtube-player-placeholder,
+        #video-player-container > #video-file-prompt { /* Ensure prompt is also absolutely positioned */
             width: 100%;
             height: 100%;
             position: absolute;
@@ -423,7 +427,7 @@
             left: 0;
         }
         #video-file-prompt { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            /* Re-assert display flex for centering content as it's now absolute */
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             background: rgba(0,0,0,0.85); color: white; padding: 25px; text-align: center;
             border-radius: var(--border-radius); z-index:10;
@@ -558,7 +562,7 @@
             <div class="container">
                 <div id="video-player-container">
                     <video id="video-player" class="hidden" playsinline controls></video>
-                    <div id="youtube-player-placeholder" class="hidden"></div> <!-- For YouTube iframe -->
+                    <div id="youtube-player-placeholder" class="hidden"></div> 
                     <div id="video-file-prompt" class="card hidden"> 
                         <p id="video-file-prompt-message">Please select the video file.</p>
                         <label class="button button-primary mt-1">
@@ -637,7 +641,7 @@
                     <span class="close-button" data-modal-id="modal-add-video">&times;</span>
                 </div>
                 <div class="form-group">
-                    <label for="add-video-local-file" class="button button-secondary button-full-width">
+                    <label for="add-video-local-file-input" class="button button-secondary button-full-width"> <!-- Corrected 'for' attribute -->
                         <span class="button-icon">&#x1F4C1;</span> Select Local Video File
                         <input type="file" id="add-video-local-file-input" accept="video/*">
                     </label>
@@ -673,10 +677,11 @@
             projects: [],
             currentProjectId: null,
             currentVideoId: null, 
-            currentVideoType: null, // 'local' or 'youtube'
-            videoElement: null, // HTML5 video player
-            youtubePlayer: null, // YouTube API player instance
+            currentVideoType: null, 
+            videoElement: null, 
+            youtubePlayer: null, 
             youtubePlayerReady: false,
+            _ytTimeUpdater: null, // To store interval ID for YouTube time updates
             timelineProgress: null,
             timelineContainer: null,
             playPauseBtn: null,
@@ -687,14 +692,14 @@
             markInTime: 0,
             markOutTime: null,
             currentRating: 0,
-            videoFileCache: {}, // videoId (string) -> objectURL (string) for LOCAL files only
+            videoFileCache: {}, 
             activeInlinePlayer: { 
                 videoId: null,
                 videoType: null,
-                playerElement: null, // Could be HTML5 video or a div for YT iframe
+                playerElement: null, 
                 youtubePlayerInstance: null,
-                promptElement: null,
-                fileInputElement: null,
+                promptElement: null, 
+                fileInputElement: null, 
                 pendingLogIdToPlay: null 
             }
         },
@@ -703,7 +708,7 @@
         init() {
             this.cacheDomElements();
             this.loadData(); 
-            this.loadYouTubeAPI(); // Load YouTube API
+            this.loadYouTubeAPI(); 
             this.registerEventListeners();
             this.navigateTo('screen-projects');
             console.log("LogReel App Initialized (Hybrid: Local Files + YouTube)");
@@ -726,7 +731,7 @@
             
             this.dom.btnBackToProjects = document.getElementById('btn-back-to-projects');
             this.dom.projectNameHeader = document.getElementById('project-name-header');
-            this.dom.btnShowAddVideoModal = document.getElementById('btn-show-add-video-modal'); // New button
+            this.dom.btnShowAddVideoModal = document.getElementById('btn-show-add-video-modal'); 
             this.dom.btnExportProject = document.getElementById('btn-export-project');
             this.dom.projectVideosSearch = document.getElementById('project-videos-search');
             this.dom.projectVideosContainer = document.getElementById('project-videos-container');
@@ -734,11 +739,11 @@
             this.dom.btnBackToProjectVideos = document.getElementById('btn-back-to-project-videos');
             this.dom.videoFilenameHeader = document.getElementById('video-filename-header');
             this.dom.videoPlayerContainer = document.getElementById('video-player-container');
-            this.data.videoElement = document.getElementById('video-player'); // HTML5
-            this.dom.youtubePlayerPlaceholder = document.getElementById('youtube-player-placeholder'); // YT
-            this.dom.videoFilePrompt = document.getElementById('video-file-prompt'); // For local files
+            this.data.videoElement = document.getElementById('video-player'); 
+            this.dom.youtubePlayerPlaceholder = document.getElementById('youtube-player-placeholder'); 
+            this.dom.videoFilePrompt = document.getElementById('video-file-prompt'); 
             this.dom.videoFilePromptMessage = document.getElementById('video-file-prompt-message');
-            this.dom.videoFileInputLogging = document.getElementById('video-file-input-logging'); // For local files on Screen 3
+            this.dom.videoFileInputLogging = document.getElementById('video-file-input-logging'); 
 
             this.data.timelineContainer = document.getElementById('timeline-container');
             this.data.timelineProgress = document.getElementById('timeline-progress');
@@ -775,9 +780,20 @@
                 window.onYouTubeIframeAPIReady = () => {
                     console.log("YouTube IFrame API Ready");
                     this.data.youtubePlayerReady = true;
-                    // If a YouTube video was pending load, try loading it now
+                    // If a YouTube video was pending load on the logging screen, try loading it now
                     if (this.currentScreen === 'screen-video-logging' && this.data.currentVideoType === 'youtube') {
                         this.renderVideoLoggingScreen(); 
+                    }
+                    // If an inline YouTube clip was pending, try to play it
+                    if (this.currentScreen === 'screen-project-videos' && 
+                        this.data.activeInlinePlayer.videoId && 
+                        this.data.activeInlinePlayer.videoType === 'youtube' &&
+                        this.data.activeInlinePlayer.pendingLogIdToPlay) {
+                            this.playClipInline(
+                                this.data.activeInlinePlayer.videoId, 
+                                this.data.activeInlinePlayer.pendingLogIdToPlay, 
+                                'youtube'
+                            );
                     }
                 };
             } else {
@@ -785,20 +801,18 @@
             }
         },
 
-        // --- Video File/URL Handling (Session cache for local, URL for YouTube) ---
-        getLocalVideoObjectURL(videoId) { // Only for local files
+        getLocalVideoObjectURL(videoId) { 
             if (this.data.videoFileCache[videoId]) {
-                // Basic check if it's an object URL, doesn't guarantee validity
                 if (this.data.videoFileCache[videoId].startsWith('blob:')) {
                     return this.data.videoFileCache[videoId];
                 }
-                delete this.data.videoFileCache[videoId]; // Invalid entry
+                console.warn(`Invalid ObjectURL found in cache for ${videoId}, removing.`);
+                delete this.data.videoFileCache[videoId]; 
             }
             return null;
         },
         
         navigateTo(screenId, params = {}) {
-            // ... (navigateTo logic mostly same, just ensure it handles currentVideoType)
             const targetScreenKey = screenId.replace('screen-', '');
             if(this.dom.screens && Object.values(this.dom.screens).length > 0) {
                 Object.values(this.dom.screens).forEach(screen => screen.classList.remove('active'));
@@ -816,14 +830,23 @@
             this.currentScreen = screenId;
             window.scrollTo(0, 0);
 
-            // Pause active players when navigating away
+            // Pause active players when navigating away or switching main player
             if (this.data.videoElement && !this.data.videoElement.paused) this.data.videoElement.pause();
-            if (this.data.youtubePlayer && typeof this.data.youtubePlayer.pauseVideo === 'function') this.data.youtubePlayer.pauseVideo();
-            if (this.data.activeInlinePlayer.playerElement && this.data.activeInlinePlayer.videoType === 'local' && !this.data.activeInlinePlayer.playerElement.paused) {
-                 this.data.activeInlinePlayer.playerElement.pause();
+            if (this.data.youtubePlayer && typeof this.data.youtubePlayer.pauseVideo === 'function') {
+                try { this.data.youtubePlayer.pauseVideo(); } catch(e) { console.warn("Error pausing main YT player", e); }
             }
-            if (this.data.activeInlinePlayer.youtubePlayerInstance && typeof this.data.activeInlinePlayer.youtubePlayerInstance.pauseVideo === 'function') {
-                this.data.activeInlinePlayer.youtubePlayerInstance.pauseVideo();
+            
+            // Clean up active inline player if navigating away from project-videos screen
+            if (screenId !== 'screen-project-videos' && this.data.activeInlinePlayer.videoId) {
+                if (this.data.activeInlinePlayer.youtubePlayerInstance && typeof this.data.activeInlinePlayer.youtubePlayerInstance.destroy === 'function') {
+                    try { this.data.activeInlinePlayer.youtubePlayerInstance.destroy(); } catch(e) { console.warn("Error destroying inline YT player", e); }
+                }
+                const oldPlayerArea = document.getElementById(`inline-player-area-${this.data.activeInlinePlayer.videoId}`);
+                if (oldPlayerArea) {
+                    oldPlayerArea.classList.remove('active');
+                    oldPlayerArea.innerHTML = ''; // Clear its content
+                }
+                this.data.activeInlinePlayer = { videoId: null, videoType: null, playerElement: null, youtubePlayerInstance: null, promptElement: null, fileInputElement: null, pendingLogIdToPlay: null };
             }
 
 
@@ -853,7 +876,7 @@
                     break;
             }
         },
-        loadData() { /* ... Same ... */ 
+        loadData() { 
             const storedData = localStorage.getItem('logReelData');
             if (storedData) {
                 try {
@@ -862,23 +885,21 @@
                         if (project.videos) {
                             project.videos.forEach(video => {
                                 if (typeof video.isImportant === 'undefined') video.isImportant = false;
-                                // Ensure videoType is set if migrating old data (though new videos will have it)
-                                if (!video.youtubeVideoId && !video.videoType) video.videoType = 'local';
-                                else if (video.youtubeVideoId && !video.videoType) video.videoType = 'youtube';
+                                if (!video.videoType) video.videoType = video.youtubeVideoId ? 'youtube' : 'local';
                             });
                         }
                     });
                 } catch (e) { console.error("Error parsing data from localStorage:", e); this.data.projects = []; }
             } else { this.data.projects = []; }
         },
-        saveData() { /* ... Same ... */ localStorage.setItem('logReelData', JSON.stringify(this.data.projects)); },
-        generateId() { /* ... Same ... */ return Date.now().toString(36) + Math.random().toString(36).substring(2, 9); },
-        getProjectById(projectId) { /* ... Same ... */ return this.data.projects.find(p => p.id === projectId); },
-        getVideoById(projectId, videoId) { /* ... Same ... */ 
+        saveData() { localStorage.setItem('logReelData', JSON.stringify(this.data.projects)); },
+        generateId() { return Date.now().toString(36) + Math.random().toString(36).substring(2, 9); },
+        getProjectById(projectId) { return this.data.projects.find(p => p.id === projectId); },
+        getVideoById(projectId, videoId) { 
             const project = this.getProjectById(projectId);
             return project ? project.videos.find(v => v.id === videoId) : null;
         },
-        getLogById(projectId, videoId, logId) { /* ... Same ... */ 
+        getLogById(projectId, videoId, logId) { 
             const video = this.getVideoById(projectId, videoId);
             return video && video.logs ? video.logs.find(l => l.id === logId) : null;
         },
@@ -886,21 +907,18 @@
             this.dom.btnNewProject.addEventListener('click', () => this.showNewProjectModal());
             this.dom.importProjectsInput.addEventListener('change', (e) => this.importProjects(e));
             this.dom.btnBackToProjects.addEventListener('click', () => this.navigateTo('screen-projects'));
-            
             this.dom.btnShowAddVideoModal.addEventListener('click', () => this.showAddVideoModal());
             this.dom.btnAddVideoConfirm.addEventListener('click', () => this.handleAddVideoConfirm());
-
             this.dom.btnExportProject.addEventListener('click', () => this.exportCurrentProject());
             this.dom.projectVideosSearch.addEventListener('input', (e) => this.renderProjectVideosScreen(e.target.value.trim()));
             this.dom.btnBackToProjectVideos.addEventListener('click', () => this.navigateTo('screen-project-videos', { projectId: this.data.currentProjectId }));
             
-            // HTML5 Video Player Events (only if this.data.videoElement exists)
             if (this.data.videoElement) {
                 this.data.videoElement.addEventListener('play', () => { if(this.data.playPauseBtn && this.data.currentVideoType === 'local') this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#10074;&#10074;</span>Pause'; });
                 this.data.videoElement.addEventListener('pause', () => { if(this.data.playPauseBtn && this.data.currentVideoType === 'local') this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#9658;</span>Play'; });
-                this.data.videoElement.addEventListener('loadedmetadata', () => this.updateVideoTimes());
-                this.data.videoElement.addEventListener('timeupdate', () => this.updateVideoTimes());
-                this.data.videoElement.addEventListener('durationchange', () => this.updateVideoTimes());
+                this.data.videoElement.addEventListener('loadedmetadata', () => {if(this.data.currentVideoType === 'local') this.updateVideoTimes()});
+                this.data.videoElement.addEventListener('timeupdate', () => {if(this.data.currentVideoType === 'local') this.updateVideoTimes()});
+                this.data.videoElement.addEventListener('durationchange', () => {if(this.data.currentVideoType === 'local') this.updateVideoTimes()});
             }
 
             this.data.timelineContainer.addEventListener('click', (e) => this.seekVideo(e));
@@ -926,15 +944,13 @@
             });
 
             this.dom.projectVideosContainer.addEventListener('click', (e) => {
-                // ... (delegation logic similar, but needs to consider video type for playClipInline)
                 const targetButton = e.target.closest('button');
                 if (!targetButton) return;
                 const videoEntryCard = targetButton.closest('.video-entry-card');
                 if (!videoEntryCard) return; 
                 const videoId = videoEntryCard.dataset.videoId;
                 const videoData = this.getVideoById(this.data.currentProjectId, videoId);
-                const videoType = videoData ? (videoData.youtubeVideoId ? 'youtube' : 'local') : null;
-
+                const videoType = videoData ? videoData.videoType : null;
 
                 if (targetButton.classList.contains('btn-log-full-video')) this.navigateTo('screen-video-logging', { projectId: this.data.currentProjectId, videoId: videoId });
                 else if (targetButton.classList.contains('btn-delete-this-video')) this.confirmDeleteVideo(videoId);
@@ -943,7 +959,6 @@
                 else if (targetButton.classList.contains('btn-edit-this-clip')) this.navigateTo('screen-video-logging', { projectId: this.data.currentProjectId, videoId: videoId, logIdToEdit: targetButton.dataset.logId });
                 else if (targetButton.classList.contains('btn-delete-this-log-item')) this.confirmDeleteLogItemFromScreen2(videoId, targetButton.dataset.logId);
             });
-             // For local file selection within an inline player prompt
             this.dom.projectVideosContainer.addEventListener('change', (e) => { 
                 if (e.target.classList.contains('inline-clip-file-input')) {
                     const videoEntryCard = e.target.closest('.video-entry-card');
@@ -952,7 +967,7 @@
                 }
             });
         },
-        renderProjectsScreen() { /* ... Same ... */ 
+        renderProjectsScreen() { 
             this.dom.projectsList.innerHTML = '';
             if (this.data.projects.length === 0) {
                 this.dom.projectsList.innerHTML = '<div class="empty-state"><p>No projects yet.</p><p>Create one or import existing projects to get started!</p></div>';
@@ -978,20 +993,20 @@
                 btn.addEventListener('click', (e) => this.confirmDeleteProject(e.currentTarget.dataset.projectId));
             });
         },
-        showNewProjectModal() { /* ... Same ... */ this.dom.newProjectNameInput.value = ''; this.showModal('modal-new-project'); this.dom.newProjectNameInput.focus(); },
-        createNewProject() { /* ... Same ... */
+        showNewProjectModal() { this.dom.newProjectNameInput.value = ''; this.showModal('modal-new-project'); this.dom.newProjectNameInput.focus(); },
+        createNewProject() {
             const name = this.dom.newProjectNameInput.value.trim();
             if (!name) { alert('Project name cannot be empty.'); return; }
             const newProject = { id: this.generateId(), name: name, videos: [], createdAt: new Date().toISOString() };
             this.data.projects.unshift(newProject); this.saveData(); this.renderProjectsScreen(); this.hideModal('modal-new-project');
         },
-        confirmDeleteProject(projectId) { /* ... Same ... (message implies local cache only now) */
+        confirmDeleteProject(projectId) { 
             const project = this.getProjectById(projectId); if (!project) return;
             this.dom.confirmDeleteMessage.innerHTML = `Are you sure you want to delete the project "<strong>${this.escapeHtml(project.name)}</strong>"? <br>This action cannot be undone.`;
             this.showModal('modal-confirm-delete');
             this.dom.btnConfirmDeleteConfirm.onclick = () => { this.deleteProject(projectId); this.hideModal('modal-confirm-delete'); }; 
         },
-        deleteProject(projectId){ /* ... Same ... (no IndexedDB cleanup needed) */
+        deleteProject(projectId){ 
             const project = this.getProjectById(projectId);
             if (project && project.videos) {
                 project.videos.forEach(video => {
@@ -1005,7 +1020,7 @@
             if (this.data.currentProjectId === projectId) { this.data.currentProjectId = null; this.data.currentVideoId = null; }
             this.saveData(); this.renderProjectsScreen();
         },
-        importProjects(event) { /* ... Same, but YT videos would just be URLs ... */
+        importProjects(event) { 
              const file = event.target.files[0];
             if (file) {
                 const reader = new FileReader();
@@ -1016,7 +1031,6 @@
                             importedData.forEach(p => { 
                                 p.videos.forEach(v => { 
                                     if(typeof v.isImportant === 'undefined') v.isImportant = false;
-                                    // Infer type if missing during import
                                     if (!v.videoType) v.videoType = v.youtubeVideoId ? 'youtube' : 'local';
                                 }); 
                             });
@@ -1029,7 +1043,7 @@
                 reader.readAsText(file); event.target.value = null; 
             }
         },
-        exportCurrentProject() { /* ... Same ... */ 
+        exportCurrentProject() { 
             const project = this.getProjectById(this.data.currentProjectId); if (!project) { alert("No project selected or found to export."); return; }
             const projectToExport = JSON.parse(JSON.stringify(project)); 
             projectToExport.videos.forEach(video => { delete video.fileURL; }); 
@@ -1041,8 +1055,8 @@
             linkElement.click(); linkElement.remove();
         },
         showAddVideoModal() {
-            this.dom.addVideoLocalFileInput.value = ''; // Clear file input
-            this.dom.addVideoYouTubeUrlInput.value = ''; // Clear URL input
+            this.dom.addVideoLocalFileInput.value = ''; 
+            this.dom.addVideoYouTubeUrlInput.value = ''; 
             this.showModal('modal-add-video');
         },
         handleAddVideoConfirm() {
@@ -1050,7 +1064,7 @@
             if (!project) { alert("No active project found."); return; }
             if (!project.videos) project.videos = [];
 
-            const localFile = this.dom.addVideoLocalFileInput.files[0];
+            const localFile = this.dom.addVideoLocalFileInput.files[0]; // Corrected: use the specific input
             const youtubeUrl = this.dom.addVideoYouTubeUrlInput.value.trim();
 
             if (!localFile && !youtubeUrl) {
@@ -1073,21 +1087,22 @@
             if (localFile) {
                 if (localFile.type.startsWith('video/')) {
                     const objectURL = URL.createObjectURL(localFile);
-                    this.data.videoFileCache[videoId] = objectURL; // Cache by videoId for session
+                    this.data.videoFileCache[videoId] = objectURL; 
                     newVideoData.filename = localFile.name;
                     newVideoData.videoType = 'local';
                 } else {
                     alert(`File "${localFile.name}" is not a recognized video format.`);
+                    this.dom.addVideoLocalFileInput.value = ''; // Clear the invalid file
                     return;
                 }
             } else if (youtubeUrl) {
                 const ytVideoId = this.extractYouTubeVideoId(youtubeUrl);
                 if (ytVideoId) {
-                    newVideoData.filename = `YouTube: ${ytVideoId}`; // Or fetch title later
+                    newVideoData.filename = `YouTube Video (ID: ${ytVideoId})`; 
                     newVideoData.youtubeVideoId = ytVideoId;
                     newVideoData.videoType = 'youtube';
                 } else {
-                    alert("Invalid YouTube URL provided.");
+                    alert("Invalid YouTube URL provided. Please use a valid YouTube video watch URL.");
                     return;
                 }
             }
@@ -1103,7 +1118,6 @@
             return (match && match[2].length === 11) ? match[2] : null;
         },
         renderProjectVideosScreen(searchTerm = '') {
-            // ... (structure same, but title needs to show if it's a YouTube video)
             const project = this.getProjectById(this.data.currentProjectId);
             if (!project) { this.navigateTo('screen-projects'); return; }
             this.dom.projectNameHeader.textContent = this.escapeHtml(project.name);
@@ -1129,26 +1143,26 @@
                 
                 let titleDisplay = this.escapeHtml(video.filename);
                 if (video.videoType === 'youtube') {
-                    titleDisplay += ` <span class="youtube-icon" title="YouTube Video">&#9658;</span>`; // Simple play icon for YT
+                    titleDisplay += ` <span class="youtube-icon" title="YouTube Video">&#9658;</span>`; 
                 }
 
                 let clipsHtml = '';
-                // ... (clipsHtml generation same as before)
                 if (clipsToDisplay.length > 0) {
                     clipsToDisplay.sort((a,b) => a.markIn - b.markIn).forEach(log => {
                         const ratingStars = Array(5).fill(0).map((_, i) => `<span class="star ${i < log.rating ? 'selected' : ''}">&#9733;</span>`).join('');
                         let logThumbnail = log.thumbnail;
-                        if (video.videoType === 'youtube' && video.youtubeVideoId && !log.thumbnail) { // Get default YT thumb if local not set
+                        if (video.videoType === 'youtube' && video.youtubeVideoId && !log.thumbnail) { 
                             logThumbnail = `https://img.youtube.com/vi/${video.youtubeVideoId}/mqdefault.jpg`;
-                        } else if (!log.thumbnail) {
+                        } else if (video.videoType === 'local' && !log.thumbnail) { // Only use placeholder if local and no thumb
                             logThumbnail = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+                        } else if (!logThumbnail) { // Fallback for any other case
+                             logThumbnail = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
                         }
 
                         clipsHtml += `<div class="clip-item-card"> <img src="${logThumbnail}" alt="Clip thumbnail" class="clip-item-thumbnail"> <div class="clip-item-info"> <p class="notes">${this.escapeHtml(log.notes)}</p> <p class="time">Time: ${this.formatTime(log.markIn)} - ${this.formatTime(log.markOut)}</p> <p class="rating">Rating: ${ratingStars}</p> ${log.keywords && log.keywords.length > 0 ? `<p class="keywords">Keywords: ${this.escapeHtml(log.keywords.join(', '))}</p>` : ''} </div> <div class="clip-item-actions"> <button class="button button-primary button-small btn-play-this-clip-inline" data-log-id="${log.id}"><span class="button-icon">&#9658;</span>Play</button> <button class="button button-subtle button-small btn-edit-this-clip" data-log-id="${log.id}">Edit</button> <button class="button button-subtle button-small btn-delete-this-log-item" data-log-id="${log.id}">Del</button> </div> </div>`;
                     });
                 } else if (searchTerm && videoMatchesSearch) clipsHtml = '<p style="padding: 10px 0; text-align:center; color: var(--text-color-light); font-size:0.9em;">No logged clips match search for this video.</p>';
                 else if (!searchTerm) clipsHtml = '<p style="padding: 10px 0; text-align:center; color: var(--text-color-light); font-size:0.9em;">No clips logged for this video yet.</p>';
-
 
                 videoCard.innerHTML = `
                     <div class="video-entry-header"> 
@@ -1158,8 +1172,7 @@
                         <div class="video-entry-actions"> <button class="button button-subtle button-small btn-toggle-important ${video.isImportant ? 'is-important' : ''}" title="${video.isImportant ? 'Unmark as important' : 'Mark as important'}"> <span class="button-icon button-icon-only">${video.isImportant ? '&#9733;' : '&#9734;'}</span> </button> <button class="button button-secondary button-small btn-log-full-video">Log Full Video</button> <button class="button button-subtle button-small btn-delete-this-video">Delete Video</button> </div> 
                     </div> 
                     <div class="inline-clip-player-area player-wrapper" id="inline-player-area-${video.id}"> 
-                        <!-- Placeholder for YT or HTML5 video -->
-                        <div class="inline-clip-player-prompt hidden" id="inline-player-prompt-${video.id}"> <p id="inline-player-prompt-msg-${video.id}">Select video file to play clip.</p> <label class="button button-primary button-small mt-1"> Select Local Video File <input type="file" class="inline-clip-file-input" data-target-player-id="${video.id}" accept="video/*"> </label> </div> 
+                        <!-- Content injected by playClipInline -->
                     </div> 
                     <div class="video-clips-list-container"> ${clipsToDisplay.length > 0 || (searchTerm && videoMatchesSearch) ? `<h4>Logged Clips (${clipsToDisplay.length})</h4>` : ''} ${clipsHtml} </div>`;
                 this.dom.projectVideosContainer.appendChild(videoCard);
@@ -1167,7 +1180,7 @@
             if (!foundItems && searchTerm) this.dom.projectVideosContainer.innerHTML = `<div class="empty-state"><p>No videos or clips found matching "<strong>${this.escapeHtml(searchTerm)}</strong>".</p></div>`;
             else if (!foundItems && !searchTerm && videosToDisplay.length > 0) this.dom.projectVideosContainer.innerHTML = '<div class="empty-state"><p>No videos to display.</p></div>';
         },
-        toggleVideoImportance(videoId) { /* ... Same ... */ 
+        toggleVideoImportance(videoId) { 
             const project = this.getProjectById(this.data.currentProjectId); if (!project) return;
             const video = project.videos.find(v => v.id === videoId); if (!video) return;
             video.isImportant = !video.isImportant; this.saveData();
@@ -1178,36 +1191,27 @@
             const logData = this.getLogById(this.data.currentProjectId, videoId, logId);
             if (!videoData || !logData) { alert("Clip or video data not found."); return; }
 
-            // Clean up previous active inline player
             if (this.data.activeInlinePlayer.videoId && this.data.activeInlinePlayer.videoId !== videoId) {
-                const oldPlayerArea = document.getElementById(`inline-player-area-${this.data.activeInlinePlayer.videoId}`);
-                if (oldPlayerArea) {
-                    oldPlayerArea.classList.remove('active');
-                    oldPlayerArea.innerHTML = `<div class="inline-clip-player-prompt hidden" id="inline-player-prompt-${this.data.activeInlinePlayer.videoId}"> <p id="inline-player-prompt-msg-${this.data.activeInlinePlayer.videoId}">Select video file to play clip.</p> <label class="button button-primary button-small mt-1"> Select Local Video File <input type="file" class="inline-clip-file-input" data-target-player-id="${this.data.activeInlinePlayer.videoId}" accept="video/*"> </label> </div>`; // Reset content
-                }
                 if (this.data.activeInlinePlayer.youtubePlayerInstance) {
-                    this.data.activeInlinePlayer.youtubePlayerInstance.destroy();
+                    try { this.data.activeInlinePlayer.youtubePlayerInstance.destroy(); } catch(e){}
                 }
+                const oldPlayerArea = document.getElementById(`inline-player-area-${this.data.activeInlinePlayer.videoId}`);
+                if (oldPlayerArea) { oldPlayerArea.classList.remove('active'); oldPlayerArea.innerHTML = ''; }
             }
             
             const playerArea = document.getElementById(`inline-player-area-${videoId}`);
             if (!playerArea) { console.error("Inline player area not found for videoId:", videoId); return; }
             
             playerArea.classList.add('active'); 
-            playerArea.innerHTML = ''; // Clear previous content (like prompts or old players)
+            playerArea.innerHTML = ''; 
 
             this.data.activeInlinePlayer = { 
-                videoId, 
-                videoType,
-                playerElement: null, // Will be set below
-                youtubePlayerInstance: null,
-                promptElement: null, // Will be set for local
-                fileInputElement: null, // Will be set for local
-                pendingLogIdToPlay: logId 
+                videoId, videoType, playerElement: null, youtubePlayerInstance: null,
+                promptElement: null, fileInputElement: null, pendingLogIdToPlay: logId 
             };
             
             if (videoType === 'youtube' && videoData.youtubeVideoId) {
-                const ytPlayerDivId = `inline-yt-player-${videoId}`;
+                const ytPlayerDivId = `inline-yt-player-${videoId}-${this.generateId()}`; // Unique ID for each instance
                 const ytPlayerDiv = document.createElement('div');
                 ytPlayerDiv.id = ytPlayerDivId;
                 playerArea.appendChild(ytPlayerDiv);
@@ -1215,42 +1219,32 @@
 
                 if (this.data.youtubePlayerReady) {
                     this.data.activeInlinePlayer.youtubePlayerInstance = new YT.Player(ytPlayerDivId, {
-                        height: '100%',
-                        width: '100%',
-                        videoId: videoData.youtubeVideoId,
-                        playerVars: { 
-                            'playsinline': 1, 
-                            'start': Math.floor(logData.markIn), // YouTube API uses seconds
-                            'end': Math.floor(logData.markOut) 
-                        },
-                        events: {
-                            'onReady': (event) => { event.target.playVideo(); this.data.activeInlinePlayer.pendingLogIdToPlay = null; },
-                            'onError': () => alert("Error playing YouTube video inline.")
-                        }
+                        height: '100%', width: '100%', videoId: videoData.youtubeVideoId,
+                        playerVars: { 'playsinline': 1, 'start': Math.floor(logData.markIn), 'end': Math.floor(logData.markOut), 'autoplay': 1, 'controls':1 },
+                        events: { 'onReady': (event) => { this.data.activeInlinePlayer.pendingLogIdToPlay = null; }, 'onError': () => alert("Error playing YouTube video inline.") }
                     });
-                } else {
-                    playerArea.innerHTML = '<p style="color:white; text-align:center; padding:20px;">YouTube Player API is loading...</p>';
-                }
+                } else { playerArea.innerHTML = '<p style="color:white; text-align:center; padding:20px;">YouTube Player API is loading...</p>'; }
             } else if (videoType === 'local') {
                 const html5Video = document.createElement('video');
                 html5Video.id = `inline-html5-player-${videoId}`;
                 html5Video.className = 'inline-clip-player';
-                html5Video.playsInline = true;
-                html5Video.controls = true;
+                html5Video.playsInline = true; html5Video.controls = true;
                 playerArea.appendChild(html5Video);
                 this.data.activeInlinePlayer.playerElement = html5Video;
 
-                // Re-add prompt structure inside playerArea if needed for local files
-                const promptDiv = document.createElement('div');
-                promptDiv.className = 'inline-clip-player-prompt hidden'; // Start hidden
-                promptDiv.id = `inline-player-prompt-${videoId}`;
-                promptDiv.innerHTML = `<p id="inline-player-prompt-msg-${videoId}">Select video file to play clip.</p> <label class="button button-primary button-small mt-1"> Select Local Video File <input type="file" class="inline-clip-file-input" data-target-player-id="${videoId}" accept="video/*"> </label>`;
-                playerArea.appendChild(promptDiv);
+                const promptDivId = `inline-player-prompt-div-${videoId}`;
+                let promptDiv = document.getElementById(promptDivId);
+                if (!promptDiv) {
+                    promptDiv = document.createElement('div');
+                    promptDiv.className = 'inline-clip-player-prompt hidden';
+                    promptDiv.id = promptDivId;
+                    promptDiv.innerHTML = `<p id="inline-player-prompt-msg-${videoId}">Select video file to play clip.</p> <label class="button button-primary button-small mt-1"> Select Local Video File <input type="file" class="inline-clip-file-input" data-target-player-id="${videoId}" accept="video/*"> </label>`;
+                    playerArea.appendChild(promptDiv); // Append to playerArea
+                }
                 this.data.activeInlinePlayer.promptElement = promptDiv;
                 this.data.activeInlinePlayer.fileInputElement = promptDiv.querySelector('input[type="file"]');
-
-
-                const objectURL = this.getLocalVideoObjectURL(videoId);
+                
+                const objectURL = this.getLocalVideoObjectURL(videoId); // videoId is correct here
                 if (objectURL) {
                     html5Video.src = `${objectURL}#t=${logData.markIn},${logData.markOut}`; 
                     html5Video.load(); 
@@ -1263,24 +1257,38 @@
             playerArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         },
         showInlineLocalFilePrompt(videoFilename, videoId, logIdToPlay = null) { 
-            const prompt = document.getElementById(`inline-player-prompt-${videoId}`); // This is within the active playerArea
-            const msgElement = document.getElementById(`inline-player-prompt-msg-${videoId}`);
-            if (prompt && msgElement) {
-                msgElement.innerHTML = `To play "<strong>${this.escapeHtml(videoFilename)}</strong>", please select the local file again for this session.`;
-                prompt.classList.remove('hidden');
-                
-                // Ensure the HTML5 video element is cleared if it exists
-                const html5Player = document.getElementById(`inline-html5-player-${videoId}`);
-                if (html5Player) { html5Player.pause(); html5Player.removeAttribute('src'); html5Player.load(); html5Player.classList.add('hidden'); }
+            // Ensure prompt exists within the specific playerArea
+            const playerArea = document.getElementById(`inline-player-area-${videoId}`);
+            if (!playerArea) return;
 
+            let promptDiv = playerArea.querySelector('.inline-clip-player-prompt');
+            if (!promptDiv) { // If for some reason it wasn't created, create it now
+                promptDiv = document.createElement('div');
+                promptDiv.className = 'inline-clip-player-prompt'; // Show it directly
+                promptDiv.id = `inline-player-prompt-div-${videoId}`; // Use a consistent ID structure
+                promptDiv.innerHTML = `<p id="inline-player-prompt-msg-${videoId}"></p> <label class="button button-primary button-small mt-1"> Select Local Video File <input type="file" class="inline-clip-file-input" data-target-player-id="${videoId}" accept="video/*"> </label>`;
+                playerArea.appendChild(promptDiv);
             }
-            if (this.data.activeInlinePlayer.videoId === videoId && logIdToPlay) {
-                this.data.activeInlinePlayer.pendingLogIdToPlay = logIdToPlay;
+            
+            const msgElement = promptDiv.querySelector('p'); // Get p tag within this specific prompt
+            if (msgElement) {
+                msgElement.innerHTML = `To play "<strong>${this.escapeHtml(videoFilename)}</strong>", please select the local file again for this session.`;
+            }
+            promptDiv.classList.remove('hidden');
+            
+            const html5Player = playerArea.querySelector('video');
+            if (html5Player) { html5Player.classList.add('hidden'); html5Player.pause(); html5Player.removeAttribute('src');}
+
+
+            if (this.data.activeInlinePlayer.videoId === videoId) {
+                this.data.activeInlinePlayer.promptElement = promptDiv; // Update active player's prompt
+                 if(logIdToPlay) this.data.activeInlinePlayer.pendingLogIdToPlay = logIdToPlay;
             }
         },
-        handleInlinePlayerFileSelection(file, videoIdToMatch) { // For local files in inline player
+        handleInlinePlayerFileSelection(file, videoIdToMatch) { 
             const videoData = this.getVideoById(this.data.currentProjectId, videoIdToMatch);
-            const inputEl = this.data.activeInlinePlayer.videoId === videoIdToMatch ? this.data.activeInlinePlayer.fileInputElement : null;
+            // Relies on activeInlinePlayer being correctly set up by playClipInline
+            const inputEl = (this.data.activeInlinePlayer.videoId === videoIdToMatch) ? this.data.activeInlinePlayer.fileInputElement : null;
 
             if (!file || !videoData ) {
                 alert(`Error: Video data not found for ID ${videoIdToMatch}.`);
@@ -1294,35 +1302,38 @@
             const objectURL = URL.createObjectURL(file);
             this.data.videoFileCache[videoIdToMatch] = objectURL; 
 
-            if (this.data.activeInlinePlayer.videoId === videoIdToMatch && this.data.activeInlinePlayer.playerElement && this.data.activeInlinePlayer.videoType === 'local') {
+            if (this.data.activeInlinePlayer.videoId === videoIdToMatch && this.data.activeInlinePlayer.videoType === 'local') {
                 if (this.data.activeInlinePlayer.promptElement) this.data.activeInlinePlayer.promptElement.classList.add('hidden');
                 
-                const html5Player = this.data.activeInlinePlayer.playerElement;
-                html5Player.classList.remove('hidden'); // Show the player
-                
-                if (this.data.activeInlinePlayer.pendingLogIdToPlay) {
-                    const pendingLogId = this.data.activeInlinePlayer.pendingLogIdToPlay;
-                    const logData = this.getLogById(this.data.currentProjectId, videoIdToMatch, pendingLogId);
-                    if (logData) {
-                        html5Player.src = `${objectURL}#t=${logData.markIn},${logData.markOut}`;
-                        html5Player.load();
+                const html5Player = this.data.activeInlinePlayer.playerElement; // Should be the <video> tag
+                if (html5Player && html5Player.tagName === 'VIDEO') {
+                    html5Player.classList.remove('hidden');
+                    if (this.data.activeInlinePlayer.pendingLogIdToPlay) {
+                        const pendingLogId = this.data.activeInlinePlayer.pendingLogIdToPlay;
+                        const logData = this.getLogById(this.data.currentProjectId, videoIdToMatch, pendingLogId);
+                        if (logData) {
+                            html5Player.src = `${objectURL}#t=${logData.markIn},${logData.markOut}`;
+                            html5Player.load();
+                            html5Player.play().catch(e => console.error("Error playing after file selection:", e));
+                            this.data.activeInlinePlayer.pendingLogIdToPlay = null;
+                        }
+                    } else { 
+                        html5Player.src = objectURL;
                         html5Player.play().catch(e => console.error("Error playing after file selection:", e));
-                        this.data.activeInlinePlayer.pendingLogIdToPlay = null;
                     }
-                } else { // Should not happen if prompt was shown for a specific clip
-                    html5Player.src = objectURL;
-                    html5Player.play().catch(e => console.error("Error playing after file selection:", e));
+                } else {
+                    console.error("Active inline player element is not a video tag for local file type.");
                 }
             }
              if(inputEl) inputEl.value = '';
         },
-        confirmDeleteLogItemFromScreen2(videoId, logId){ /* ... Same ... */ 
+        confirmDeleteLogItemFromScreen2(videoId, logId){ 
              const log = this.getLogById(this.data.currentProjectId, videoId, logId); if (!log) return;
             this.dom.confirmDeleteMessage.innerHTML = `Are you sure you want to delete this log entry? <br><small style="color:var(--text-color-light);">${this.escapeHtml(log.notes.substring(0,50))}...</small><br>This action cannot be undone.`;
             this.showModal('modal-confirm-delete');
             this.dom.btnConfirmDeleteConfirm.onclick = () => { this.deleteLogItem(videoId, logId); this.hideModal('modal-confirm-delete'); };
         },
-        deleteLogItem(videoId, logId) { /* ... Same ... */ 
+        deleteLogItem(videoId, logId) { 
             const video = this.getVideoById(this.data.currentProjectId, videoId); if (!video || !video.logs) return;
             video.logs = video.logs.filter(l => l.id !== logId); this.saveData();
             this.renderProjectVideosScreen(this.dom.projectVideosSearch.value.trim()); 
@@ -1335,96 +1346,97 @@
             this.dom.videoFilenameHeader.textContent = this.escapeHtml(videoData.filename);
             this.resetLogForm(); this.renderSavedLogsList();
 
-            // Clear previous players
             this.data.videoElement.classList.add('hidden');
-            this.data.videoElement.pause(); this.data.videoElement.removeAttribute('src');
+            this.data.videoElement.pause(); this.data.videoElement.removeAttribute('src'); this.data.videoElement.load();
             this.dom.youtubePlayerPlaceholder.classList.add('hidden');
-            this.dom.youtubePlayerPlaceholder.innerHTML = ''; // Remove old iframe
-            if (this.data.youtubePlayer) { this.data.youtubePlayer.destroy(); this.data.youtubePlayer = null; }
+            this.dom.youtubePlayerPlaceholder.innerHTML = ''; 
+            if (this.data.youtubePlayer) { try {this.data.youtubePlayer.destroy();} catch(e){} this.data.youtubePlayer = null; }
+            clearInterval(this.data._ytTimeUpdater); // Clear any existing interval for YT time
             
             this.dom.videoFilePrompt.classList.add('hidden');
             this.dom.videoPlayerContainer.classList.remove('hidden'); 
-            this.updateVideoTimes(); // Reset time display
+            
+            // Reset controls and time display before loading new video
+            if (this.data.playPauseBtn) this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#9658;</span>Play';
+            this.updateVideoTimes(); 
+
 
             if (this.data.currentVideoType === 'youtube' && videoData.youtubeVideoId) {
-                this.dom.timelineContainer.classList.add('hidden'); // Hide custom timeline for YT for now
+                this.dom.timelineContainer.style.display = 'none'; // Hide custom timeline for YT
+                this.dom.youtubePlayerPlaceholder.classList.remove('hidden');
                 if (this.data.youtubePlayerReady) {
                     this.data.youtubePlayer = new YT.Player(this.dom.youtubePlayerPlaceholder, {
                         height: '100%', width: '100%', videoId: videoData.youtubeVideoId,
-                        playerVars: { 'playsinline': 1, 'controls': 1, 'modestbranding': 1, 'rel': 0 },
+                        playerVars: { 'playsinline': 1, 'controls': 1, 'modestbranding': 1, 'rel': 0, 'autoplay': 0 },
                         events: {
-                            'onReady': (event) => { /* event.target.playVideo(); */ this.onYouTubePlayerReady(event); },
+                            'onReady': (event) => this.onYouTubePlayerReady(event),
                             'onStateChange': (event) => this.onYouTubePlayerStateChange(event),
-                            'onError': () => alert("Error playing YouTube video.")
+                            'onError': (e) => {console.error("YT Player Error:", e); alert("Error playing YouTube video.")}
                         }
                     });
-                    this.dom.youtubePlayerPlaceholder.classList.remove('hidden');
                 } else {
                     this.dom.youtubePlayerPlaceholder.innerHTML = '<p style="color:var(--text-color-light); text-align:center; padding: 20px;">Loading YouTube Player...</p>';
-                    this.dom.youtubePlayerPlaceholder.classList.remove('hidden');
                 }
             } else if (this.data.currentVideoType === 'local') {
-                this.dom.timelineContainer.classList.remove('hidden');
+                this.dom.timelineContainer.style.display = 'block'; // Show custom timeline
+                this.dom.videoElement.classList.remove('hidden');
                 const objectURL = this.getLocalVideoObjectURL(videoData.id);
                 if (objectURL) {
                     this.data.videoElement.src = objectURL; 
-                    this.data.videoElement.classList.remove('hidden');
                 } else { 
                     this.promptForVideoFileOnLoggingScreen(videoData.filename); 
                 }
             }
         },
         onYouTubePlayerReady(event) {
-            console.log("Main YouTube Player Ready");
-            // Auto-update time can be done via setInterval or listening to state changes
-            // For simplicity, we can enable our custom controls if desired, or rely on YT's.
+            console.log("Main YouTube Player Ready on Screen 3");
              if (this.data.playPauseBtn) this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#9658;</span>Play';
-             this.updateYouTubeTimeDisplay();
+             this.updateYouTubeTimeDisplay(); // Initial time display
         },
         onYouTubePlayerStateChange(event) {
             if (this.data.currentVideoType !== 'youtube' || !this.data.youtubePlayer) return;
             
+            clearInterval(this.data._ytTimeUpdater); // Clear previous interval
             if (event.data === YT.PlayerState.PLAYING) {
                 if(this.data.playPauseBtn) this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#10074;&#10074;</span>Pause';
-                this._ytTimeUpdater = setInterval(() => this.updateYouTubeTimeDisplay(), 250);
+                this.data._ytTimeUpdater = setInterval(() => this.updateYouTubeTimeDisplay(), 250);
             } else {
                 if(this.data.playPauseBtn) this.data.playPauseBtn.innerHTML = '<span class="button-icon">&#9658;</span>Play';
-                clearInterval(this._ytTimeUpdater);
-                 if (event.data === YT.PlayerState.ENDED || event.data === YT.PlayerState.PAUSED) {
-                    this.updateYouTubeTimeDisplay(); // final update
+                 if (event.data === YT.PlayerState.ENDED || event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.CUED || event.data === YT.PlayerState.UNSTARTED) {
+                    this.updateYouTubeTimeDisplay(); 
                 }
             }
         },
         updateYouTubeTimeDisplay() {
             if (this.data.currentVideoType !== 'youtube' || !this.data.youtubePlayer || typeof this.data.youtubePlayer.getCurrentTime !== 'function') {
-                if(this.data.timecodeDisplay) this.data.timecodeDisplay.textContent = '00:00 / 00:00';
+                if(this.data.timecodeDisplay) this.data.timecodeDisplay.textContent = '00:00 / --:--'; // Indicate YT not ready
                 return;
             }
             const currentTime = this.data.youtubePlayer.getCurrentTime();
             const duration = this.data.youtubePlayer.getDuration();
             if(this.data.timecodeDisplay) this.data.timecodeDisplay.textContent = `${this.formatTime(currentTime)} / ${this.formatTime(duration)}`;
-            // Update mark in/out buttons based on YT player time
-            if (this.data.markInTime === 0 || this.data.markInBtn.classList.contains('default-mark')) { if(this.data.markInBtn) this.data.markInBtn.textContent = `Mark In (${this.formatTime(currentTime, true)})`; }
-            if (this.data.markOutTime === null || this.data.markOutBtn.classList.contains('default-mark')) { if(this.data.markOutBtn) this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(currentTime, true)})`; }
+            
+            if (this.data.markInBtn && (this.data.markInTime === 0 || this.data.markInBtn.classList.contains('default-mark'))) { this.data.markInBtn.textContent = `Mark In (${this.formatTime(currentTime, true)})`; }
+            if (this.data.markOutBtn && (this.data.markOutTime === null || this.data.markOutBtn.classList.contains('default-mark'))) { this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(currentTime, true)})`; }
         },
         setPlaybackSpeed(speed) {
             if (this.data.currentVideoType === 'local' && this.data.videoElement) {
                 this.data.videoElement.playbackRate = speed;
             } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer && typeof this.data.youtubePlayer.setPlaybackRate === 'function') {
-                this.data.youtubePlayer.setPlaybackRate(speed);
+                try { this.data.youtubePlayer.setPlaybackRate(speed); } catch (e) { console.warn("Could not set YT playback rate", e); }
             }
         },
-        promptForVideoFileOnLoggingScreen(filename) { /* ... Same ... */ 
+        promptForVideoFileOnLoggingScreen(filename) { 
             this.data.videoElement.classList.add('hidden'); 
             this.dom.videoFilePrompt.classList.remove('hidden'); 
             this.dom.videoFilePromptMessage.innerHTML = `To log "<strong>${this.escapeHtml(filename)}</strong>", please select the local file again for this session.`;
             this.dom.videoFileInputLogging.dataset.expectedFilename = filename; 
         },
-        handleVideoFileSelectionForLogging(file) { // For Screen 3 local file selection
+        handleVideoFileSelectionForLogging(file) { 
             const expectedFilename = this.dom.videoFileInputLogging.dataset.expectedFilename;
             if (file && file.name === expectedFilename) {
                 const objectURL = URL.createObjectURL(file); 
-                this.data.videoFileCache[this.data.currentVideoId] = objectURL; // Cache by videoId
+                this.data.videoFileCache[this.data.currentVideoId] = objectURL; 
                 this.data.videoElement.src = objectURL; 
                 this.dom.videoFilePrompt.classList.add('hidden'); 
                 this.data.videoElement.classList.remove('hidden'); 
@@ -1433,9 +1445,9 @@
             }
             this.dom.videoFileInputLogging.value = ''; 
         },
-        updateVideoTimes() { // Primarily for HTML5 video
+        updateVideoTimes() { 
             if (this.data.currentVideoType !== 'local' || !this.data.videoElement || !this.data.videoElement.duration || isNaN(this.data.videoElement.duration)) {
-                if (this.data.currentVideoType === 'local' && this.data.timecodeDisplay) { // Only clear if it's for local and no YT
+                if (this.data.currentVideoType === 'local' && this.data.timecodeDisplay) { 
                      this.data.timecodeDisplay.textContent = '00:00 / 00:00'; 
                      if(this.data.timelineProgress) this.data.timelineProgress.style.width = '0%';
                      if(this.data.markInBtn) this.data.markInBtn.textContent = `Mark In (00:00.0)`;
@@ -1446,8 +1458,8 @@
             const currentTime = this.data.videoElement.currentTime; const duration = this.data.videoElement.duration;
             if(this.data.timecodeDisplay) this.data.timecodeDisplay.textContent = `${this.formatTime(currentTime)} / ${this.formatTime(duration)}`;
             if(this.data.timelineProgress) this.data.timelineProgress.style.width = `${(currentTime / duration) * 100}%`;
-            if (this.data.markInTime === 0 || this.data.markInBtn.classList.contains('default-mark')) { if(this.data.markInBtn) this.data.markInBtn.textContent = `Mark In (${this.formatTime(currentTime, true)})`; }
-            if (this.data.markOutTime === null || this.data.markOutBtn.classList.contains('default-mark')) { if(this.data.markOutBtn) this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(currentTime, true)})`; }
+            if (this.data.markInBtn && (this.data.markInTime === 0 || this.data.markInBtn.classList.contains('default-mark'))) { this.data.markInBtn.textContent = `Mark In (${this.formatTime(currentTime, true)})`; }
+            if (this.data.markOutBtn && (this.data.markOutTime === null || this.data.markOutBtn.classList.contains('default-mark'))) { this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(currentTime, true)})`; }
         },
         togglePlayPause() { 
             if (this.data.currentVideoType === 'local') {
@@ -1458,7 +1470,7 @@
                 }
                 if (this.data.videoElement.paused || this.data.videoElement.ended) { this.data.videoElement.play().catch(e => console.error("Error playing video:", e)); } 
                 else { this.data.videoElement.pause(); }
-            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer) {
+            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer && typeof this.data.youtubePlayer.getPlayerState === 'function') {
                 const playerState = this.data.youtubePlayer.getPlayerState();
                 if (playerState === YT.PlayerState.PLAYING) {
                     this.data.youtubePlayer.pauseVideo();
@@ -1467,7 +1479,7 @@
                 }
             }
         },
-        seekVideo(event) { // Only for HTML5 video with custom timeline
+        seekVideo(event) { 
             if (this.data.currentVideoType !== 'local' || !this.data.videoElement.duration || !this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) return;
             const timelineRect = this.data.timelineContainer.getBoundingClientRect();
             const clickX = event.clientX - timelineRect.left;
@@ -1479,7 +1491,7 @@
             if (this.data.currentVideoType === 'local') {
                 if (!this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) { alert("Load video first."); return; }
                 currentTime = this.data.videoElement.currentTime;
-            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer) {
+            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer && typeof this.data.youtubePlayer.getCurrentTime === 'function') {
                 currentTime = this.data.youtubePlayer.getCurrentTime();
             } else { alert("Video not ready."); return; }
 
@@ -1487,12 +1499,12 @@
             if(this.data.markInBtn) {
                 this.data.markInBtn.textContent = `Mark In (${this.formatTime(this.data.markInTime, true)})`;
                 this.data.markInBtn.classList.remove('default-mark', 'button-secondary'); this.data.markInBtn.classList.add('button-primary'); 
-                setTimeout(() => { this.data.markInBtn.classList.remove('button-primary'); this.data.markInBtn.classList.add('button-secondary');}, 1000);
+                setTimeout(() => { if(this.data.markInBtn) {this.data.markInBtn.classList.remove('button-primary'); this.data.markInBtn.classList.add('button-secondary');}}, 1000);
             }
             if (this.data.markOutTime !== null && this.data.markOutTime < this.data.markInTime) {
                 this.data.markOutTime = null; 
                 if(this.data.markOutBtn) {
-                     this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(currentTime, true)})`; // Update with current time
+                     this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(currentTime, true)})`; 
                      this.data.markOutBtn.classList.add('default-mark');
                 }
             }
@@ -1502,7 +1514,7 @@
             if (this.data.currentVideoType === 'local') {
                 if (!this.data.videoElement.src || !this.dom.videoFilePrompt.classList.contains('hidden')) { alert("Load video first."); return; }
                 currentTime = this.data.videoElement.currentTime;
-            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer) {
+            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer && typeof this.data.youtubePlayer.getCurrentTime === 'function') {
                 currentTime = this.data.youtubePlayer.getCurrentTime();
             } else { alert("Video not ready."); return; }
 
@@ -1511,11 +1523,11 @@
             if(this.data.markOutBtn) {
                 this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(this.data.markOutTime, true)})`;
                 this.data.markOutBtn.classList.remove('default-mark', 'button-secondary'); this.data.markOutBtn.classList.add('button-primary');
-                setTimeout(() => { this.data.markOutBtn.classList.remove('button-primary'); this.data.markOutBtn.classList.add('button-secondary'); }, 1000);
+                setTimeout(() => { if(this.data.markOutBtn) {this.data.markOutBtn.classList.remove('button-primary'); this.data.markOutBtn.classList.add('button-secondary');} }, 1000);
             }
         },
-        handleStarRating(event) { /* ... Same ... */ if (event.target.classList.contains('star')) { this.data.currentRating = parseInt(event.target.dataset.value); this.updateStarDisplay(); } },
-        updateStarDisplay() { /* ... Same ... */ this.dom.logRatingContainer.querySelectorAll('.star').forEach(star => { star.classList.toggle('selected', parseInt(star.dataset.value) <= this.data.currentRating); }); },
+        handleStarRating(event) { if (event.target.classList.contains('star')) { this.data.currentRating = parseInt(event.target.dataset.value); this.updateStarDisplay(); } },
+        updateStarDisplay() { this.dom.logRatingContainer.querySelectorAll('.star').forEach(star => { star.classList.toggle('selected', parseInt(star.dataset.value) <= this.data.currentRating); }); },
         async saveLogEntry() { 
             const notes = this.dom.logNotes.value.trim();
             const keywordsRaw = this.dom.logKeywords.value.trim();
@@ -1535,7 +1547,7 @@
                     } else { console.warn("Local video not ready for thumbnail."); }
                 } catch (error) { console.error("Error generating thumbnail for local video:", error); }
             } else if (this.data.currentVideoType === 'youtube' && videoData && videoData.youtubeVideoId) {
-                thumbnail = `https://img.youtube.com/vi/${videoData.youtubeVideoId}/mqdefault.jpg`; // Default YT thumbnail
+                thumbnail = `https://img.youtube.com/vi/${videoData.youtubeVideoId}/mqdefault.jpg`; 
             }
             
             if (!videoData) { alert("Error: Video not found."); this.dom.saveLogBtn.disabled = false; this.dom.saveLogBtn.textContent = 'Save Log'; return; }
@@ -1549,10 +1561,9 @@
             this.saveData(); this.renderSavedLogsList(); this.resetLogForm();
             this.dom.saveLogBtn.disabled = false; this.dom.saveLogBtn.textContent = 'Save Log';
         },
-        generateLogThumbnail(time) { // Only for local HTML5 video
+        generateLogThumbnail(time) { 
             return new Promise((resolve, reject) => {
                 if (this.data.currentVideoType !== 'local' || !this.data.videoElement || !this.data.videoElement.src || this.data.videoElement.readyState < 2 || !this.dom.videoFilePrompt.classList.contains('hidden')) { return reject("Local video not ready for thumbnail."); }
-                // ... (rest of thumbnail generation logic same as before)
                 const video = this.data.videoElement; const canvas = this.dom.thumbnailCanvas; const ctx = canvas.getContext('2d');
                 const originalTime = video.currentTime; const originalPaused = video.paused; const originalMuted = video.muted; video.muted = true;
                 let seekTimeout; const cleanup = () => { video.removeEventListener('seeked', onSeeked); video.removeEventListener('error', onError); clearTimeout(seekTimeout); video.currentTime = originalTime; if (!originalPaused) video.play().catch(e=>console.warn("Resume play fail in cleanup:",e)); video.muted = originalMuted; };
@@ -1570,7 +1581,7 @@
             if (this.data.currentVideoType === 'local' && this.data.videoElement && this.data.videoElement.src && this.dom.videoFilePrompt.classList.contains('hidden')) {
                 defaultTime = this.data.videoElement.currentTime;
             } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer && typeof this.data.youtubePlayer.getCurrentTime === 'function') {
-                defaultTime = this.data.youtubePlayer.getCurrentTime();
+                try { defaultTime = this.data.youtubePlayer.getCurrentTime(); } catch(e) { defaultTime = 0; }
             }
             if(this.data.markInBtn) {
                 this.data.markInBtn.textContent = `Mark In (${this.formatTime(defaultTime, true)})`; 
@@ -1582,7 +1593,7 @@
             }
             this.dom.editingLogIdInput.value = ''; this.dom.saveLogBtn.textContent = 'Save Log';
         },
-        renderSavedLogsList() { /* ... Same, but thumbnails for YT will be default ones ... */ 
+        renderSavedLogsList() { 
             const video = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId); this.dom.savedLogsList.innerHTML = '';
             if (!video || !video.logs || video.logs.length === 0) { this.dom.savedLogsList.innerHTML = '<div class="empty-state" style="padding:20px; font-size:0.9em;"><p>No logs saved for this video yet.</p></div>'; return; }
             const sortedLogs = [...video.logs].sort((a, b) => a.markIn - b.markIn);
@@ -1590,10 +1601,12 @@
                 const item = document.createElement('div'); item.className = 'log-item'; item.id = `log-item-${log.id}`;
                 const ratingStars = Array(5).fill(0).map((_, i) => `<span class="star ${i < log.rating ? 'selected' : ''}">&#9733;</span>`).join('');
                  let logThumbnail = log.thumbnail;
-                 if (video.videoType === 'youtube' && video.youtubeVideoId && !log.thumbnail) { // Get default YT thumb if local not set
+                 if (video.videoType === 'youtube' && video.youtubeVideoId && !log.thumbnail) { 
                     logThumbnail = `https://img.youtube.com/vi/${video.youtubeVideoId}/mqdefault.jpg`;
-                 } else if (!log.thumbnail) {
+                 } else if (video.videoType === 'local' && !log.thumbnail) {
                     logThumbnail = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+                 } else if (!logThumbnail) {
+                     logThumbnail = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
                  }
 
                 item.innerHTML = `<div class="log-item-header"> <span class="log-item-time">${this.formatTime(log.markIn)} - ${this.formatTime(log.markOut)}</span> <div class="log-item-rating">${ratingStars}</div> </div> <p class="log-item-notes">${this.escapeHtml(log.notes)}</p> ${log.keywords && log.keywords.length > 0 ? `<p class="log-item-keywords">Keywords: ${this.escapeHtml(log.keywords.join(', '))}</p>` : ''} <img src="${logThumbnail}" alt="Log thumbnail"> <div class="card-actions" style="margin-top:10px;"> <button class="button button-subtle button-small btn-go-to-log-time" data-time="${log.markIn}">Go to</button> <button class="button button-secondary button-small btn-edit-log" data-log-id="${log.id}">Edit</button> <button class="button button-subtle button-small btn-delete-log" data-log-id="${log.id}">Delete</button> </div>`;
@@ -1613,24 +1626,23 @@
                     alert("Local video file not loaded. Please select it first."); 
                     this.promptForVideoFileOnLoggingScreen(currentVideoData?.filename || "the video file"); 
                 }
-            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer) {
-                this.data.youtubePlayer.seekTo(time, true);
-                this.data.youtubePlayer.playVideo();
-                this.dom.youtubePlayerPlaceholder.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else if (this.data.currentVideoType === 'youtube' && this.data.youtubePlayer && typeof this.data.youtubePlayer.seekTo === 'function') {
+                try {
+                    this.data.youtubePlayer.seekTo(time, true);
+                    this.data.youtubePlayer.playVideo();
+                    this.dom.youtubePlayerPlaceholder.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } catch (e) { console.error("Error seeking/playing YouTube video:", e); }
             }
         },
-        editLogEntry(logId, fromNavigation = false) { /* ... Same, relies on player being set up by renderVideoLoggingScreen ... */
+        editLogEntry(logId, fromNavigation = false) { 
             const videoIdForLog = this.data.currentVideoId; const log = this.getLogById(this.data.currentProjectId, videoIdForLog, logId); if (!log) return;
             this.dom.logNotes.value = log.notes; this.dom.logKeywords.value = log.keywords ? log.keywords.join(', ') : '';
             this.data.currentRating = log.rating; this.updateStarDisplay();
             this.data.markInTime = log.markIn; this.data.markOutTime = log.markOut;
             
-            // For HTML5, try to seek if loaded
             if (this.data.currentVideoType === 'local' && this.data.videoElement && this.data.videoElement.src && this.dom.videoFilePrompt.classList.contains('hidden')) { 
                 this.data.videoElement.currentTime = log.markIn; 
             } 
-            // For YouTube, seeking is handled by GoTo or when player is ready.
-            // Just update button text based on stored log times.
             this.data.markInBtn.textContent = `Mark In (${this.formatTime(log.markIn, true)})`;
             this.data.markOutBtn.textContent = `Mark Out (${this.formatTime(log.markOut, true)})`;
             this.data.markInBtn.classList.remove('default-mark'); this.data.markOutBtn.classList.remove('default-mark');
@@ -1638,18 +1650,18 @@
             this.dom.logNotes.focus();
             const logFormCard = this.dom.logNotes.closest('.card'); if (logFormCard) logFormCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
         },
-        confirmDeleteLogOnScreen3(logId) { /* ... Same ... */ 
+        confirmDeleteLogOnScreen3(logId) { 
             const log = this.getLogById(this.data.currentProjectId, this.data.currentVideoId, logId); if (!log) return;
             this.dom.confirmDeleteMessage.innerHTML = `Are you sure you want to delete this log entry? <br><small style="color:var(--text-color-light);">${this.escapeHtml(log.notes.substring(0,50))}...</small><br>This action cannot be undone.`;
             this.showModal('modal-confirm-delete');
             this.dom.btnConfirmDeleteConfirm.onclick = () => { this.deleteLogOnScreen3(logId); this.hideModal('modal-confirm-delete'); };
         },
-        deleteLogOnScreen3(logId) { /* ... Same ... */ 
+        deleteLogOnScreen3(logId) { 
             const video = this.getVideoById(this.data.currentProjectId, this.data.currentVideoId); if (!video || !video.logs) return;
             video.logs = video.logs.filter(l => l.id !== logId); this.saveData(); this.renderSavedLogsList();
             if(this.dom.editingLogIdInput.value === logId) { this.resetLogForm(); }
         },
-        highlightAndScrollToLog(logId) { /* ... Same ... */ 
+        highlightAndScrollToLog(logId) { 
             const logElement = document.getElementById(`log-item-${logId}`);
             if (logElement) {
                 this.dom.savedLogsList.querySelectorAll('.log-item').forEach(el => el.style.backgroundColor = '');
@@ -1660,7 +1672,7 @@
         },
         showModal(modalId) { const modal = document.getElementById(modalId); if (modal) modal.style.display = 'block'; },
         hideModal(modalId) { const modal = document.getElementById(modalId); if (modal) modal.style.display = 'none'; },
-        formatTime(seconds, includeMillis = false) { /* ... Same ... */ 
+        formatTime(seconds, includeMillis = false) { 
             if (isNaN(seconds) || seconds < 0) return includeMillis ? '00:00.0' : '00:00';
             const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60);
             const s = Math.floor(seconds % 60); const ms = Math.floor((seconds - Math.floor(seconds)) * 10); 
@@ -1668,13 +1680,13 @@
             timeStr += `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
             if (includeMillis) timeStr += `.${ms}`; return timeStr;
         },
-        escapeHtml(unsafe) { /* ... Same ... */ 
+        escapeHtml(unsafe) { 
             if (typeof unsafe !== 'string') return String(unsafe);
             return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
     };
 
-    document.addEventListener('DOMContentLoaded', () => { // No longer async, as init itself is not heavily async now
+    document.addEventListener('DOMContentLoaded', () => { 
         app.init();
     });
     </script>
